@@ -1,0 +1,36 @@
+{
+  "id": "data_science",
+  "name": "数据科学与机器学习知识库",
+  "description": "包含数据分析、机器学习、深度学习的理论和实践",
+  "category": "数据科学",
+  "documents": [
+    {
+      "id": "pandas_advanced",
+      "title": "Pandas高级数据处理",
+      "content": "MultiIndex处理多层索引数据。GroupBy操作进行分组聚合。窗口函数计算滚动统计。数据透视表重塑数据结构。向量化操作提高计算效率。",
+      "keywords": ["Pandas", "MultiIndex", "GroupBy", "窗口函数", "向量化"],
+      "difficulty": "intermediate"
+    },
+    {
+      "id": "ml_pipeline",
+      "title": "机器学习流水线",
+      "content": "特征工程提取有效特征。交叉验证评估模型性能。超参数调优优化模型。模型集成提高预测准确性。模型部署上线服务化。",
+      "keywords": ["特征工程", "交叉验证", "超参数", "模型集成", "模型部署"],
+      "difficulty": "advanced"
+    },
+    {
+      "id": "deep_learning_optimization",
+      "title": "深度学习优化技巧",
+      "content": "批量归一化加速训练收敛。Dropout防止过拟合。学习率调度策略。梯度裁剪避免梯度爆炸。混合精度训练节省显存。",
+      "keywords": ["批量归一化", "Dropout", "学习率", "梯度裁剪", "混合精度"],
+      "difficulty": "expert"
+    },
+    {
+      "id": "data_visualization",
+      "title": "数据可视化最佳实践",
+      "content": "选择合适的图表类型表达数据关系。颜色搭配遵循可访问性原则。交互式图表提升用户体验。仪表板设计突出关键指标。动画效果展示数据变化趋势。",
+      "keywords": ["数据可视化", "图表设计", "交互式", "仪表板", "动画"],
+      "difficulty": "intermediate"
+    }
+  ]
+}
