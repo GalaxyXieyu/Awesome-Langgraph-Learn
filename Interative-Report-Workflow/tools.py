@@ -40,7 +40,7 @@ def tavily_search(query: str, max_results: int = 5) -> List[Dict[str, Any]]:
         
         # 创建Tavily搜索工具
         search_tool = TavilySearchResults(
-            tavily_api_key="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",
+            tavily_api_key="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",
             max_results=max_results,
             search_depth="advanced",
             include_answer=True,

@@ -70,19 +70,19 @@ def create_agents():
         tools=get_search_tools(),
         prompt="""你是一个搜索专家。你的任务是帮助用户搜索信息。
 
-你的能力：
-- 使用web_search工具进行网络搜索
-- 分析搜索结果的相关性和质量
-- 提供准确、有用的信息摘要
+        你的能力：
+        - 使用web_search工具进行网络搜索
+        - 分析搜索结果的相关性和质量
+        - 提供准确、有用的信息摘要
 
-工作原则：
-1. 理解用户的搜索意图
-2. 选择合适的搜索关键词
-3. 分析和筛选搜索结果
-4. 提供清晰、结构化的信息摘要
+        工作原则：
+        1. 理解用户的搜索意图
+        2. 选择合适的搜索关键词
+        3. 分析和筛选搜索结果
+        4. 提供清晰、结构化的信息摘要
 
-请始终提供高质量、相关的搜索结果。"""
-    )
+        请始终提供高质量、相关的搜索结果。"""
+            )
     
     # Writing Agent - 专门负责写作
     writing_agent = create_react_agent(
@@ -90,19 +90,19 @@ def create_agents():
         tools=get_writing_tools(),
         prompt="""你是一个写作专家。你的任务是帮助用户生成高质量的内容。
 
-你的能力：
-- 使用content_writer工具生成各种风格的内容
-- 根据用户需求调整写作风格和长度
-- 创作结构清晰、逻辑严密的文章
+        你的能力：
+        - 使用content_writer工具生成各种风格的内容
+        - 根据用户需求调整写作风格和长度
+        - 创作结构清晰、逻辑严密的文章
 
-工作原则：
-1. 理解用户的写作需求和目标受众
-2. 选择合适的写作风格和结构
-3. 确保内容的准确性和可读性
-4. 提供有价值、有深度的内容
+        工作原则：
+        1. 理解用户的写作需求和目标受众
+        2. 选择合适的写作风格和结构
+        3. 确保内容的准确性和可读性
+        4. 提供有价值、有深度的内容
 
-请始终创作高质量、有价值的内容。"""
-    )
+        请始终创作高质量、有价值的内容。"""
+            )
     
     # Analysis Agent - 专门负责分析
     analysis_agent = create_react_agent(
@@ -110,19 +110,19 @@ def create_agents():
         tools=get_analysis_tools(),
         prompt="""你是一个分析专家。你的任务是帮助用户分析数据和文本。
 
-你的能力：
-- 使用text_analyzer工具进行文本分析
-- 使用calculator工具进行数学计算
-- 提供深入的分析见解和建议
+        你的能力：
+        - 使用text_analyzer工具进行文本分析
+        - 使用calculator工具进行数学计算
+        - 提供深入的分析见解和建议
 
-工作原则：
-1. 仔细理解分析需求
-2. 选择合适的分析方法和工具
-3. 提供准确、客观的分析结果
-4. 给出有价值的建议和见解
+        工作原则：
+        1. 仔细理解分析需求
+        2. 选择合适的分析方法和工具
+        3. 提供准确、客观的分析结果
+        4. 给出有价值的建议和见解
 
-请始终提供准确、有深度的分析结果。"""
-    )
+        请始终提供准确、有深度的分析结果。"""
+            )
     
     return {
         "search": search_agent,
@@ -248,11 +248,11 @@ async def intelligent_supervisor_node(state: MultiAgentState, config=None) -> Mu
 
         # 添加Supervisor的分析消息
         supervisor_message = f"""
-🧠 智能调度分析：
-- 决策：{next_action}
-- 理由：{reasoning}
-- 用户输入：{state.get('user_input', '')[:50]}...
-"""
+        🧠 智能调度分析：
+        - 决策：{next_action}
+        - 理由：{reasoning}
+        - 用户输入：{state.get('user_input', '')[:50]}...
+        """
 
         state["messages"] = state.get("messages", []) + [
             AIMessage(content=supervisor_message)
@@ -293,11 +293,7 @@ async def agent_execution_node(state: MultiAgentState, config=None) -> MultiAgen
         return state
 
     # 获取流式写入器
-    try:
-        writer = get_stream_writer()
-    except Exception:
-        writer = lambda _: None  # 如果无法获取writer，使用空函数
-
+    writer = get_stream_writer()
     try:
         writer({"step": f"{next_action}_agent", "status": f"开始执行{next_action}任务", "progress": 0})
 
@@ -396,10 +392,10 @@ async def agent_execution_node(state: MultiAgentState, config=None) -> MultiAgen
 
         # 添加执行结果消息
         execution_message = f"""
-🤖 {next_action.title()} Agent 执行完成：
-⏱️ 执行时间：{execution_time:.2f}秒
-📊 结果：{result_text[:300]}{'...' if len(result_text) > 300 else ''}
-"""
+            🤖 {next_action.title()} Agent 执行完成：
+            ⏱️ 执行时间：{execution_time:.2f}秒
+            📊 结果：{result_text[:300]}{'...' if len(result_text) > 300 else ''}
+            """
 
         state["messages"] = state.get("messages", []) + [
             AIMessage(content=execution_message)
@@ -432,12 +428,6 @@ async def agent_execution_node(state: MultiAgentState, config=None) -> MultiAgen
         return state
 
 # ============================================================================
-# 质量检查节点
-# ============================================================================
-
-
-
-# ============================================================================
 # 结果整合节点
 # ============================================================================
 
@@ -457,24 +447,23 @@ async def result_integration_node(state: MultiAgentState, config=None) -> MultiA
         # 构建结果整合提示
         integration_prompt = ChatPromptTemplate.from_messages([
             ("system", """你是一个结果整合专家。请将多个Agent的执行结果整合成一个完整、连贯的最终答案。
+            整合原则：
+            1. 保持信息的准确性和完整性
+            2. 确保逻辑清晰、结构合理
+            3. 去除重复信息，突出关键内容
+            4. 提供有价值的综合见解
 
-整合原则：
-1. 保持信息的准确性和完整性
-2. 确保逻辑清晰、结构合理
-3. 去除重复信息，突出关键内容
-4. 提供有价值的综合见解
+            请生成一个完整、专业的最终回答。"""),
+                        ("human", """
+            用户原始问题：{user_input}
 
-请生成一个完整、专业的最终回答。"""),
-            ("human", """
-用户原始问题：{user_input}
+            各Agent执行结果：
+            {agent_results}
 
-各Agent执行结果：
-{agent_results}
+            执行路径：{execution_path}
 
-执行路径：{execution_path}
-
-请整合以上信息，生成最终答案。
-""")
+            请整合以上信息，生成最终答案。
+            """)
         ])
 
         # 准备整合数据
@@ -519,16 +508,16 @@ async def result_integration_node(state: MultiAgentState, config=None) -> MultiA
 
         # 添加最终结果消息
         final_message = f"""
-🎯 最终整合结果：
+            🎯 最终整合结果：
 
-{final_result}
+            {final_result}
 
----
-📈 执行摘要：
-- 执行路径：{' → '.join(state.get('execution_path', []))}
-- 迭代次数：{state.get('iteration_count', 0)}
-- 参与Agent：{', '.join(agent_results.keys())}
-"""
+            ---
+            📈 执行摘要：
+            - 执行路径：{' → '.join(state.get('execution_path', []))}
+            - 迭代次数：{state.get('iteration_count', 0)}
+            - 参与Agent：{', '.join(agent_results.keys())}
+        """
 
         state["messages"] = state.get("messages", []) + [
             AIMessage(content=final_message)
@@ -618,7 +607,7 @@ def create_multi_agent_graph(checkpointer: Optional[InMemorySaver] = None):
     workflow.add_node("result_integration", result_integration_node)
 
     # 设置起始节点
-    workflow.add_edge(START, "supervisor")
+    workflow.add_edge(START, "supervisor") 
 
     # 添加条件路由
     workflow.add_conditional_edges(
@@ -829,71 +818,9 @@ def run_multi_agent_system(
     """
     return asyncio.run(run_multi_agent_system_async(user_input, max_iterations, context))
 
-async def test_async_system():
-    """测试异步多智能体系统"""
-    print("=== 异步智能多智能体系统测试 ===")
-
-    test_cases = [
-        "搜索Python最新特性并写一份分析报告",
-        "分析这句话的情感：今天天气真不错，我很开心",
-        "写一篇关于人工智能发展趋势的文章"
-    ]
-
-    for i, test_case in enumerate(test_cases, 1):
-        print(f"\n--- 异步测试案例 {i} ---")
-        print(f"用户输入: {test_case}")
-
-        # 测试异步执行
-        result = await run_multi_agent_system_async(test_case, max_iterations=3)
-
-        if result["success"]:
-            print(f"✅ 异步执行成功")
-            print(f"执行路径: {' → '.join(result['execution_path'])}")
-
-            print(f"执行时间: {result['execution_time']:.2f}秒")
-            print(f"最终结果: {result['final_result'][:200]}...")
-        else:
-            print(f"❌ 异步执行失败: {result['error_message']}")
-
-        print("-" * 80)
-
-async def test_streaming_system():
-    """测试流式输出系统"""
-    print("\n=== 流式输出测试 ===")
-
-    test_input = "搜索人工智能最新发展并分析"
-    print(f"用户输入: {test_input}")
-    print("开始流式执行...")
-
-    chunk_count = 0
-    async for chunk in stream_multi_agent_system(test_input, max_iterations=2):
-        chunk_count += 1
-        print(f"📦 流式块 {chunk_count}: {chunk['type']}")
-
-        if chunk['type'] == 'error':
-            print(f"❌ 错误: {chunk['error_message']}")
-            break
-        elif chunk['type'] == 'final':
-            print(f"🎯 最终结果完成，总执行时间: {chunk['summary']['total_execution_time']:.2f}秒")
-            break
-        else:
-            print(f"⏱️ 执行时间: {chunk['execution_time']:.2f}秒")
-
-    print("流式执行完成")
-
 if __name__ == "__main__":
-    # 测试同步版本（兼容性）
-    print("=== 同步兼容性测试 ===")
     result = run_multi_agent_system("计算 2+3*4 的结果", max_iterations=2)
     if result["success"]:
         print(f"✅ 同步执行成功: {result['final_result'][:100]}...")
     else:
         print(f"❌ 同步执行失败: {result['error_message']}")
-
-    # 运行异步测试
-    print("\n开始异步测试...")
-    asyncio.run(test_async_system())
-
-    # 运行流式测试
-    print("\n开始流式测试...")
-    asyncio.run(test_streaming_system())
