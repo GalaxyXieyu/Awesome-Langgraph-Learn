@@ -1,0 +1,64 @@
+# LangGraph 核心依赖
+langgraph>=0.2.74
+langchain-core>=0.3.0
+langchain-openai>=0.2.0
+
+# 存储后端依赖
+langgraph-checkpoint-redis>=1.0.0
+langgraph-checkpoint-postgres>=1.0.0
+langgraph-checkpoint-sqlite>=1.0.0
+
+# Redis 相关
+redis>=5.0.0
+hiredis>=2.0.0  # Redis性能优化
+
+# PostgreSQL 相关
+psycopg2-binary>=2.9.0
+sqlalchemy>=2.0.0
+
+# SQLite 相关 (Python内置，但可能需要额外工具)
+# sqlite3 # 内置模块
+
+# 异步支持
+asyncio-redis>=0.16.0
+asyncpg>=0.29.0  # PostgreSQL异步驱动
+
+# 配置管理
+pydantic>=2.0.0
+python-dotenv>=1.0.0
+
+# 监控和日志
+structlog>=23.0.0
+prometheus-client>=0.19.0
+
+# 测试依赖
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.0.0
+pytest-benchmark>=4.0.0
+
+# 开发工具
+black>=23.0.0
+isort>=5.12.0
+flake8>=6.0.0
+mypy>=1.5.0
+
+# 类型提示
+typing-extensions>=4.8.0
+
+# 工具库
+click>=8.1.0  # CLI工具
+rich>=13.0.0  # 美化输出
+tabulate>=0.9.0  # 表格输出
+
+# 可选：向量搜索支持
+# sentence-transformers>=2.2.0
+# faiss-cpu>=1.7.0
+
+# 可选：加密支持
+cryptography>=41.0.0
+pycryptodome>=3.19.0
+
+# 可选：性能分析
+memory-profiler>=0.61.0
+line-profiler>=4.1.0
