@@ -24,6 +24,14 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+def safe_get_stream_writer():
+    """安全获取流写入器，避免上下文错误"""
+    try:
+        return get_stream_writer()
+    except Exception:
+        # 如果没有流上下文，返回一个空的写入器
+        return lambda x: None
+
 # ============================================================================
 # 智能状态定义
 # ============================================================================
@@ -311,7 +319,7 @@ class AdaptiveResearchAgent:
 
 async def context_aware_planning_node(state: IntelligentSectionState, config=None) -> IntelligentSectionState:
     """🧠 上下文感知规划节点"""
-    writer = get_stream_writer()
+    writer = safe_get_stream_writer()
     writer({
         "step": "context_aware_planning",
         "status": "🧠 开始上下文感知规划",
@@ -376,7 +384,7 @@ async def context_aware_planning_node(state: IntelligentSectionState, config=Non
 
 async def initial_research_node(state: IntelligentSectionState, config=None) -> IntelligentSectionState:
     """🔍 初步研究节点"""
-    writer = get_stream_writer()
+    writer = safe_get_stream_writer()
     writer({
         "step": "initial_research",
         "status": "🔍 开始初步并行研究",
@@ -536,7 +544,7 @@ async def initial_research_node(state: IntelligentSectionState, config=None) -> 
 
 async def draft_content_generation_node(state: IntelligentSectionState, config=None) -> IntelligentSectionState:
     """📝 初稿内容生成节点"""
-    writer = get_stream_writer()
+    writer = safe_get_stream_writer()
     writer({
         "step": "draft_generation",
         "status": "📝 开始生成初稿内容",
@@ -657,7 +665,7 @@ async def draft_content_generation_node(state: IntelligentSectionState, config=N
 
 async def quality_assessment_node(state: IntelligentSectionState, config=None) -> IntelligentSectionState:
     """📊 智能质量评估节点"""
-    writer = get_stream_writer()
+    writer = safe_get_stream_writer()
     writer({
         "step": "quality_assessment",
         "status": "📊 开始智能质量评估",
@@ -773,7 +781,7 @@ def quality_decision_node(state: IntelligentSectionState) -> str:
 
 async def supplementary_research_node(state: IntelligentSectionState, config=None) -> IntelligentSectionState:
     """🎯 补充研究节点"""
-    writer = get_stream_writer()
+    writer = safe_get_stream_writer()
     writer({
         "step": "supplementary_research",
         "status": "🎯 开始补充研究",
@@ -937,7 +945,7 @@ async def supplementary_research_node(state: IntelligentSectionState, config=Non
 
 async def content_enhancement_node(state: IntelligentSectionState, config=None) -> IntelligentSectionState:
     """📝 内容增强节点"""
-    writer = get_stream_writer()
+    writer = safe_get_stream_writer()
     writer({
         "step": "content_enhancement",
         "status": "📝 开始内容增强",
@@ -1056,7 +1064,7 @@ async def content_enhancement_node(state: IntelligentSectionState, config=None) 
 
 async def content_polishing_node(state: IntelligentSectionState, config=None) -> IntelligentSectionState:
     """✨ 智能润色节点"""
-    writer = get_stream_writer()
+    writer = safe_get_stream_writer()
     writer({
         "step": "content_polishing",
         "status": "✨ 开始智能润色",
@@ -1174,7 +1182,7 @@ async def content_polishing_node(state: IntelligentSectionState, config=None) ->
 
 async def final_integration_node(state: IntelligentSectionState, config=None) -> IntelligentSectionState:
     """🎯 最终整合节点"""
-    writer = get_stream_writer()
+    writer = safe_get_stream_writer()
     writer({
         "step": "final_integration",
         "status": "🎯 开始最终整合",
