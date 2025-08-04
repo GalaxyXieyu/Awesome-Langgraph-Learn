@@ -171,6 +171,7 @@ class CreateTaskRequest(BaseModel):
     """创建任务请求"""
     config: WritingTaskConfig
     user_id: str
+    conversation_id: Optional[str] = Field(None, description="可选的会话ID，用于恢复现有会话")
 
 
 class CreateTaskResponse(BaseModel):
@@ -179,6 +180,8 @@ class CreateTaskResponse(BaseModel):
     session_id: str
     status: TaskStatus
     message: str = "任务创建成功"
+    is_resumed: bool = Field(False, description="是否为恢复的会话")
+    conversation_context: Optional[Dict[str, Any]] = Field(None, description="会话上下文信息")
 
 
 class TaskStatusResponse(BaseModel):
@@ -204,6 +207,7 @@ class InterruptResponseRequest(BaseModel):
     approved: bool = True
     feedback: Optional[str] = None
     modifications: Dict[str, Any] = Field(default_factory=dict)
+    interrupt_id: Optional[str] = None
 
 
 class SessionInfo(BaseModel):
@@ -304,3 +308,38 @@ class AppConfig(BaseModel):
     
     class Config:
         env_prefix = "APP_"
+
+
+# ============================================================================
+# 会话管理相关模型
+# ============================================================================
+
+class ConversationSummary(BaseModel):
+    """会话摘要模型"""
+    conversation_id: str
+    user_id: str
+    created_at: datetime
+    last_activity: datetime
+    statistics: Dict[str, int] = Field(description="统计信息")
+    can_resume: bool = Field(description="是否可以恢复")
+    last_task: Optional[Dict[str, Any]] = Field(None, description="最后一个任务")
+
+
+class ResumeValidationResponse(BaseModel):
+    """恢复验证响应"""
+    is_valid: bool
+    message: str
+    conversation_exists: bool = False
+    can_resume: bool = False
+    suggested_action: Optional[str] = None
+
+
+class ConversationContext(BaseModel):
+    """会话上下文模型"""
+    session_id: str
+    user_id: str
+    created_at: datetime
+    last_activity: datetime
+    total_tasks: int
+    recent_tasks: List[Dict[str, Any]] = Field(default_factory=list)
+    active_tasks: List[str] = Field(default_factory=list)

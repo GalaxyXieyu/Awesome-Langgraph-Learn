@@ -9,9 +9,9 @@ redis==5.0.1
 
 # LangGraph 和 AI
 langgraph==0.0.62
-langchain==0.1.0
-langchain-openai==0.0.2
-langchain-core==0.1.0
+langchain>=0.1.0
+langchain-openai>=0.0.2
+langchain-core>=0.2.0,<0.3
 
 # 数据处理
 pydantic==2.5.0

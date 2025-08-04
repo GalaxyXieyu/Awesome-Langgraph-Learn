@@ -5,6 +5,8 @@ FastAPI 主应用
 
 import json
 import uuid
+import logging
+import asyncio
 from typing import Dict, Any, Optional
 from datetime import datetime
 
@@ -13,15 +15,20 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from contextlib import asynccontextmanager
 
+# 抑制 asyncio 的 socket.send() 警告
+logging.getLogger('asyncio').setLevel(logging.ERROR)
+
 from ..models.schemas import (
     CreateTaskRequest, CreateTaskResponse, TaskStatusResponse,
     InterruptResponseRequest, SessionInfo, ErrorResponse,
-    WritingTaskConfig, WritingMode, WritingStyle, TaskStatus
+    WritingTaskConfig, WritingMode, WritingStyle, TaskStatus,
+    ConversationSummary, ResumeValidationResponse, ConversationContext
 )
 from ..celery_app.tasks import execute_writing_task, resume_writing_task, cancel_writing_task
 from ..utils.config import get_config
 from ..utils.redis_client import get_redis_client
 from ..utils.session_manager import get_session_manager
+from ..utils.conversation_service import get_conversation_service
 from ..utils.logger import get_logger, setup_logging
 
 # 设置日志
@@ -63,9 +70,9 @@ app = FastAPI(
 # 添加 CORS 中间件
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=config.cors_origins,
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_origins=["*"],  # 开发环境允许所有来源
+    allow_credentials=False,  # 设置为False以支持通配符
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -143,10 +150,10 @@ async def delete_session(session_id: str):
     try:
         session_manager = get_session_manager()
         success = await session_manager.delete_session(session_id)
-        
+
         if not success:
             raise HTTPException(status_code=404, detail="会话不存在")
-        
+
         return {"message": "会话已删除", "session_id": session_id}
     except HTTPException:
         raise
@@ -155,19 +162,93 @@ async def delete_session(session_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/v1/conversations/{conversation_id}/summary", response_model=ConversationSummary)
+async def get_conversation_summary(conversation_id: str):
+    """获取会话摘要"""
+    try:
+        conversation_service = get_conversation_service()
+        summary = await conversation_service.get_conversation_summary(conversation_id)
+
+        if not summary:
+            raise HTTPException(status_code=404, detail="会话不存在")
+
+        return ConversationSummary(**summary)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"获取会话摘要失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if 'conversation_service' in locals():
+            await conversation_service.close()
+
+
+@app.post("/api/v1/conversations/{conversation_id}/validate-resume", response_model=ResumeValidationResponse)
+async def validate_resume_request(conversation_id: str, task_id: Optional[str] = None):
+    """验证恢复请求"""
+    try:
+        conversation_service = get_conversation_service()
+        is_valid, message = await conversation_service.validate_resume_request(conversation_id, task_id)
+
+        # 获取额外信息
+        conversation_exists = await conversation_service.check_conversation_exists(conversation_id)
+
+        response = ResumeValidationResponse(
+            is_valid=is_valid,
+            message=message,
+            conversation_exists=conversation_exists,
+            can_resume=is_valid and conversation_exists
+        )
+
+        if not is_valid:
+            response.suggested_action = "create_new" if not conversation_exists else "check_task_status"
+
+        return response
+    except Exception as e:
+        logger.error(f"验证恢复请求失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if 'conversation_service' in locals():
+            await conversation_service.close()
+
+
 # ============================================================================
 # 任务管理 API
 # ============================================================================
 
 @app.post("/api/v1/tasks", response_model=CreateTaskResponse)
 async def create_task(request: CreateTaskRequest):
-    """创建写作任务"""
+    """创建写作任务（支持会话恢复）"""
     try:
-        # 生成任务和会话 ID
-        task_id = f"task_{uuid.uuid4().hex[:8]}"
-        session_id = f"session_{request.user_id}_{int(datetime.now().timestamp())}"
+        # 使用会话服务判断是恢复还是创建
+        conversation_service = get_conversation_service()
+        session_id, is_resumed = await conversation_service.should_resume_or_create(
+            request.conversation_id,
+            request.user_id
+        )
 
-        # 立即创建任务状态记录
+        # 生成任务 ID
+        task_id = f"task_{uuid.uuid4().hex[:8]}"
+
+        # 准备响应数据
+        response_data = {
+            "task_id": task_id,
+            "session_id": session_id,
+            "status": TaskStatus.PENDING,
+            "is_resumed": is_resumed
+        }
+
+        # 如果是恢复模式，获取会话上下文
+        if is_resumed:
+            logger.info(f"🔄 恢复会话模式: {session_id}")
+            context = await conversation_service.prepare_resume_context(session_id)
+            response_data["conversation_context"] = context
+            response_data["message"] = f"恢复会话成功，会话ID: {session_id}"
+        else:
+            logger.info(f"📝 创建新会话模式: {session_id}")
+            response_data["message"] = f"创建新任务成功，会话ID: {session_id}"
+
+        # 创建任务状态记录
         session_manager = get_session_manager()
         logger.info(f"正在创建任务状态记录: {task_id}")
 
@@ -184,7 +265,9 @@ async def create_task(request: CreateTaskRequest):
                 "status": "pending",
                 "current_step": "initializing",
                 "progress": 0,
-                "created_at": datetime.now().isoformat()
+                "created_at": datetime.now().isoformat(),
+                "is_resumed": is_resumed,
+                "original_conversation_id": request.conversation_id
             }
         )
 
@@ -205,21 +288,22 @@ async def create_task(request: CreateTaskRequest):
             user_id=request.user_id,
             session_id=session_id,
             task_id=task_id,
-            config_data=request.config.model_dump()
+            config_data=request.config.model_dump(),
+            is_resumed=is_resumed,
+            original_conversation_id=request.conversation_id
         )
 
         logger.info(f"创建写作任务: {task_id}, Celery任务: {celery_task.id}")
 
-        return CreateTaskResponse(
-            task_id=task_id,
-            session_id=session_id,
-            status=TaskStatus.PENDING,
-            message="任务已创建，正在处理中"
-        )
-        
+        return CreateTaskResponse(**response_data)
+
     except Exception as e:
         logger.error(f"创建任务失败: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        # 关闭会话服务连接
+        if 'conversation_service' in locals():
+            await conversation_service.close()
 
 
 @app.get("/api/v1/tasks/{task_id}", response_model=TaskStatusResponse)
@@ -288,20 +372,38 @@ async def get_task_status(task_id: str):
 @app.post("/api/v1/tasks/{task_id}/resume")
 async def resume_task(task_id: str, request: InterruptResponseRequest):
     """恢复任务（响应用户交互）"""
+    conversation_service = None
     try:
         # 获取任务信息
         session_manager = get_session_manager()
         task_data = await session_manager.get_task_status(task_id)
-        
+
         if not task_data:
             raise HTTPException(status_code=404, detail="任务不存在")
-        
+
         user_id = task_data.get("user_id")
         session_id = task_data.get("session_id")
-        
+
         if not user_id or not session_id:
             raise HTTPException(status_code=400, detail="任务信息不完整")
-        
+
+        # 使用会话服务验证恢复请求
+        conversation_service = get_conversation_service()
+        is_valid, validation_message = await conversation_service.validate_resume_request(session_id, task_id)
+
+        if not is_valid:
+            raise HTTPException(status_code=400, detail=f"恢复请求无效: {validation_message}")
+
+        # 检查任务状态是否支持恢复
+        task_status = task_data.get("status")
+        if task_status not in ["paused", "failed"]:
+            raise HTTPException(
+                status_code=400,
+                detail=f"任务状态不支持恢复: {task_status}。只有暂停或失败的任务可以恢复。"
+            )
+
+        logger.info(f"🔄 恢复任务验证通过: {task_id}, 状态: {task_status}")
+
         # 启动恢复任务
         celery_task = resume_writing_task.delay(
             user_id=user_id,
@@ -309,16 +411,25 @@ async def resume_task(task_id: str, request: InterruptResponseRequest):
             task_id=task_id,
             user_response=request.model_dump()
         )
-        
+
         logger.info(f"恢复写作任务: {task_id}, Celery任务: {celery_task.id}")
-        
-        return {"message": "任务已恢复", "task_id": task_id, "celery_task_id": celery_task.id}
-        
+
+        return {
+            "message": "任务已恢复",
+            "task_id": task_id,
+            "celery_task_id": celery_task.id,
+            "session_id": session_id,
+            "previous_status": task_status
+        }
+
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"恢复任务失败: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conversation_service:
+            await conversation_service.close()
 
 
 @app.delete("/api/v1/tasks/{task_id}")
@@ -345,7 +456,7 @@ async def cancel_task(task_id: str):
         logger.info(f"取消写作任务: {task_id}, Celery任务: {celery_task.id}")
         
         return {"message": "任务已取消", "task_id": task_id}
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -353,49 +464,124 @@ async def cancel_task(task_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/v1/users/{user_id}/tasks")
+async def get_user_tasks(user_id: str):
+    """获取用户的所有任务"""
+    try:
+        logger.info(f"获取用户任务列表: {user_id}")
+
+        session_manager = get_session_manager()
+        task_ids = await session_manager.get_user_tasks(user_id)
+
+        # 获取每个任务的详细信息
+        tasks = []
+        for task_id in task_ids:
+            task_data = await session_manager.get_task_status(task_id)
+            if task_data:
+                tasks.append(task_data)
+
+        return {"status": "success", "tasks": tasks, "count": len(tasks)}
+
+    except Exception as e:
+        logger.error(f"获取用户任务失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ============================================================================
 # 事件流 API (Server-Sent Events)
 # ============================================================================
 
-@app.get("/api/v1/events/{session_id}")
-async def get_event_stream(session_id: str):
-    """获取会话事件流 (Server-Sent Events)"""
-    
+@app.get("/api/v1/events/{conversation_id}")
+async def get_event_stream(conversation_id: str):
+    """获取会话事件流 (Server-Sent Events) - 支持新的 WorkflowAdapter 格式"""
+
     async def event_generator():
-        """事件生成器"""
+        """事件生成器 - 改进错误处理"""
         redis_client = get_redis_client()
-        stream_name = f"task_events:{session_id}"
+        # 使用新的流名称格式
+        stream_name = f"conversation_events:{conversation_id}"
         last_id = "0"
-        
+
         try:
             while True:
-                # 读取新事件
-                events = redis_client.xread({stream_name: last_id}, count=10, block=1000)
-                
-                if events:
-                    for stream, messages in events:
-                        for message_id, fields in messages:
-                            # 格式化为 SSE 格式
-                            event_data = {
-                                "id": message_id,
-                                "event_type": fields.get("event_type", "unknown"),
-                                "task_id": fields.get("task_id", ""),
-                                "timestamp": fields.get("timestamp", ""),
-                                "data": json.loads(fields.get("data", "{}"))
-                            }
-                            
-                            yield f"data: {json.dumps(event_data, ensure_ascii=False)}\n\n"
-                            last_id = message_id
-                else:
-                    # 发送心跳
-                    yield f"data: {json.dumps({'type': 'heartbeat', 'timestamp': datetime.now().isoformat()})}\n\n"
-                    
+                try:
+                    # 读取新事件
+                    events = redis_client.xread({stream_name: last_id}, count=10, block=1000)
+
+                    if events:
+                        for stream, messages in events:
+                            for message_id, fields in messages:
+                                try:
+                                    # 解析新格式的数据
+                                    event_type = fields.get("event_type", "unknown")
+                                    timestamp = fields.get("timestamp", "")
+                                    data_str = fields.get("data", "{}")
+
+                                    # 解析 JSON 数据
+                                    data = json.loads(data_str) if isinstance(data_str, str) else data_str
+
+                                    # 格式化为 SSE 格式
+                                    event_data = {
+                                        "id": message_id,
+                                        "event_type": event_type,
+                                        "conversation_id": conversation_id,
+                                        "timestamp": timestamp,
+                                        "step": data.get("step", "unknown"),
+                                        "status": data.get("status", ""),
+                                        "progress": data.get("progress", 0),
+                                        "data": data
+                                    }
+
+                                    try:
+                                        yield f"data: {json.dumps(event_data, ensure_ascii=False)}\n\n"
+                                        last_id = message_id
+                                    except (ConnectionResetError, BrokenPipeError, OSError) as e:
+                                        # 客户端断开连接，正常退出
+                                        logger.info(f"客户端断开连接: {conversation_id}")
+                                        return
+
+                                except Exception as e:
+                                    logger.error(f"解析事件数据失败: {e}, fields: {fields}")
+                                    continue
+                    else:
+                        # 发送心跳
+                        try:
+                            yield f"data: {json.dumps({'type': 'heartbeat', 'timestamp': datetime.now().isoformat()})}\n\n"
+                        except (ConnectionResetError, BrokenPipeError, OSError) as e:
+                            # 客户端断开连接，正常退出
+                            logger.info(f"客户端断开连接（心跳）: {conversation_id}")
+                            return
+
+                except Exception as e:
+                    logger.error(f"Redis 读取错误: {e}")
+                    # 短暂等待后重试
+                    import asyncio
+                    await asyncio.sleep(1)
+                    continue
+
         except Exception as e:
-            logger.error(f"事件流错误: {e}")
-            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
-    
+            logger.error(f"事件流严重错误: {e}")
+            try:
+                yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+            except:
+                # 如果连接已断开，忽略发送错误
+                pass
+
+    async def safe_event_generator():
+        """安全的事件生成器包装器"""
+        try:
+            async for chunk in event_generator():
+                yield chunk
+        except (ConnectionResetError, BrokenPipeError, OSError) as e:
+            # 客户端断开连接，静默处理
+            logger.debug(f"客户端断开连接: {conversation_id}")
+            return
+        except Exception as e:
+            logger.error(f"事件流异常: {e}")
+            return
+
     return StreamingResponse(
-        event_generator(),
+        safe_event_generator(),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
@@ -408,46 +594,102 @@ async def get_event_stream(session_id: str):
 
 @app.get("/api/v1/tasks/{task_id}/stream")
 async def stream_task_progress(task_id: str):
-    """任务进度流式接口"""
+    """任务进度流式接口 - 兼容新的 conversation_events 格式"""
     async def progress_generator():
+        # 获取任务信息以确定 conversation_id
+        session_manager = get_session_manager()
+        task_data = await session_manager.get_task_status(task_id)
+
+        if not task_data:
+            yield f"data: {json.dumps({'type': 'error', 'message': '任务不存在'})}\n\n"
+            return
+
+        # 确定 conversation_id
+        metadata = task_data.get("metadata", {})
+        original_conversation_id = metadata.get("original_conversation_id")
+        session_id = task_data.get("session_id")
+        conversation_id = original_conversation_id or session_id
+
         redis_client = get_redis_client()
-        stream_name = f"stream:{task_id}"
+        stream_name = f"conversation_events:{conversation_id}"
         last_id = "0"
 
         try:
             while True:
-                # 从 Redis 流中读取进度更新
                 try:
-                    events = redis_client.client.xread({stream_name: last_id}, count=10, block=1000)
-                except Exception:
+                    # 从 Redis 流中读取进度更新
+                    events = redis_client.xread({stream_name: last_id}, count=10, block=1000)
+                except Exception as e:
+                    logger.error(f"Redis 读取错误: {e}")
                     events = []
 
                 if events:
                     for stream, messages in events:
                         for message_id, fields in messages:
-                            # 解码字节数据
-                            data = fields.get(b"data", b"").decode() if isinstance(fields.get(b"data", b""), bytes) else fields.get("data", "")
-                            timestamp = fields.get(b"timestamp", b"").decode() if isinstance(fields.get(b"timestamp", b""), bytes) else fields.get("timestamp", "")
+                            try:
+                                # 解析新格式的数据
+                                event_type = fields.get("event_type", "unknown")
+                                timestamp = fields.get("timestamp", "")
+                                data_str = fields.get("data", "{}")
 
-                            event_data = {
-                                "id": message_id.decode() if isinstance(message_id, bytes) else message_id,
-                                "timestamp": timestamp,
-                                "task_id": task_id,
-                                "data": data
-                            }
+                                # 解析 JSON 数据
+                                data = json.loads(data_str) if isinstance(data_str, str) else data_str
 
-                            yield f"data: {json.dumps(event_data)}\n\n"
-                            last_id = message_id
+                                event_data = {
+                                    "id": message_id,
+                                    "event_type": event_type,
+                                    "timestamp": timestamp,
+                                    "task_id": task_id,
+                                    "conversation_id": conversation_id,
+                                    "step": data.get("step", "unknown"),
+                                    "status": data.get("status", ""),
+                                    "progress": data.get("progress", 0),
+                                    "data": data
+                                }
+
+                                try:
+                                    yield f"data: {json.dumps(event_data, ensure_ascii=False)}\n\n"
+                                    last_id = message_id
+                                except (ConnectionResetError, BrokenPipeError, OSError) as e:
+                                    # 客户端断开连接，正常退出
+                                    logger.info(f"客户端断开连接（任务流）: {task_id}")
+                                    return
+
+                            except Exception as e:
+                                logger.error(f"解析任务进度数据失败: {e}, fields: {fields}")
+                                continue
                 else:
                     # 发送心跳
-                    yield f"data: {json.dumps({'type': 'heartbeat', 'timestamp': datetime.now().isoformat()})}\n\n"
+                    try:
+                        yield f"data: {json.dumps({'type': 'heartbeat', 'timestamp': datetime.now().isoformat()})}\n\n"
+                    except (ConnectionResetError, BrokenPipeError, OSError) as e:
+                        # 客户端断开连接，正常退出
+                        logger.info(f"客户端断开连接（任务流心跳）: {task_id}")
+                        return
 
         except Exception as e:
-            logger.error(f"任务流式错误: {e}")
-            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+            logger.error(f"任务流式严重错误: {e}")
+            try:
+                yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+            except:
+                # 如果连接已断开，忽略发送错误
+                pass
+
+    async def safe_progress_generator():
+        """安全的进度生成器包装器"""
+        try:
+            async for chunk in progress_generator():
+                yield chunk
+        except (ConnectionResetError, BrokenPipeError, OSError) as e:
+            # 客户端断开连接，静默处理
+            logger.debug(f"客户端断开连接（任务流）: {task_id}")
+            return
+        except Exception as e:
+            logger.error(f"任务流异常: {e}")
+            return
 
     return StreamingResponse(
-        progress_generator(),
+        safe_progress_generator(),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

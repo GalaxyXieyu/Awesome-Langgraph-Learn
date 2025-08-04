@@ -7,7 +7,9 @@ import json
 import time
 import uuid
 import asyncio
-from typing import Dict, Any, Optional
+import sys
+import os
+from typing import Dict, Any, Optional, cast
 from datetime import datetime
 
 from ..models.schemas import WritingTaskState, TaskStatus, MessageType, StreamEvent
@@ -15,22 +17,11 @@ from ..utils.redis_client import RedisClient
 from ..utils.logger import get_logger
 from ..utils.config import get_config
 
-# 导入 LangGraph Redis checkpoint
-try:
-    from langgraph.checkpoint.redis import RedisSaver
-    REDIS_CHECKPOINT_AVAILABLE = True
-except ImportError:
-    from langgraph.checkpoint.memory import InMemorySaver
-    REDIS_CHECKPOINT_AVAILABLE = False
-
-# 导入 LangGraph 组件
-from langgraph.graph import StateGraph, START, END
-from langgraph.graph.message import add_messages
-from langchain_core.messages import BaseMessage
-from typing import TypedDict, List
-
 logger = get_logger(__name__)
 
+# 导入您的真正 Graph
+from ..graph.graph import create_writing_assistant_graph
+from langgraph.types import Command
 
 class CeleryStreamWriter:
     """
@@ -176,327 +167,325 @@ class InterruptManager:
 
 class WorkflowAdapter:
     """
-    工作流适配器
-    将 Interative-Report-Workflow 适配到 Celery 系统，使用 Redis checkpoint
+    工作流适配器 - 重新设计版本
+
+    核心职责：
+    1. 直接调用外部 Interactive-Report-Workflow 图
+    2. 处理流式输出适配到 Redis Streams
+    3. 管理中断检测和用户交互
+    4. 提供统一的执行和恢复接口
+
+    设计原则：
+    - 不重新构建图结构
+    - 不修改外部图的 checkpoint
+    - 只负责调用和数据转换
     """
 
-    def __init__(self, task_id: str, session_id: str, redis_client: RedisClient):
-        self.task_id = task_id
-        self.session_id = session_id
+    def __init__(self, conversation_id: str, redis_client: RedisClient):
+        self.conversation_id = conversation_id  # 作为 LangGraph 的 thread_id
         self.redis_client = redis_client
-        self.stream_writer = CeleryStreamWriter(task_id, session_id, redis_client)
-        self.interrupt_manager = InterruptManager(task_id, session_id, redis_client)
+        self.stream_writer = CeleryStreamWriter(conversation_id, conversation_id, redis_client)
+        self.interrupt_manager = InterruptManager(conversation_id, conversation_id, redis_client)
 
-        # 创建 Redis checkpoint
-        self.checkpointer = self._create_checkpointer()
+        # 直接使用外部图（已配置 Redis checkpoint）
+        self.graph = create_writing_assistant_graph()
 
-        # 创建 LangGraph 工作流
-        self.graph = self._create_compiled_graph()
+        logger.info(f"✅ WorkflowAdapter 初始化完成，conversation_id: {conversation_id}")
+        logger.info(f"📊 图类型: {type(self.graph)}")
 
-    def _create_checkpointer(self):
-        """创建 Redis checkpoint"""
+    async def execute_workflow(
+        self,
+        initial_state: Optional[Dict[str, Any]] = None,
+        resume_command: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        统一的工作流执行接口
+
+        Args:
+            initial_state: 初始状态（用于新任务）
+            resume_command: 恢复命令（用于恢复任务，如 "yes", "no"）
+
+        Returns:
+            执行结果，包含流式输出、中断信息等
+        """
         try:
-            if REDIS_CHECKPOINT_AVAILABLE:
-                config = get_config()
-                redis_url = f"redis://{config.redis.host}:{config.redis.port}/{config.redis.db}"
-                if config.redis.password:
-                    redis_url = f"redis://:{config.redis.password}@{config.redis.host}:{config.redis.port}/{config.redis.db}"
+            # 配置 LangGraph
+            config = {
+                "configurable": {"thread_id": self.conversation_id}
+            }
 
-                logger.info(f"使用 Redis checkpoint: {redis_url}")
-                return RedisSaver.from_conn_string(redis_url)
+            # 确定输入参数
+            if initial_state is not None and resume_command is not None:
+                # 恢复调用，但需要重建状态
+                input_data = Command(resume=resume_command)
+                logger.info(f"🔄 恢复工作流执行: {self.conversation_id}, command: {resume_command}")
+                logger.info(f"📝 重建状态，主题: {initial_state.get('topic', 'unknown')}")
+
+                # 确保 LangGraph 状态中包含所有必需字段
+                # 通过先更新状态，然后发送恢复命令
+                try:
+                    # 先尝试获取当前状态
+                    current_state = await self.graph.aget_state(config)
+                    if current_state and current_state.values:
+                        # 更新现有状态
+                        updated_state = {**current_state.values, **initial_state}
+                        await self.graph.aupdate_state(config, updated_state)
+                        logger.info(f"✅ 状态更新成功，包含字段: {list(updated_state.keys())}")
+                    else:
+                        # 如果没有现有状态，先初始化状态
+                        await self.graph.aupdate_state(config, initial_state)
+                        logger.info(f"✅ 状态初始化成功，包含字段: {list(initial_state.keys())}")
+                except Exception as e:
+                    logger.warning(f"⚠️ 状态更新失败，继续执行: {e}")
+
+            elif initial_state is not None:
+                # 初始调用
+                input_data = initial_state
+                logger.info(f"🚀 开始新的工作流执行: {self.conversation_id}")
+                logger.info(f"📝 初始状态: {initial_state.get('topic', 'unknown')}")
+            elif resume_command is not None:
+                # 纯恢复调用（不重建状态）
+                input_data = Command(resume=resume_command)
+                logger.info(f"🔄 恢复工作流执行: {self.conversation_id}, command: {resume_command}")
             else:
-                logger.warning("Redis checkpoint 不可用，使用内存存储")
-                return InMemorySaver()
-        except Exception as e:
-            logger.error(f"创建 checkpoint 失败: {e}")
-            return InMemorySaver()
+                raise ValueError("必须提供 initial_state 或 resume_command 之一")
 
-    def _create_compiled_graph(self):
-        """创建编译后的图，集成真正的 Interative-Report-Workflow"""
-        try:
-            # 导入真正的工作流
-            import sys
-            import os
-
-            # 添加 Interative-Report-Workflow 路径
-            workflow_path = os.path.join(os.path.dirname(__file__), "../../../Interative-Report-Workflow")
-            if workflow_path not in sys.path:
-                sys.path.append(workflow_path)
-
-            try:
-                # 暂时禁用原始工作流，因为有图结构错误
-                # from graph import create_writing_assistant_graph
-                # logger.info("✅ 成功导入 Interative-Report-Workflow")
-                #
-                # # 使用真正的工作流图
-                # graph = create_writing_assistant_graph()
-                #
-                # # 重新编译图以添加 checkpointer
-                # compiled_graph = graph.compile(checkpointer=self.checkpointer)
-                # logger.info("✅ 工作流图编译成功")
-                # return compiled_graph
-
-                logger.info("🔄 使用修复版简化工作流（支持真正的 interrupt）")
-                return self._create_interrupt_capable_graph()
-
-            except ImportError as e:
-                logger.warning(f"⚠️ 无法导入 Interative-Report-Workflow: {e}")
-                logger.info("🔄 使用简化版工作流")
-
-                # 回退到简化版本
-                return self._create_interrupt_capable_graph()
+            # 执行图并处理流式输出
+            return await self._execute_with_streaming(input_data, config)
 
         except Exception as e:
-            logger.error(f"创建工作流图失败: {e}")
+            logger.error(f"❌ 工作流执行失败: {e}")
             raise
 
-    def _create_interrupt_capable_graph(self):
-        """创建支持真正 interrupt 的工作流图"""
-        from langgraph.graph import StateGraph, START, END
-        from langgraph.graph.message import add_messages
-        from langchain_core.messages import BaseMessage
-        from typing import TypedDict, Annotated, List
+    async def _execute_with_streaming(
+        self,
+        input_data: Any,
+        config: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        执行图并处理流式输出
 
-        # 定义状态
-        class WritingState(TypedDict):
-            topic: str
-            user_id: str
-            max_words: int
-            style: str
-            language: str
-            mode: str
-            outline: Optional[Dict[str, Any]]
-            article: Optional[str]
-            search_results: List[Dict[str, Any]]
-            user_confirmation: Optional[str]
-            search_permission: Optional[str]
-            rag_permission: Optional[str]
-            messages: Annotated[List[BaseMessage], add_messages]
+        正确处理 LangGraph 的流式输出格式：
+        - ('custom', {...}): 自定义流式数据
+        - ('updates', {...}): 状态更新
+        - ('updates', {'__interrupt__': ...}): 中断信号
+        """
+        try:
+            final_result = None
+            interrupted = False
+            interrupt_info = None
 
-        # 创建工作流
-        workflow = StateGraph(WritingState)
+            # 使用正确的流式调用方式
+            async for chunk in self.graph.astream(
+                input_data,
+                cast(Any, config),
+                stream_mode=["custom", "updates"]
+            ):
+                logger.info(f"📊 流式输出: {chunk}")
 
-        # 节点函数
-        def generate_outline(state: WritingState) -> WritingState:
-            """生成大纲"""
-            outline = {
-                "title": f"关于{state['topic']}的深度研究报告",
-                "sections": [
-                    {
-                        "title": "概述",
-                        "description": f"{state['topic']}的基本概念和重要性",
-                        "key_points": [f"{state['topic']}的定义", "发展历程", "重要意义"]
-                    },
-                    {
-                        "title": "现状分析",
-                        "description": f"{state['topic']}的当前发展状况",
-                        "key_points": ["市场现状", "技术水平", "主要挑战"]
-                    },
-                    {
-                        "title": "技术细节",
-                        "description": f"{state['topic']}的核心技术和实现",
-                        "key_points": ["核心算法", "技术架构", "实现方案"]
-                    },
-                    {
-                        "title": "应用案例",
-                        "description": f"{state['topic']}的实际应用场景",
-                        "key_points": ["典型案例", "应用效果", "经验总结"]
-                    },
-                    {
-                        "title": "未来展望",
-                        "description": f"{state['topic']}的发展趋势和前景",
-                        "key_points": ["发展趋势", "技术突破", "应用前景"]
-                    }
-                ]
-            }
+                # 处理不同类型的流式输出
+                if isinstance(chunk, tuple) and len(chunk) == 2:
+                    stream_type, data = chunk
 
-            # 检查模式，如果是交互模式则触发中断
-            mode = state.get("mode")
-            logger.info(f"生成大纲节点: mode={mode}, topic={state.get('topic')}")
+                    if stream_type == "custom":
+                        # 处理自定义流式数据（进度、状态等）
+                        await self._handle_custom_stream(data)
 
-            if mode == "interactive":
-                logger.info(f"触发中断: 交互模式需要用户确认大纲")
-                from langgraph.errors import NodeInterrupt
-                raise NodeInterrupt(f"需要用户确认大纲: {outline['title']}")
+                    elif stream_type == "updates":
+                        # 处理状态更新
+                        if "__interrupt__" in data:
+                            # 检测到中断
+                            interrupted = True
+                            interrupt_info = data["__interrupt__"]
+                            logger.info(f"🛑 检测到中断: {interrupt_info}")
+                            break
+                        else:
+                            # 正常状态更新
+                            await self._handle_state_update(data)
+                            final_result = data
 
-            return {
-                **state,
-                "outline": outline
-            }
+                # 保存最终结果
+                if chunk and not interrupted:
+                    final_result = chunk
 
-        def write_article(state: WritingState) -> WritingState:
-            """写文章"""
-            outline = state.get("outline", {})
-            topic = state.get("topic", "未知主题")
-
-            # 简化的文章生成
-            article = f"# {outline.get('title', topic) if outline else topic}\n\n"
-
-            if outline:
-                sections = outline.get("sections", [])
-                for section in sections:
-                    article += f"## {section.get('title', '章节')}\n\n"
-                    article += f"{section.get('description', '内容描述')}...\n\n"
-
-            article += f"这是关于{topic}的详细分析和研究报告。"
-
-            return {
-                **state,
-                "article": article
-            }
-
-        # 添加节点
-        workflow.add_node("generate_outline", generate_outline)
-        workflow.add_node("write_article", write_article)
-
-        # 添加边
-        workflow.add_edge(START, "generate_outline")
-        workflow.add_edge("generate_outline", "write_article")
-        workflow.add_edge("write_article", END)
-
-        # 编译图（带 interrupt 支持）
-        return workflow.compile(
-            checkpointer=self.checkpointer,
-            interrupt_before=["write_article"]  # 在写文章前中断
-        )
-
-    def _create_simple_graph(self):
-        """创建简化版工作流图（带 interrupt 支持）"""
-        from langgraph.graph import StateGraph, START, END
-        from langgraph.graph.message import add_messages
-        from langchain_core.messages import BaseMessage
-        from typing import TypedDict, Annotated, List
-
-        # 定义状态
-        class WritingState(TypedDict):
-            topic: str
-            user_id: str
-            max_words: int
-            style: str
-            language: str
-            mode: str
-            outline: Optional[Dict[str, Any]]
-            article: Optional[str]
-            search_results: List[Dict[str, Any]]
-            user_confirmation: Optional[str]
-            search_permission: Optional[str]
-            rag_permission: Optional[str]
-            messages: Annotated[List[BaseMessage], add_messages]
-
-        # 创建工作流
-        workflow = StateGraph(WritingState)
-
-        # 节点函数
-        def generate_outline(state: WritingState) -> WritingState:
-            """生成大纲"""
-            outline = {
-                "title": f"关于{state['topic']}的深度研究报告",
-                "sections": [
-                    {
-                        "title": "概述",
-                        "description": f"{state['topic']}的基本概念和重要性",
-                        "key_points": [f"{state['topic']}的定义", "发展历程", "重要意义"]
-                    },
-                    {
-                        "title": "现状分析",
-                        "description": f"{state['topic']}的当前发展状况",
-                        "key_points": ["市场现状", "技术水平", "主要挑战"]
-                    },
-                    {
-                        "title": "技术细节",
-                        "description": f"{state['topic']}的核心技术和实现",
-                        "key_points": ["核心算法", "技术架构", "实现方案"]
-                    },
-                    {
-                        "title": "应用案例",
-                        "description": f"{state['topic']}的实际应用场景",
-                        "key_points": ["典型案例", "应用效果", "经验总结"]
-                    },
-                    {
-                        "title": "未来展望",
-                        "description": f"{state['topic']}的发展趋势和前景",
-                        "key_points": ["发展趋势", "技术突破", "应用前景"]
-                    }
-                ]
-            }
-
-            return {
-                **state,
-                "outline": outline,
-                "current_step": "awaiting_confirmation"
-            }
-
-        def check_confirmation(state: WritingState) -> str:
-            """检查用户确认"""
-            mode = state.get("mode", "interactive")
-            user_confirmation = state.get("user_confirmation")
-
-            logger.info(f"检查确认状态: mode={mode}, confirmation={user_confirmation}")
-
-            if mode == "copilot":
-                logger.info("自动模式，跳过确认")
-                return "write_article"  # 自动模式跳过确认
-
-            # 交互模式需要用户确认
-            if user_confirmation == "yes":
-                logger.info("用户确认，继续写文章")
-                return "write_article"
-            elif user_confirmation == "no":
-                logger.info("用户拒绝，重新生成大纲")
-                return "generate_outline"  # 重新生成大纲
+            # 返回执行结果
+            if interrupted:
+                return await self._handle_interrupt(interrupt_info)
             else:
-                logger.info("等待用户确认，中断工作流")
-                return "wait_confirmation"  # 等待用户确认
+                return self._format_completion_result(final_result)
 
-        def write_article(state: WritingState) -> WritingState:
-            """写文章"""
-            outline = state.get("outline", {})
-            topic = state.get("topic", "未知主题")
+        except Exception as e:
+            logger.error(f"❌ 流式执行失败: {e}")
+            raise
 
-            # 简化的文章生成
-            article = f"# {outline.get('title', topic)}\n\n"
+    async def _handle_custom_stream(self, data: Dict[str, Any]):
+        """处理自定义流式数据 - 直接使用外部图的格式"""
+        try:
+            logger.info(f"📥 开始处理流式数据: {data}")
 
-            sections = outline.get("sections", [])
-            for section in sections:
-                article += f"## {section.get('title', '章节')}\n\n"
-                article += f"{section.get('description', '内容描述')}...\n\n"
+            # 外部图已经提供了正确的格式，直接写入 Redis Streams
+            stream_name = f"conversation_events:{self.conversation_id}"
+            logger.info(f"📝 写入流名称: {stream_name}")
 
-            article += f"这是关于{topic}的详细分析和研究报告。"
+            # 添加 conversation_id 到数据中
+            enhanced_data = {
+                **data,
+                "conversation_id": self.conversation_id
+            }
+
+            # 准备写入 Redis 的数据
+            redis_data = {
+                "event_type": enhanced_data.get("event_type", "progress_update"),
+                "timestamp": str(enhanced_data.get("timestamp", datetime.now().timestamp())),
+                "data": json.dumps(enhanced_data, ensure_ascii=False, default=str)
+            }
+            logger.info(f"📋 Redis 数据: {redis_data}")
+
+            # 直接写入 Redis Streams
+            result = self.redis_client.xadd(stream_name, redis_data)
+            logger.info(f"📤 流式数据已写入: {result}, step: {data.get('step', 'unknown')}")
+
+        except Exception as e:
+            logger.error(f"❌ 处理流式数据失败: {e}")
+            import traceback
+            logger.error(f"❌ 详细错误: {traceback.format_exc()}")
+
+    async def _handle_state_update(self, data: Dict[str, Any]):
+        """处理状态更新 - 直接写入"""
+        try:
+            stream_name = f"conversation_events:{self.conversation_id}"
+
+            # 添加元数据
+            enhanced_data = {
+                **data,
+                "conversation_id": self.conversation_id,
+                "event_type": "state_update"
+            }
+
+            # 直接写入 Redis Streams
+            self.redis_client.xadd(
+                stream_name,
+                {
+                    "event_type": "state_update",
+                    "timestamp": datetime.now().timestamp(),
+                    "data": json.dumps(enhanced_data, ensure_ascii=False, default=str)
+                }
+            )
+
+            logger.debug(f"📤 状态更新已写入: {list(data.keys())}")
+
+        except Exception as e:
+            logger.error(f"❌ 处理状态更新失败: {e}")
+
+    async def _handle_interrupt(self, interrupt_info: Any) -> Dict[str, Any]:
+        """处理中断信号"""
+        try:
+            # 解析中断信息
+            if hasattr(interrupt_info, '__iter__') and len(interrupt_info) > 0:
+                interrupt_data = interrupt_info[0]
+                if hasattr(interrupt_data, 'value'):
+                    interrupt_value = interrupt_data.value
+                else:
+                    interrupt_value = interrupt_data
+            else:
+                interrupt_value = interrupt_info
+
+            # 创建中断事件 - 修复格式以匹配前端期望
+            interrupt_id = str(uuid.uuid4())
+            interrupt_event = {
+                "event_type": "interrupt_request",
+                "conversation_id": self.conversation_id,
+                "timestamp": datetime.now().isoformat(),
+                "data": {
+                    "interrupt_id": interrupt_id,
+                    "interrupt_type": interrupt_value.get("type", "confirmation"),  # 前端期望 interrupt_type
+                    "title": interrupt_value.get("message", "需要用户确认"),      # 前端期望 title
+                    "message": interrupt_value.get("instructions", "请回复 yes 或 no"),  # 详细消息
+                    "timeout": 300
+                }
+            }
+
+            # 写入 Redis Streams
+            stream_name = f"conversation_events:{self.conversation_id}"
+            self.redis_client.xadd(
+                stream_name,
+                {
+                    "event_type": interrupt_event["event_type"],
+                    "timestamp": interrupt_event["timestamp"],
+                    "data": json.dumps(interrupt_event["data"], ensure_ascii=False, default=str)
+                }
+            )
+
+            logger.info(f"🛑 中断事件已发送: {interrupt_event['data']['interrupt_type']}")
 
             return {
-                **state,
-                "article": article,
-                "current_step": "completed"
+                "completed": False,
+                "interrupted": True,
+                "interrupt_id": interrupt_event["data"]["interrupt_id"],
+                "interrupt_type": interrupt_event["data"]["interrupt_type"],
+                "title": interrupt_event["data"]["title"],
+                "message": interrupt_event["data"]["message"]
             }
 
-        # 添加节点
-        workflow.add_node("generate_outline", generate_outline)
-        workflow.add_node("write_article", write_article)
-
-        # 添加边
-        workflow.add_edge(START, "generate_outline")
-        workflow.add_conditional_edges(
-            "generate_outline",
-            check_confirmation,
-            {
-                "write_article": "write_article",
-                "generate_outline": "generate_outline",
-                "wait_confirmation": END  # 中断等待用户确认
+        except Exception as e:
+            logger.error(f"❌ 处理中断失败: {e}")
+            return {
+                "completed": False,
+                "interrupted": True,
+                "error": f"处理中断失败: {e}"
             }
-        )
-        workflow.add_edge("write_article", END)
 
-        # 编译图（带 interrupt）
-        # 注意：interrupt_before 只在特定条件下生效
-        return workflow.compile(
-            checkpointer=self.checkpointer
-            # interrupt_before=["write_article"]  # 暂时注释，使用条件中断
-        )
+    def _format_completion_result(self, final_result: Any) -> Dict[str, Any]:
+        """格式化完成结果"""
+        try:
+            if isinstance(final_result, tuple) and len(final_result) == 2:
+                _, data = final_result
+            else:
+                data = final_result
+
+            # 提取关键信息
+            result = {
+                "completed": True,
+                "interrupted": False,
+                "conversation_id": self.conversation_id
+            }
+
+            if isinstance(data, dict):
+                # 提取常见字段
+                if "article_generation" in data:
+                    article_data = data["article_generation"]
+                    result.update({
+                        "outline": article_data.get("outline"),
+                        "article": article_data.get("article"),
+                        "topic": article_data.get("topic"),
+                        "search_results": article_data.get("search_results", [])
+                    })
+                else:
+                    # 直接使用数据
+                    result.update({
+                        "outline": data.get("outline"),
+                        "article": data.get("article"),
+                        "topic": data.get("topic"),
+                        "search_results": data.get("search_results", [])
+                    })
+
+            logger.info(f"✅ 工作流执行完成: {self.conversation_id}")
+            return result
+
+        except Exception as e:
+            logger.error(f"❌ 格式化完成结果失败: {e}")
+            return {
+                "completed": True,
+                "interrupted": False,
+                "conversation_id": self.conversation_id,
+                "error": f"格式化结果失败: {e}"
+            }
 
     async def execute_writing_workflow(
         self,
         initial_state: Dict[str, Any],
-        task_state: WritingTaskState
+        task_state: WritingTaskState,
+        is_resumed: bool = False
     ) -> Dict[str, Any]:
         """
         执行写作工作流（支持 interrupt 和 streaming）
@@ -525,7 +514,8 @@ class WorkflowAdapter:
             interrupted = False
 
             try:
-                async for chunk in self.graph.astream(initial_state, config=config):
+                # 使用您的真正 Graph 的调用方式
+                async for chunk in self.graph.astream(initial_state, cast(Any, config), stream_mode=["custom", "updates"]):
                     logger.info(f"工作流步骤: {chunk}")
 
                     # 处理流式输出
@@ -598,56 +588,54 @@ class WorkflowAdapter:
                 "configurable": {"thread_id": self.session_id}
             }
 
-            # 处理用户响应，更新状态
+            # 处理用户响应
             response_type = user_response.get("response", "")
             approved = user_response.get("approved", False)
 
-            # 构建更新的状态
-            updated_state = {}
-
-            if response_type == "确认继续" or approved:
-                updated_state["user_confirmation"] = "yes"
+            # 根据用户响应决定 resume 参数
+            if response_type == "确认继续" or approved or "yes" in response_type.lower():
+                resume_value = "yes"
             else:
-                updated_state["user_confirmation"] = "no"
+                resume_value = "no"
 
-            # 使用 LangGraph 的 update_state 更新状态
-            try:
-                # 更新图的状态
+            logger.info(f"🔄 使用 Command 恢复工作流: resume={resume_value}")
+
+            # 使用您的 Graph 的 Command 方式恢复
+            if REAL_GRAPH_AVAILABLE and Command:
+                # 使用 Command(resume="yes") 的方式
+                final_result = None
+                async for chunk in self.graph.astream(Command(resume=resume_value), cast(Any, config), stream_mode=["custom", "updates"]):
+                    logger.info(f"恢复工作流步骤: {chunk}")
+                    if chunk:
+                        final_result = chunk
+
+                result = final_result
+            else:
+                # 回退到传统方式
+                updated_state = {"user_confirmation": resume_value}
                 self.graph.update_state(config, updated_state)
-                logger.info(f"✅ 状态更新成功: {updated_state}")
-
-                # 继续执行图
                 result = await self.graph.ainvoke(None, config=config)
 
-                # 检查是否完成
-                if result.get("current_step") == "completed":
-                    logger.info(f"工作流恢复执行完成: {self.task_id}")
-                    return {
-                        "completed": True,
-                        "outline": result.get("outline"),
-                        "article": result.get("article"),
-                        "search_results": result.get("search_results", []),
-                        "state": result
-                    }
-                else:
-                    # 可能还有其他中断
-                    logger.info(f"工作流仍在等待: {result.get('current_step')}")
-                    return {
-                        "completed": False,
-                        "paused": True,
-                        "current_step": result.get("current_step", "waiting"),
-                        "progress": 75,
-                        "state": result
-                    }
-
-            except Exception as e:
-                logger.error(f"使用 checkpoint 恢复失败: {e}")
-                # 回退到重新执行
-                logger.info("回退到重新执行工作流")
-
-                # 重建完整状态
-                full_state = self._rebuild_state_from_task(task_state, user_response)
-                return await self.execute_writing_workflow(full_state, task_state)
+            # 检查是否完成
+            if result and result.get("current_step") == "completed":
+                logger.info(f"工作流恢复执行完成: {self.task_id}")
+                return {
+                    "completed": True,
+                    "outline": result.get("outline"),
+                    "article": result.get("article"),
+                    "search_results": result.get("search_results", []),
+                    "state": result
+                }
+            else:
+                # 可能还有其他中断
+                logger.info(f"工作流仍在等待: {result.get('current_step') if result else 'unknown'}")
+                return {
+                    "completed": False,
+                    "paused": True,
+                    "current_step": result.get("current_step", "waiting") if result else "waiting",
+                    "progress": 75,
+                    "state": result or {}
+                }
 
         except Exception as e:
             logger.error(f"恢复工作流失败: {e}")

@@ -12,7 +12,7 @@ from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.pydantic_v1 import BaseModel, Field
-from tools import tavily_search, validate_outline, format_article
+from .tools import tavily_search, validate_outline, format_article
 import logging
 import time
 from langgraph.config import get_stream_writer
@@ -101,7 +101,13 @@ async def generate_outline_node(state: WritingState, config=None) -> WritingStat
     大纲生成节点 - 修复流式处理
     """
     writer = get_stream_writer()
-    writer({"step": "outline_generation", "status": "开始生成大纲", "progress": 0})
+    writer({
+        "event_type": "progress_update",
+        "step": "outline_generation",
+        "status": "开始生成大纲",
+        "progress": 0,
+        "timestamp": time.time()
+    })
 
     parser = JsonOutputParser(pydantic_object=ArticleOutline)
     
@@ -120,7 +126,13 @@ async def generate_outline_node(state: WritingState, config=None) -> WritingStat
 
     llm_chain = outline_prompt | create_llm() | parser
     
-    writer({"step": "outline_generation", "status": "正在生成大纲", "progress": 50})
+    writer({
+        "event_type": "progress_update",
+        "step": "outline_generation",
+        "status": "正在生成大纲",
+        "progress": 50,
+        "timestamp": time.time()
+    })
 
     input_data = {
         "topic": state['topic'],
@@ -172,11 +184,13 @@ async def generate_outline_node(state: WritingState, config=None) -> WritingStat
     validation_result = validate_outline.invoke({"outline": outline})
 
     writer({
+        "event_type": "progress_update",
         "step": "outline_generation",
         "status": "大纲生成完成",
         "progress": 100,
         "outline": outline,
-        "validation_score": validation_result.get('score', 0)
+        "validation_score": validation_result.get('score', 0),
+        "timestamp": time.time()
     })
 
     # 更新状态
@@ -554,10 +568,12 @@ def should_continue_after_search(_: WritingState) -> str:
     """
     return "article_generation"
 
-def create_writing_assistant_graph():
+def create_writing_assistant_graph(custom_stream_writer=None):
     """
-    创建智能写作助手的状态图 - 简化版本
-    所有节点都会中断让用户确认
+    创建智能写作助手的状态图 - 支持自定义流式写入器
+
+    Args:
+        custom_stream_writer: 自定义流式写入器函数，用于将流式数据写入 Redis Streams
 
     Returns:
         编译后的状态图
@@ -620,12 +636,33 @@ def create_writing_assistant_graph():
     workflow.add_edge("article_generation", END)
 
     # 配置checkpointer以支持状态持久化
-    memory = InMemorySaver()
+    try:
+        # 尝试使用 Redis checkpoint（生产环境）
+        from langgraph.checkpoint.redis import RedisSaver
+        from ..utils.config import get_config
 
-    # 编译图
-    app = workflow.compile(
-        checkpointer=memory
-    )
+        config = get_config()
+        redis_url = f"redis://{config.redis.host}:{config.redis.port}/{config.redis.db}"
+        if config.redis.password:
+            redis_url = f"redis://:{config.redis.password}@{config.redis.host}:{config.redis.port}/{config.redis.db}"
+
+        checkpointer = RedisSaver.from_conn_string(redis_url)
+        logger.info(f"✅ 使用 Redis checkpoint: {redis_url}")
+
+    except Exception as e:
+        # 回退到内存 checkpoint（开发环境）
+        checkpointer = InMemorySaver()
+        logger.warning(f"⚠️ Redis checkpoint 不可用，回退到内存 checkpoint: {e}")
+
+    # 编译图，支持自定义流式写入器
+    compile_config = {"checkpointer": checkpointer}
+
+    # 如果提供了自定义流式写入器，配置到编译选项中
+    if custom_stream_writer:
+        compile_config["stream_writer"] = custom_stream_writer
+        logger.info("✅ 配置自定义流式写入器（Redis Streams）")
+
+    app = workflow.compile(**compile_config)
 
     return app
 

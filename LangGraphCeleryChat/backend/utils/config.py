@@ -42,7 +42,7 @@ def get_config() -> AppConfig:
         jwt_secret_key=os.getenv("JWT_SECRET_KEY", "your-secret-key-change-in-production"),
         jwt_algorithm=os.getenv("JWT_ALGORITHM", "HS256"),
         jwt_expire_minutes=int(os.getenv("JWT_EXPIRE_MINUTES", "1440")),
-        cors_origins=os.getenv("CORS_ORIGINS", "http://localhost:3000,https://yourdomain.com").split(","),
+        cors_origins=os.getenv("CORS_ORIGINS", "http://localhost:3000,https://yourdomain.com,file://,null").split(","),
         task_timeout=int(os.getenv("TASK_TIMEOUT", "3600")),
         max_concurrent_tasks=int(os.getenv("MAX_CONCURRENT_TASKS", "10"))
     )

@@ -21,7 +21,7 @@ logger = get_logger(__name__)
 
 
 @celery_app.task(bind=True)
-def execute_writing_task(self, user_id: str, session_id: str, task_id: str, config_data: Dict[str, Any]):
+def execute_writing_task(self, user_id: str, session_id: str, task_id: str, config_data: Dict[str, Any], is_resumed: bool = False, original_conversation_id: Optional[str] = None):
     """
     异步执行写作任务，基于 Interative-Report-Workflow
     
@@ -63,13 +63,13 @@ def execute_writing_task(self, user_id: str, session_id: str, task_id: str, conf
                 metadata=task_state.dict()
             )
             
-            # 创建工作流适配器
+            # 创建工作流适配器（使用 conversation_id 作为统一标识）
+            conversation_id = original_conversation_id or session_id
             workflow_adapter = WorkflowAdapter(
-                task_id=task_id,
-                session_id=session_id,
+                conversation_id=conversation_id,
                 redis_client=get_redis_client()
             )
-            
+
             # 准备初始状态（基于 Interative-Report-Workflow 的 WritingState）
             initial_state = {
                 "topic": config.topic,
@@ -86,41 +86,64 @@ def execute_writing_task(self, user_id: str, session_id: str, task_id: str, conf
                 "rag_permission": None,
                 "messages": []
             }
-            
-            # 执行工作流
+
+            # 执行工作流（使用新的统一接口）
             logger.info(f"开始执行写作任务: {task_id}, 主题: {config.topic}")
-            
-            result = await workflow_adapter.execute_writing_workflow(
-                initial_state=initial_state,
-                task_state=task_state
+
+            result = await workflow_adapter.execute_workflow(
+                initial_state=initial_state
             )
             
-            # 更新最终结果
-            task_dict = task_state.dict()
-            task_dict.update({
-                "status": TaskStatus.COMPLETED,
-                "current_step": "completed",
-                "progress": 100,
-                "outline": result.get("outline"),
-                "article": result.get("article"),
-                "search_results": result.get("search_results", []),
-                "word_count": len(result.get("article") or ""),
-                "generation_time": time.time() - task_state.created_at.timestamp(),
-                "completed_at": datetime.now()
-            })
-            final_state = WritingTaskState(**task_dict)
-            
-            # 更新任务状态为完成
-            await session_manager.set_task_status(
-                task_id=task_id,
-                status="completed",
-                result=final_state.dict(),
-                user_id=user_id,
-                session_id=session_id
-            )
-            
-            logger.info(f"写作任务完成: {task_id}")
-            return final_state.dict()
+            # 处理执行结果
+            if result.get("completed", False):
+                # 任务完成
+                task_dict = task_state.dict()
+                task_dict.update({
+                    "status": TaskStatus.COMPLETED,
+                    "current_step": "completed",
+                    "progress": 100,
+                    "outline": result.get("outline"),
+                    "article": result.get("article"),
+                    "search_results": result.get("search_results", []),
+                    "word_count": len(result.get("article") or ""),
+                    "generation_time": time.time() - task_state.created_at.timestamp(),
+                    "completed_at": datetime.now()
+                })
+                final_state = WritingTaskState(**task_dict)
+
+                # 更新任务状态为完成
+                await session_manager.set_task_status(
+                    task_id=task_id,
+                    status="completed",
+                    result=final_state.dict(),
+                    user_id=user_id,
+                    session_id=session_id
+                )
+
+                logger.info(f"写作任务完成: {task_id}")
+                return final_state.dict()
+            else:
+                # 任务被中断，等待用户交互
+                task_dict = task_state.dict()
+                task_dict.update({
+                    "status": TaskStatus.PAUSED,
+                    "current_step": result.get("interrupt_type", "waiting"),
+                    "progress": result.get("progress", task_state.progress),
+                    "updated_at": datetime.now()
+                })
+                paused_state = WritingTaskState(**task_dict)
+
+                # 更新任务状态为暂停
+                await session_manager.set_task_status(
+                    task_id=task_id,
+                    status="paused",
+                    metadata=paused_state.dict(),
+                    user_id=user_id,
+                    session_id=session_id
+                )
+
+                logger.info(f"写作任务暂停，等待用户交互: {task_id}")
+                return paused_state.dict()
             
         except Exception as e:
             logger.error(f"执行写作任务失败: {task_id}, 错误: {str(e)}")
@@ -184,19 +207,44 @@ def resume_writing_task(self, user_id: str, session_id: str, task_id: str, user_
                 metadata=task_state.dict()
             )
             
-            # 创建工作流适配器
+            # 创建工作流适配器（使用相同的 conversation_id）
+            metadata = task_data.get("metadata", {})
+            original_conversation_id = metadata.get("original_conversation_id")
+            conversation_id = original_conversation_id or session_id
+
             workflow_adapter = WorkflowAdapter(
-                task_id=task_id,
-                session_id=session_id,
+                conversation_id=conversation_id,
                 redis_client=get_redis_client()
             )
-            
-            # 处理用户响应并恢复工作流
+
+            # 处理用户响应并恢复工作流（使用新的统一接口）
             logger.info(f"恢复写作任务: {task_id}, 用户响应: {user_response}")
-            
-            result = await workflow_adapter.resume_writing_workflow(
-                task_state=task_state,
-                user_response=user_response
+
+            # 提取用户响应命令
+            resume_command = user_response.get("response", "yes")  # 默认为 yes
+
+            # 重建工作流状态，确保包含所有必需字段
+            initial_state = {
+                "topic": task_state.config.topic,
+                "user_id": task_state.user_id,
+                "max_words": task_state.config.max_words,
+                "style": task_state.config.style.value,
+                "language": task_state.config.language,
+                "mode": task_state.config.mode.value,
+                "outline": task_state.outline.model_dump() if task_state.outline else None,
+                "article": task_state.article,
+                "search_results": [sr.model_dump() for sr in task_state.search_results] if task_state.search_results else [],
+                "user_confirmation": task_state.user_confirmation,
+                "search_permission": task_state.search_permission,
+                "rag_permission": task_state.rag_permission,
+                "messages": []
+            }
+
+            logger.info(f"🔄 重建工作流状态，主题: {initial_state['topic']}, 模式: {initial_state['mode']}")
+
+            result = await workflow_adapter.execute_workflow(
+                initial_state=initial_state,
+                resume_command=resume_command
             )
             
             # 更新最终结果
