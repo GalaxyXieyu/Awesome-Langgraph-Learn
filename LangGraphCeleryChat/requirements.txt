@@ -1,42 +1,12 @@
-# Web 框架
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
-python-multipart==0.0.6
-
-# 异步任务队列
-celery==5.3.4
-redis==5.0.1
-
-# LangGraph 和 AI
-langgraph==0.0.62
+# LangGraph Celery Chat - 优化版依赖
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+celery>=5.3.0
+redis>=5.0.0
+pydantic>=2.0.0
+python-multipart
+langgraph>=0.0.62
 langchain>=0.1.0
-langchain-openai>=0.0.2
-langchain-core>=0.2.0,<0.3
-
-# 数据处理
-pydantic==2.5.0
-pydantic-settings==2.1.0
-
-# 认证和安全
-python-jose[cryptography]==3.3.0
-passlib[bcrypt]==1.7.4
-
-# 监控和日志
-flower==2.0.1
-structlog==23.2.0
-
-# HTTP 客户端
-httpx==0.25.2
-aiofiles==23.2.1
-
-# 模板引擎
-jinja2==3.1.2
-
-# 环境配置
-python-dotenv==1.0.0
-
-# 开发工具
-pytest==7.4.3
-pytest-asyncio==0.21.1
-black==23.11.0
-isort==5.12.0
+langchain-openai
+langchain-community
+psycopg[binary]>=3.1.0

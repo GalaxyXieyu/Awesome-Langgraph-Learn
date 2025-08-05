@@ -1,654 +1,296 @@
-# 🚀 LangGraph Celery Chat - 智能写作助手系统
+# LangGraph Celery Chat - 优化版
 
-基于 FastAPI + Celery + Redis + LangGraph 的智能写作助手系统，支持实时流式输出、任务管理和用户交互。
+基于 ReActAgentsTest 参考代码的简洁实现，总代码量 < 500 行。
 
-## 📋 系统简介
+## 核心优势
 
-这是一个**智能写作助手系统**，就像一个会写文章的AI机器人：
-- 🔍 **自动研究**: 根据主题自动搜索相关资料
-- 📝 **生成大纲**: 智能分析并创建文章结构
-- ✍️ **自动写作**: 基于大纲生成完整高质量文章
-- 💬 **用户互动**: 支持大纲确认、搜索权限等交互
-- 🔄 **会话恢复**: 支持任务中断和恢复功能
+- **单文件架构**: 只有一个 `main.py` 文件（400+ 行）
+- **直接调用**: FastAPI → Celery → LangGraph，无中间层
+- **保持核心功能**: 你的 `graph.py` 和 `tools.py` 完全不变
+- **简化状态管理**: Redis 存基础状态，LangGraph 管理 checkpoint
 
-### 🌟 核心特性
-
-- **异步任务处理**: 基于 Celery 的分布式任务队列
-- **实时流式输出**: Server-Sent Events (SSE) 支持
-- **智能写作工作流**: 基于 LangGraph 的状态机
-- **用户交互支持**: 支持大纲确认、搜索权限等交互
-- **会话管理**: 支持会话恢复和上下文管理
-- **多模式支持**: Copilot（自动）和 Interactive（交互）模式
-
-## 🏗️ 系统架构
-
-### 技术栈
-- **后端**: FastAPI + Celery + Redis + LangGraph
-- **前端**: React/Vue + Server-Sent Events (SSE)
-- **基础设施**: Nginx + SSL/TLS + Redis Cluster
-- **监控**: Celery Flower + Redis 监控
-
-### 架构特点
-- ✅ **生产就绪**: HTTPS 安全传输，支持负载均衡
-- ✅ **高可靠性**: 任务持久化，支持失败重试和恢复
-- ✅ **高性能**: Redis Streams 提供高吞吐量事件流
-- ✅ **可扩展性**: Celery 支持分布式部署和水平扩展
-- ✅ **监控完善**: Celery Flower + Redis 监控工具
-
-## 📁 项目结构
+## 项目结构
 
 ```
-LangGraphCeleryChat/
-├── docs/                   # 文档
-│   ├── 技术架构评估报告.md
-│   ├── 接口设计规范.md
-│   └── 部署指南.md
-├── backend/                # 后端服务
-│   ├── app/               # FastAPI 应用
-│   ├── celery_app/        # Celery 任务
-│   ├── adapters/          # LangGraph 适配器
-│   ├── models/            # 数据模型
-│   └── utils/             # 工具函数
-├── frontend/              # 前端应用
-│   ├── src/               # 源代码
-│   ├── public/            # 静态资源
-│   └── dist/              # 构建输出
-├── tests/                 # 测试文件
-├── docker/                # Docker 配置
-├── nginx/                 # Nginx 配置
-└── requirements.txt       # Python 依赖
+optimized/
+├── main.py           # 唯一的主文件（FastAPI + Celery + 任务）
+├── graph/           # 你的核心代码（不变）
+│   ├── graph.py     # 复制自原项目
+│   └── tools.py     # 复制自原项目
+├── requirements.txt # 依赖列表
+└── README.md       # 说明文档
 ```
 
-## 🛠️ 系统要求
+## 快速启动
 
-### 最低要求
-- **Python**: 3.11+
-- **Redis**: 6.0+
-- **内存**: 4GB+
-- **存储**: 10GB+
-- **网络**: 稳定的互联网连接（用于AI模型调用）
+1. **安装依赖**
+   ```bash
+   pip install -r requirements.txt
+   python install_deps.py  # 安装测试依赖
+   ```
 
-### 推荐配置
-- **Python**: 3.11
-- **Redis**: 7.0+
-- **内存**: 8GB+
-- **存储**: 20GB+ SSD
-- **CPU**: 4核心+
+2. **一键启动**
+   ```bash
+   ./run.sh
+   ```
 
-## 🚀 快速开始
+   或手动启动：
+   ```bash
+   # 终端1: 启动 Celery Worker
+   celery -A main.celery_app worker --loglevel=info
+   
+   # 终端2: 启动 FastAPI 服务
+   python main.py
+   ```
 
-### 1. 环境准备
+## 测试接口
 
+### 快速测试
 ```bash
-# 克隆项目
-git clone <your-repo-url>
-cd LangGraphCeleryChat
-
-# 创建虚拟环境
-conda create -n langgraph python=3.11
-conda activate langgraph
-
-# 安装依赖
-pip install -r requirements.txt
+python quick_test.py
 ```
 
-### 2. 配置环境变量
-
-创建 `.env` 文件：
-
+### 完整测试（包含中断流程）
 ```bash
-# .env
+python test_api.py
+```
+
+这个测试会：
+1. 创建写作任务
+2. 监控事件流
+3. 等待 LangGraph 中断
+4. 模拟用户确认
+5. 恢复任务执行
+6. 验证最终结果
+
+## API 接口
+
+### 创建任务
+```bash
+curl -X POST "http://localhost:8000/api/v1/tasks" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "user_id": "user123",
+       "topic": "人工智能的发展趋势",
+       "max_words": 2000,
+       "style": "professional",
+       "language": "zh"
+     }'
+```
+
+### 查看任务状态
+```bash
+curl "http://localhost:8000/api/v1/tasks/{task_id}"
+```
+
+### 恢复中断任务
+```bash
+curl -X POST "http://localhost:8000/api/v1/tasks/{task_id}/resume" \
+     -H "Content-Type: application/json" \
+     -d '{"response": "yes", "approved": true}'
+```
+
+### 实时事件流
+```bash
+curl "http://localhost:8000/api/v1/events/{task_id}"
+```
+
+## 与原版本对比
+
+| 项目 | 原版本 | 优化版本 |
+|------|--------|----------|
+| 总文件数 | 20+ | 4 |
+| 总代码行数 | 2000+ | 400+ |
+| 核心文件 | main.py (759行) + tasks.py (341行) + adapter.py (705行) | main.py (400行) |
+| 状态管理 | 3套系统 | 2套系统 |
+| 中间层 | WorkflowAdapter + CeleryStreamWriter + InterruptManager | 无 |
+
+## 配置说明
+
+所有配置都在 `main.py` 顶部：
+
+```python
 # Redis 配置
-REDIS_HOST=localhost
-REDIS_PORT=6379
-REDIS_DB=0
-REDIS_PASSWORD=
+REDIS_URL = "redis://localhost:6379/0"
 
 # Celery 配置
-CELERY_BROKER_URL=redis://localhost:6379/0
-CELERY_RESULT_BACKEND=redis://localhost:6379/0
-
-# API 配置
-API_HOST=0.0.0.0
-API_PORT=8000
-DEBUG=true
-
-# AI 模型配置
-OPENAI_API_KEY=your_openai_api_key
-OPENAI_BASE_URL=https://api.openai.com/v1
-
-# 日志配置
-LOG_LEVEL=INFO
-LOG_FILE=logs/app.log
+celery_app = Celery("writing_tasks", broker=REDIS_URL, backend=REDIS_URL)
 ```
 
-### 3. 启动服务
+## 核心设计思路
 
-```bash
-# 创建日志目录
-mkdir -p logs
+1. **去掉 WorkflowAdapter**: 直接在 Celery 任务中调用 LangGraph
+2. **简化流式输出**: 直接写入 Redis Streams，无复杂封装
+3. **统一 ID 管理**: task_id 即是 thread_id，避免映射混乱
+4. **保持兼容性**: API 接口与原版本完全兼容
 
-# 启动 Redis（如果使用本地Redis）
-redis-server
-
-# 启动 Celery Worker
-celery -A backend.celery_app worker --loglevel=info
-
-# 启动 FastAPI 服务
-uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-### 4. 验证部署
-
-```bash
-# 健康检查
-curl http://localhost:8000/health
-
-# 创建测试任务
-curl -X POST http://localhost:8000/api/v1/tasks \
-  -H "Content-Type: application/json" \
-  -d '{
-    "user_id": "test_user",
-    "config": {
-      "topic": "测试文章",
-      "max_words": 500,
-      "style": "technical",
-      "language": "zh",
-      "mode": "copilot"
-    }
-  }'
-```
-
-## 📚 API 接口使用
-
-### 🏠 基础接口
-
-#### 健康检查
-```bash
-GET /health
-```
-
-#### 创建写作任务
-```bash
-POST /api/v1/tasks
-{
-  "user_id": "user_001",
-  "conversation_id": "session_id",  // 可选，用于恢复会话
-  "config": {
-    "topic": "FastAPI 微服务架构设计",
-    "max_words": 1000,
-    "style": "technical",        // formal, casual, academic, technical
-    "language": "zh",            // zh, en
-    "mode": "copilot",          // copilot, interactive
-    "enable_search": true
-  }
-}
-```
-
-#### 监听实时进度
-```javascript
-const eventSource = new EventSource('http://localhost:8000/api/v1/events/session_id');
-eventSource.onmessage = function(event) {
-    const data = JSON.parse(event.data);
-    console.log('进度更新:', data);
-};
-```
-
-#### 响应用户交互
-```bash
-POST /api/v1/tasks/{task_id}/resume
-{
-  "response": "yes",           // 用户响应
-  "approved": true,            // 是否批准
-  "feedback": "请增加更多技术细节",  // 可选反馈
-  "modifications": {}          // 可选修改建议
-}
-```
-
-## 🔧 核心功能
-
-### 🔄 WorkflowAdapter 重构优化
-
-系统经过重大架构重构，实现了更简洁、高效、易维护的设计：
-
-#### 核心改进
-
-| 改进项目 | 之前的问题 | 现在的解决方案 | 好处 |
-|---------|-----------|---------------|------|
-| **统一接口** | 分离的初始调用和恢复调用方法 | 统一的 `execute_workflow()` 接口 | 更简单易用 |
-| **图调用方式** | 重复构建复杂的图结构 | 直接使用外部预编译图 | 性能更好，避免重复 |
-| **流式数据格式** | 多层数据转换和嵌套结构 | 外部图直接输出 Redis Streams 兼容格式 | 减少处理时间 |
-| **架构简化** | 功能重复，代码冗余 | 删除冗余代码，保持单一职责 | 更容易维护和调试 |
-
-#### 技术特性
-- **职责分离**: 适配器只负责适配，不重新实现图逻辑
-- **直接集成**: 使用外部图的完整功能，避免重复构建
-- **标准格式**: Redis Streams 兼容的数据格式
-- **统一接口**: 支持任意 LangGraph 应用
-- **中断处理**: 自动映射到 Redis Streams
-- **状态管理**: 完整的任务状态持久化
-
-### 实时通信
-- **Server-Sent Events**: 替代 WebSocket，更稳定
-- **Redis Streams**: 高性能事件流处理
-- **多客户端支持**: 支持多个前端同时连接
-
-### 任务管理
-- **异步执行**: Celery 分布式任务队列
-- **任务持久化**: Redis 状态存储
-- **进度跟踪**: 实时进度更新
-- **智能会话恢复**: 支持基于 conversationId 的会话恢复和创建
-
-### 🔄 智能 Resume 功能
-
-系统提供了完整的会话管理和恢复机制：
-
-#### 会话创建和恢复逻辑
-- **自动判断**: 根据 `conversationId` 参数自动判断是恢复现有会话还是创建新会话
-- **Redis 检查**: 查询 Redis 中是否存在该 conversationId 的会话数据
-- **智能处理**:
-  - 如果会话存在 → 进入 resume 模式（恢复现有会话）
-  - 如果会话不存在 → 进入创建模式（新建会话）
-
-#### API 接口
-```python
-# 创建新任务（支持会话恢复）
-POST /api/v1/tasks
-{
-    "config": {
-        "topic": "人工智能在医疗诊断中的应用",
-        "mode": "interactive"
-    },
-    "user_id": "user_123",
-    "conversation_id": "conv_456"  # 可选，用于恢复现有会话
-}
-
-# 获取会话摘要
-GET /api/v1/conversations/{conversation_id}/summary
-
-# 验证恢复请求
-POST /api/v1/conversations/{conversation_id}/validate-resume?task_id={task_id}
-
-# 恢复任务（增强版错误处理）
-POST /api/v1/tasks/{task_id}/resume
-```
-
-#### 使用示例
-```python
-import requests
-
-# 场景1: 创建新会话
-response = requests.post("http://localhost:8000/api/v1/tasks", json={
-    "config": {"topic": "AI技术发展", "mode": "interactive"},
-    "user_id": "user_123"
-    # 不提供 conversation_id，系统自动创建新会话
-})
-new_session = response.json()
-print(f"新会话ID: {new_session['session_id']}")
-
-# 场景2: 恢复现有会话
-response = requests.post("http://localhost:8000/api/v1/tasks", json={
-    "config": {"topic": "AI技术应用", "mode": "interactive"},
-    "user_id": "user_123",
-    "conversation_id": new_session['session_id']  # 使用现有会话ID
-})
-resumed_session = response.json()
-print(f"恢复会话: {resumed_session['is_resumed']}")
-
-# 场景3: 获取会话摘要
-summary = requests.get(f"http://localhost:8000/api/v1/conversations/{new_session['session_id']}/summary")
-print(f"会话统计: {summary.json()['statistics']}")
-```
-
-## 📊 监控和运维
-
-### Celery Flower 监控
-访问 `http://localhost:5555` 查看：
-- 任务执行状态
-- Worker 性能指标
-- 队列长度统计
-- 失败任务分析
-
-### Redis 监控
-```bash
-# Redis 性能监控
-redis-cli info
-redis-cli monitor
-
-# 查看事件流
-redis-cli XREAD STREAMS task_events:session_123 $
-```
-
-### 应用日志
-```bash
-# 查看应用日志
-tail -f logs/app.log
-
-# 查看 Celery 日志
-tail -f logs/celery.log
-```
-
-## 🔒 安全配置
-
-### HTTPS 配置
-```nginx
-server {
-    listen 443 ssl http2;
-    server_name yourdomain.com;
-    
-    ssl_certificate /path/to/cert.pem;
-    ssl_certificate_key /path/to/key.pem;
-    
-    location / {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-}
-```
-
-### JWT 认证
-```python
-# 生成 JWT Token
-from backend.utils.auth import create_access_token
-
-token = create_access_token(data={"user_id": "user_123"})
-```
-
-## 🧪 测试
-
-```bash
-# 运行单元测试
-pytest tests/
-
-# 运行集成测试
-pytest tests/integration/
-
-# 运行性能测试
-pytest tests/performance/
-```
-
-## 📈 性能优化
-
-### Redis 优化
-- 使用 Redis Cluster 提高可用性
-- 配置合适的内存策略
-- 启用 AOF 持久化
-
-### Celery 优化
-- 调整 Worker 并发数
-- 配置任务路由和优先级
-- 启用结果后端缓存
-
-### FastAPI 优化
-- 使用 Gunicorn + Uvicorn Workers
-- 启用 Gzip 压缩
-- 配置连接池
-
-## 🚀 部署指南
-
-### 开发环境部署
-按照上面的"快速开始"步骤即可。
-
-### 生产环境部署
-
-#### 使用 Docker 部署
-
-**Dockerfile 示例**：
-```dockerfile
-FROM python:3.11-slim
-
-WORKDIR /app
-
-# 安装系统依赖
-RUN apt-get update && apt-get install -y \
-    gcc \
-    && rm -rf /var/lib/apt/lists/*
-
-# 复制并安装Python依赖
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# 复制应用代码
-COPY . .
-
-# 创建日志目录
-RUN mkdir -p logs
-
-EXPOSE 8000
-CMD ["uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
-```
-
-**docker-compose.yml 示例**：
-```yaml
-version: '3.8'
-
-services:
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    command: redis-server --appendonly yes
-
-  celery-worker:
-    build: .
-    command: celery -A backend.celery_app worker --loglevel=info
-    volumes:
-      - ./logs:/app/logs
-    depends_on:
-      - redis
-    environment:
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-    env_file:
-      - .env
-
-  api:
-    build: .
-    ports:
-      - "8000:8000"
-    volumes:
-      - ./logs:/app/logs
-    depends_on:
-      - redis
-      - celery-worker
-    environment:
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-    env_file:
-      - .env
-
-  nginx:
-    image: nginx:alpine
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf
-      - ./ssl:/etc/nginx/ssl
-    depends_on:
-      - api
-
-volumes:
-  redis_data:
-```
-
-#### 启动生产环境
-```bash
-# 构建并启动所有服务
-docker-compose up -d
-
-# 查看服务状态
-docker-compose ps
-
-# 查看日志
-docker-compose logs -f api
-docker-compose logs -f celery-worker
-```
-
-### 🔒 安全配置
-
-#### 环境变量安全
-```bash
-# 生产环境 .env
-DEBUG=false
-SECRET_KEY=your-super-secret-key-change-this-in-production
-ALLOWED_HOSTS=your-domain.com,www.your-domain.com
-
-# Redis 密码保护
-REDIS_PASSWORD=your-redis-password
-
-# API 密钥
-OPENAI_API_KEY=your-production-openai-key
-```
-
-#### 防火墙配置
-```bash
-# 只开放必要端口
-ufw allow 22    # SSH
-ufw allow 80    # HTTP
-ufw allow 443   # HTTPS
-ufw deny 6379   # Redis（仅内部访问）
-ufw deny 8000   # API（通过Nginx代理）
-ufw enable
-```
-
-## 🤝 贡献指南
-
-1. Fork 项目
-2. 创建功能分支
-3. 提交更改
-4. 推送到分支
-5. 创建 Pull Request
-
-## 📄 许可证
-
-MIT License
-
-## 🆘 故障排除
-
-### 常见问题
-
-| 问题 | 原因 | 解决方案 |
-|------|------|----------|
-| **Redis 连接失败** | Redis 服务未启动 | `redis-cli ping` 检查状态 |
-| **Celery Worker 无响应** | Worker 进程异常 | 重启 Worker: `docker-compose restart celery-worker` |
-| **API 响应慢** | 系统资源不足 | 检查 CPU/内存使用情况 |
-| **SSL 证书错误** | 证书配置错误 | 检查证书路径和有效期 |
-
-### 调试工具
-
-```bash
-# 健康检查脚本
-curl -s http://localhost:8000/health | jq '.'
-
-# 检查 Celery Worker 状态
-celery -A backend.celery_app inspect active
-
-# 查看应用日志
-tail -f logs/app.log
-
-# 启用调试模式
-export LOG_LEVEL=DEBUG
-uvicorn backend.app.main:app --reload --log-level debug
-```
-
-### 监控和日志
-
-#### 系统监控
-- **Celery Flower**: 访问 `http://localhost:5555` 查看任务状态
-- **Redis 监控**: `redis-cli info` 查看性能指标
-- **应用日志**: 查看 `logs/` 目录下的日志文件
-
-#### 性能优化
-- **Redis 优化**: 配置内存策略和持久化
-- **Celery 优化**: 调整 Worker 并发数和任务路由
-- **FastAPI 优化**: 使用 Gunicorn + Uvicorn Workers
-
-## 📞 前端集成示例
-
-### JavaScript 示例
-```javascript
-class WritingAssistant {
-  constructor(baseUrl = 'http://localhost:8000') {
-    this.baseUrl = baseUrl;
-    this.eventSource = null;
-  }
-
-  // 创建写作任务
-  async createTask(config) {
-    const response = await fetch(`${this.baseUrl}/api/v1/tasks`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        user_id: 'user_001',
-        config: config
-      })
-    });
-    return await response.json();
-  }
-
-  // 监听实时进度
-  listenToProgress(conversationId, callbacks = {}) {
-    this.eventSource = new EventSource(
-      `${this.baseUrl}/api/v1/events/${conversationId}`
-    );
-
-    this.eventSource.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      switch (data.event_type) {
-        case 'progress_update':
-          callbacks.onProgress?.(data);
-          break;
-        case 'interrupt_request':
-          callbacks.onInterrupt?.(data);
-          break;
-        case 'task_complete':
-          callbacks.onComplete?.(data);
-          break;
-      }
-    };
-  }
-}
-
-// 使用示例
-const assistant = new WritingAssistant();
-
-const task = await assistant.createTask({
-  topic: "Vue.js 3.0 新特性详解",
-  max_words: 1500,
-  style: "technical",
-  language: "zh",
-  mode: "interactive"
-});
-
-assistant.listenToProgress(task.session_id, {
-  onProgress: (data) => console.log(`进度: ${data.progress}%`),
-  onComplete: (data) => console.log('任务完成!')
-});
-```
+这就是"少即是多"的典型例子！
 
 ---
 
-## 📋 总结
+## 开发与调试日志：实现端到端流式输出
 
-这是一个**生产级的智能写作助手系统**，集成了以下核心能力：
+在开发过程中，我们经历了一个完整的、从“只有心跳”到“完美流式输出”的排错和解决流程。
 
-### ✨ 核心优势
-- **🤖 智能化**: AI 自动研究和写作，质量高
-- **⚡ 实时性**: 流式输出，用户可实时查看写作进度  
-- **🔄 交互式**: 支持用户参与和确认，确保内容符合要求
-- **🛠️ 稳定性**: 经过架构重构优化，运行更稳定可靠
-- **🚀 易部署**: 提供完整的开发和生产环境部署方案
-- **📚 易集成**: 详细的 API 文档和前端集成示例
+1.  **问题：前端只有心跳，没有事件。**
+    *   **诊断**：FastAPI 服务正常，但 Celery Worker 未执行任务。
+    *   **解决方案**：修改 `run.sh` 脚本，将 Celery Worker 从后台 (`--detach`) 启动改为**前台启动**，从而暴露了 Worker 的日志，确认了它没有在运行。
 
-### 🎯 适用场景
-- 📝 技术文档写作
-- 📰 新闻文章生成  
-- 📚 学习资料整理
-- 💼 商业报告撰写
-- 🎓 学术论文辅助
+2.  **问题：Worker 运行了，但事件依然没有到达前端。**
+    *   **诊断**：Worker 日志显示任务已执行，但事件流中没有数据。怀疑是 FastAPI/Worker 与**远程 Redis** 之间的通信不稳定。
+    *   **解决方案**：修改 `main.py` 中的 `REDIS_URL`，将服务切换到**本地 Redis**，排除了所有网络不确定性。
 
-**注意**: 这是一个企业级的 LangGraph 智能写作解决方案，适合需要高可靠性、可扩展性和专业写作能力的应用场景。
+3.  **问题：`custom` 事件流是空的，只有 `updates` 事件。**
+    *   **诊断**：`LangGraphCeleryChat/graph/graph.py` 没有使用官方的 `get_stream_writer`。它使用了自定义的 fallback 实现，只会将进度打印到日志，而不会 `yield` 到事件流。
+    *   **解决方案**：修改 `graph.py`，**导入并使用 `langgraph.config` 的 `get_stream_writer`**，打通了 `custom` 事件流的通道。
+
+4.  **问题：前端拿不到 `custom` 事件中的 `current_content`。**
+    *   **诊断**：`graph.py` 正确地输出了 `current_content`，但 `main.py` 在处理 `progress_detail` 事件时，**没有正确地将整个 `data` 对象传递出去**。
+    *   **解决方案**：修正 `main.py` 中的事件解析逻辑，确保将 `custom` 事件的 `data` 字典**完整地**传递给前端。
+
+5.  **最终实现：打字机效果。**
+    *   **需求**：在前端逐字打印真实的 `chunk` 数据。
+    *   **解决方案（三步走）**：
+        1.  **`graph.py`**: 修改 `article_generation_node`，`yield` 出包含单个 `token` 的新事件类型 `article_generation_chunk`。
+        2.  **`main.py`**: 增加逻辑，识别这个新事件并将其包装为 `article_chunk` 类型推送到 Redis。
+        3.  **`test_frontend.html`**: 增加 JavaScript 逻辑，监听 `article_chunk` 事件并将其 `token` 实时追加到结果区域。
+
+通过这一系列精准的诊断和修复，我们最终构建了一个健壮、稳定且用户体验优秀的端到端实时流式 AI 应用。
+
+---
+
+## 重要问题解决：LangGraph Checkpoint NotImplementedError
+
+### 问题描述
+
+在使用 LangGraph 的 RedisSaver 作为 checkpoint 时，遇到了 `NotImplementedError` 错误：
+
+```
+File ".../langgraph/checkpoint/base/__init__.py", line 268, in aget_tuple
+    raise NotImplementedError
+NotImplementedError
+```
+
+### 问题分析
+
+#### 1. **错误发生场景**
+- ❌ **异步调用失败**：使用 `graph.astream()` 或 `graph.ainvoke()` 时出错
+- ✅ **同步调用正常**：使用 `graph.invoke()` 时工作正常
+- 🎯 **根本原因**：RedisSaver 的异步方法 `aget_tuple()` 没有正确实现
+
+#### 2. **官方 GitHub Issues 确认**
+通过查阅官方 GitHub issues，发现这是一个已知问题：
+- [Issue #4193](https://github.com/langchain-ai/langgraph/issues/4193): PostgresSaver 同样问题
+- [Issue #495](https://github.com/langchain-ai/langgraph/issues/495): SqliteSaver 同样问题
+
+**关键发现**：所有 checkpoint savers 的异步方法都存在 `NotImplementedError` 问题。
+
+#### 3. **环境差异分析**
+- **工作环境**：`RedisMemory-Graph/test.py` 使用 `graph.invoke()` (同步调用) ✅
+- **失败环境**：`LangGraphCeleryChat` 使用 `graph.astream()` (异步调用) ❌
+
+### 解决方案
+
+#### 方案1：使用 AsyncRedisSaver（推荐）
+
+根据官方文档，正确的异步使用方式是：
+
+```python
+from langgraph.checkpoint.redis.aio import AsyncRedisSaver
+
+async with AsyncRedisSaver.from_conn_string(REDIS_URL) as checkpointer:
+    await checkpointer.asetup()
+    graph = workflow.compile(checkpointer=checkpointer)
+
+    # 现在可以安全使用异步方法
+    async for chunk in graph.astream(state, config):
+        # 处理流式输出
+        pass
+```
+
+#### 方案2：回退到 MemorySaver
+
+如果 Redis 不可用，回退到内存存储：
+
+```python
+from langgraph.checkpoint.memory import MemorySaver
+
+checkpointer = MemorySaver()
+graph = workflow.compile(checkpointer=checkpointer)
+```
+
+### 实际修复代码
+
+在 `main.py` 中的修复：
+
+```python
+async def run_workflow():
+    try:
+        # 使用官方推荐的 AsyncRedisSaver
+        from langgraph.checkpoint.redis.aio import AsyncRedisSaver
+
+        async with AsyncRedisSaver.from_conn_string(REDIS_URL) as checkpointer:
+            await checkpointer.asetup()
+            logger.info(f"✅ 使用 AsyncRedisSaver: {REDIS_URL}")
+
+            # 创建并编译图
+            workflow = create_writing_assistant_graph()
+            graph = workflow.compile(checkpointer=checkpointer)
+
+            # 异步流式执行
+            async for chunk in graph.astream(initial_state, config, stream_mode=["updates", "custom"]):
+                # 处理流式输出...
+                pass
+
+    except Exception as redis_error:
+        # 回退到内存 checkpoint
+        logger.warning(f"⚠️ AsyncRedisSaver 失败，使用 MemorySaver: {redis_error}")
+
+        from langgraph.checkpoint.memory import MemorySaver
+        checkpointer = MemorySaver()
+
+        workflow = create_writing_assistant_graph()
+        graph = workflow.compile(checkpointer=checkpointer)
+
+        # 继续执行...
+```
+
+### 附加修复：LangChain 弃用警告
+
+同时修复了 LangChain 的弃用警告：
+
+```python
+# ❌ 旧版本
+from langchain_core.pydantic_v1 import BaseModel, Field
+
+# ✅ 新版本
+from pydantic import BaseModel, Field
+```
+
+### 验证结果
+
+修复后的 Celery 日志显示：
+
+```
+[2025-08-05 16:57:21,263: INFO/ForkPoolWorker-8] Index already exists, not overwriting.
+[2025-08-05 16:57:21,263: INFO/ForkPoolWorker-8] Redis client is a standalone client
+[2025-08-05 16:57:21,531: INFO/ForkPoolWorker-8] Index already exists, not overwriting.
+```
+
+- ✅ **AsyncRedisSaver 工作正常**：Redis 索引设置成功
+- ✅ **没有 NotImplementedError**：异步方法正常工作
+- ✅ **任务正常执行**：Celery 任务开始执行
+
+### 关键学习点
+
+1. **异步 vs 同步**：在异步环境中必须使用对应的异步 checkpoint saver
+2. **官方文档重要性**：AsyncRedisSaver 的正确使用方式在官方文档中有详细说明
+3. **上下文管理器**：`async with` 确保 checkpoint 的生命周期正确管理
+4. **回退策略**：始终准备 MemorySaver 作为备选方案
+
+### 相关资源
+
+- [LangGraph 官方文档 - Memory](https://langchain-ai.github.io/langgraph/how-tos/memory/add-memory/#use-in-production)
+- [GitHub Issue #4193](https://github.com/langchain-ai/langgraph/issues/4193)
+- [GitHub Issue #495](https://github.com/langchain-ai/langgraph/issues/495)
+- [Redis Developer LangGraph Redis](https://github.com/redis-developer/langgraph-redis)

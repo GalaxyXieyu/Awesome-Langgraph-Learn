@@ -104,6 +104,7 @@ def advanced_web_search(query: str, max_results: int = 5) -> List[Dict[str, Any]
             "error": str(e)
         }]
 
+@tool
 def calculate_search_quality(result: Dict[str, Any]) -> float:
     """计算搜索结果质量评分"""
     score = 0.0
@@ -130,6 +131,7 @@ def calculate_search_quality(result: Dict[str, Any]) -> float:
     
     return min(1.0, score)
 
+@tool
 def deduplicate_search_results(results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """智能去重搜索结果"""
     unique_results = []
@@ -151,6 +153,7 @@ def deduplicate_search_results(results: List[Dict[str, Any]]) -> List[Dict[str, 
     
     return unique_results
 
+@tool
 def calculate_content_quality(content: str, insights: Dict[str, Any]) -> float:
     """计算内容质量评分"""
     score = 0.0

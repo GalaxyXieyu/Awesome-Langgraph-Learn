@@ -1,0 +1,39 @@
+{
+  "mcpServers": {
+    "context7": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@upstash/context7-mcp"
+      ],
+      "env": {
+        "DEFAULT_MINIMUM_TOKENS": ""
+      }
+    },
+    "playwright": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@playwright/mcp@latest",
+        "--browser=",
+        "--headless=",
+        "--viewport-size="
+      ]
+    },
+    "sequentialthinking": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-sequential-thinking"
+      ]
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "/Volumes/DATABASE/code/langgraph_learn/.kilocode/mcp.json"
+      ]
+    }
+  }
+}

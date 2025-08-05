@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LangGraph 写作助手</title>
+    <style>
+        :root {
+            --primary-color: #007bff;
+            --secondary-color: #6c757d;
+            --success-color: #28a745;
+            --danger-color: #dc3545;
+            --warning-color: #ffc107;
+            --info-color: #17a2b8;
+            --light-color: #f8f9fa;
+            --dark-color: #343a40;
+            --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+        body { font-family: var(--font-family); background-color: var(--light-color); color: var(--dark-color); line-height: 1.6; margin: 0; padding: 20px; }
+        .container { max-width: 1200px; margin: auto; background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        h1, h2 { color: var(--primary-color); border-bottom: 2px solid var(--primary-color); padding-bottom: 10px; }
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; }
+        .form-group { display: flex; flex-direction: column; }
+        .form-group label { margin-bottom: 8px; font-weight: bold; }
+        .form-group input, .form-group select, .form-group textarea { padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 16px; }
+        .form-group textarea { min-height: 80px; resize: vertical; }
+        .btn { display: inline-block; padding: 12px 24px; border: none; border-radius: 4px; color: #fff; background-color: var(--primary-color); font-size: 16px; cursor: pointer; transition: background-color 0.3s ease; text-align: center; margin-top: 20px; }
+        .btn:hover { background-color: #0056b3; }
+        .btn:disabled { background-color: var(--secondary-color); cursor: not-allowed; }
+        .btn-success { background-color: var(--success-color); }
+        .btn-success:hover { background-color: #218838; }
+        
+        /* 日志和结果区域样式 */
+        .output-container { margin-top: 30px; }
+        .log-stream { 
+            background: #222; 
+            color: #eee; 
+            padding: 15px; 
+            border-radius: 4px; 
+            height: 300px; 
+            overflow-y: auto; 
+            font-family: "Courier New", Courier, monospace; 
+            font-size: 14px; 
+            white-space: pre-wrap; 
+            word-wrap: break-word; 
+        }
+        .result { 
+            background: #fdfdfd; 
+            border: 1px solid #eee; 
+            padding: 15px; 
+            border-radius: 4px; 
+            margin-top: 20px; 
+            min-height: 200px; 
+            white-space: pre-wrap; 
+            font-size: 16px; 
+        }
+        .log-entry { 
+            padding: 4px 0; 
+            border-bottom: 1px solid #444; 
+        }
+        .log-entry.event-article_chunk { display: none; }
+        
+        /* 中断弹窗样式 */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+        .modal-buttons {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .modal-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .btn-confirm {
+            background: var(--success-color);
+            color: white;
+        }
+        .btn-cancel {
+            background: var(--danger-color);
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>LangGraph 写作助手</h1>
+
+        <form id="task-form">
+            <h2>写作任务配置</h2>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="topic">文章主题</label>
+                    <textarea id="topic" name="topic" required>撰写一篇关于"在大型语言模型(LLM)驱动的应用程序中，LangGraph与传统流程编排工具(如Airflow)的比较"的深度分析文章。</textarea>
+                </div>
+                <div class="form-group">
+                    <label for="max_words">最大字数</label>
+                    <input type="number" id="max_words" name="max_words" value="1500" required>
+                </div>
+                <div class="form-group">
+                    <label for="style">写作风格</label>
+                    <select id="style" name="style">
+                        <option value="professional" selected>专业</option>
+                        <option value="academic">学术</option>
+                        <option value="technical">技术</option>
+                        <option value="casual">休闲</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="language">语言</label>
+                    <select id="language" name="language">
+                        <option value="zh" selected>中文</option>
+                        <option value="en">English</option>
+                    </select>
+                </div>
+            </div>
+            <button type="submit" id="start-btn" class="btn btn-success">开始创作</button>
+        </form>
+
+        <div class="output-container">
+            <h2>实时过程流</h2>
+            <div id="log-stream" class="log-stream"></div>
+            <h2>最终结果</h2>
+            <div id="result" class="result"></div>
+        </div>
+    </div>
+
+    <!-- 中断确认弹窗 -->
+    <div id="interrupt-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h3 id="modal-title">需要您的决策</h3>
+            <div id="modal-message-container">
+                <p id="modal-message">任务已暂停，请确认是否继续？</p>
+                <p id="modal-instructions" class="modal-instructions"></p>
+            </div>
+            <div class="modal-buttons">
+                <button id="resume-btn" class="modal-btn btn-confirm">是 (Yes)</button>
+                <button id="cancel-btn" class="modal-btn btn-cancel">否 (No)</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const API_BASE_URL = "http://127.0.0.1:8000";
+        const form = document.getElementById('task-form');
+        const logStream = document.getElementById('log-stream');
+        const resultDiv = document.getElementById('result');
+        const modal = document.getElementById('interrupt-modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modalMessage = document.getElementById('modal-message');
+        const modalInstructions = document.getElementById('modal-instructions');
+        const resumeBtn = document.getElementById('resume-btn');
+        const cancelBtn = document.getElementById('cancel-btn');
+        
+        let currentTaskId = null;
+        let eventSource = null;
+
+        // 添加日志条目的函数
+        function addLog(message, type, data = null) {
+            const entry = document.createElement('div');
+            entry.className = `log-entry event-${type}`;
+            
+            let displayMessage = `[${new Date().toLocaleTimeString()}] ${message}`;
+            
+            // 如果有详细数据，添加格式化的JSON
+            if (data) {
+                displayMessage += '\n' + JSON.stringify(data, null, 2);
+            }
+            
+            entry.textContent = displayMessage;
+            logStream.appendChild(entry);
+            logStream.scrollTop = logStream.scrollHeight;
+        }
+
+        // 显示中断弹窗
+        function showInterruptModal(title, message, instructions) {
+            modalTitle.textContent = title || "需要您的决策";
+            modalMessage.textContent = message || "任务已暂停，请确认是否继续？";
+
+            // 显示指令信息
+            if (instructions && instructions !== message) {
+                modalInstructions.textContent = instructions;
+                modalInstructions.style.display = 'block';
+            } else {
+                modalInstructions.style.display = 'none';
+            }
+
+            modal.style.display = 'flex';
+
+            return new Promise((resolve, reject) => {
+                resumeBtn.onclick = () => {
+                    modal.style.display = 'none';
+                    resolve("yes");
+                };
+                cancelBtn.onclick = () => {
+                    modal.style.display = 'none';
+                    resolve("no");
+                };
+            });
+        }
+
+        // 监听事件流
+        function listenToEvents(taskId) {
+            currentTaskId = taskId;
+            eventSource = new EventSource(`${API_BASE_URL}/api/v1/events/${taskId}`);
+
+            eventSource.onopen = () => addLog('已连接到事件流', 'connected');
+
+            eventSource.onmessage = async (event) => {
+                const eventData = JSON.parse(event.data);
+                if (!eventData.data || !eventData.data.type) return;
+
+                const innerData = eventData.data;
+                const type = innerData.type;
+
+                switch (type) {
+                    case 'custom_event':
+                        // 处理自定义事件 - 这是主要的流式内容更新
+                        const step = innerData.step || 'unknown';
+                        const status = innerData.status || '';
+                        const progress = innerData.progress || 0;
+
+                        addLog(`[${step}] ${status} (${progress}%)`, type);
+
+                        // 如果有内容摘要，显示详细信息
+                        if (innerData.content_summary) {
+                            const summary = innerData.content_summary;
+                            if (summary.title) {
+                                addLog(`📋 标题: ${summary.title}`, 'info');
+                            }
+                            if (summary.sections_count > 0) {
+                                addLog(`📋 章节数: ${summary.sections_count}`, 'info');
+                                if (summary.section_titles && summary.section_titles.length > 0) {
+                                    addLog(`📋 章节: ${summary.section_titles.join(', ')}`, 'info');
+                                }
+                            }
+                        }
+                        break;
+
+                    case 'progress_update':
+                        addLog(`[节点] ${innerData.step}`, type, innerData.content_info);
+                        break;
+
+                    case 'progress_detail':
+                        const detailData = innerData.data || {};
+                        addLog(
+                            `[进度] ${detailData.step} - ${detailData.status} (${detailData.progress || 0}%)`,
+                            type,
+                            detailData.current_content
+                        );
+                        break;
+                    
+                    case 'article_chunk':
+                        resultDiv.textContent += innerData.token;
+                        break;
+                    
+                    case 'interrupt_request':
+                        // 根据中断类型显示不同的日志信息
+                        const interruptType = innerData.interrupt_type || 'confirmation';
+                        const interruptTitle = innerData.title || innerData.interrupt_type || "需要您的决策";
+
+                        addLog(`[中断] ${interruptType} - 等待用户确认...`, type);
+
+                        // 显示详细的中断信息
+                        if (innerData.instructions) {
+                            addLog(`[说明] ${innerData.instructions}`, 'info');
+                        }
+
+                        const shouldResume = await showInterruptModal(
+                            interruptTitle,
+                            innerData.message || "任务已暂停，请确认是否继续？",
+                            innerData.instructions || "请选择您的决策"
+                        );
+                        
+                        if (shouldResume === "yes") {
+                            try {
+                                const response = await fetch(`${API_BASE_URL}/api/v1/tasks/${taskId}/resume`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ response: "yes" })
+                                });
+                                if (!response.ok) throw new Error('恢复任务失败');
+                                addLog('[中断] 用户选择继续', type);
+                            } catch (error) {
+                                addLog(`[错误] ${error.message}`, 'error');
+                            }
+                        } else {
+                            addLog('[中断] 用户选择取消', type);
+                            eventSource.close();
+                        }
+                        break;
+                    
+                    case 'task_complete':
+                        addLog('[完成] 任务成功结束!', type);
+                        eventSource.close();
+                        break;
+                    
+                    case 'task_failed':
+                        addLog(`[失败] ${innerData.error}`, 'error');
+                        eventSource.close();
+                        break;
+
+                    case 'connected':
+                    case 'debug':
+                    case 'heartbeat':
+                        // 忽略这些系统事件
+                        break;
+
+                    default:
+                        // 调试：显示未知事件类型
+                        console.log('未知事件类型:', type, innerData);
+                        addLog(`[调试] 未知事件: ${type}`, 'debug');
+                        break;
+                }
+            };
+
+            eventSource.onerror = (err) => {
+                addLog('事件流连接错误', 'error');
+                eventSource.close();
+            };
+        }
+
+        // 表单提交处理
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            // 清空之前的输出
+            logStream.innerHTML = '';
+            resultDiv.textContent = '';
+            
+            // 如果存在之前的事件流，关闭它
+            if (eventSource) {
+                eventSource.close();
+            }
+
+            const startBtn = document.getElementById('start-btn');
+            startBtn.disabled = true;
+            startBtn.textContent = '正在创建任务...';
+
+            try {
+                const formData = new FormData(form);
+                const data = {
+                    user_id: `user_${Date.now()}`,
+                    topic: formData.get('topic'),
+                    max_words: parseInt(formData.get('max_words'), 10),
+                    style: formData.get('style'),
+                    language: formData.get('language'),
+                    mode: "interactive" // 使用交互模式，允许中断
+                };
+
+                const response = await fetch(`${API_BASE_URL}/api/v1/tasks`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`创建任务失败: ${response.statusText}`);
+                }
+
+                const result = await response.json();
+                addLog(`任务创建成功 (ID: ${result.task_id})`, 'success');
+                listenToEvents(result.task_id);
+
+            } catch (error) {
+                addLog(`错误: ${error.message}`, 'error');
+            } finally {
+                startBtn.disabled = false;
+                startBtn.textContent = '开始创作';
+            }
+        });
+    });
+    </script>
+</body>
+</html>
