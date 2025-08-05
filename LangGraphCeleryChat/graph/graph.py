@@ -251,6 +251,7 @@ def create_confirmation_node(config_key: str):
             message = config["message_template"].format(topic=topic)
         
         # interactive模式需要用户确认
+        # interrupt()会暂停执行，直到用户恢复，然后返回用户的响应
         user_response = interrupt({
             "type": config["type"],
             "message": message,
@@ -271,6 +272,7 @@ def create_confirmation_node(config_key: str):
         return state
     
     return confirmation_node
+
 
 # 创建确认节点实例
 outline_confirmation_node = create_confirmation_node("outline")

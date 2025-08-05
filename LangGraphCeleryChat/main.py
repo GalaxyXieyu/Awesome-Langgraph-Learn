@@ -198,79 +198,138 @@ async def _process_stream_chunk(chunk, task_id):
         return None
 
 def _check_for_interruption(chunk, task_id):
-    """检查是否有中断请求 - 提取的公共函数"""
-    if isinstance(chunk, tuple) and len(chunk) == 2:
-        stream_type, data = chunk
-        if stream_type == "updates" and isinstance(data, dict) and "__interrupt__" in data:
-            interrupt_info = data["__interrupt__"]
+    """检查是否有中断请求 - 改进版本"""
+    try:
+        # 记录原始chunk用于调试
+        logger.debug(f"检查中断 - chunk类型: {type(chunk)}, 内容: {chunk}")
+        
+        if isinstance(chunk, tuple) and len(chunk) == 2:
+            stream_type, data = chunk
+            logger.debug(f"流类型: {stream_type}, 数据类型: {type(data)}")
+            
+            # 检查是否是中断信号
+            is_interrupt = False
+            interrupt_info = None
+            
+            if stream_type == "updates" and isinstance(data, dict):
+                # 方式1：检查 __interrupt__ 键
+                if "__interrupt__" in data:
+                    is_interrupt = True
+                    interrupt_info = data["__interrupt__"]
+                    logger.info(f"发现中断信号 (方式1): {interrupt_info}")
+                
+                # 方式2：检查是否有节点包含中断信息
+                for node_name, node_data in data.items():
+                    if isinstance(node_data, dict) and "interrupt" in str(node_data).lower():
+                        is_interrupt = True
+                        interrupt_info = node_data
+                        logger.info(f"发现中断信号 (方式2) 在节点 {node_name}: {interrupt_info}")
+                        break
+            
+            elif stream_type == "custom" and isinstance(data, dict):
+                # 方式3：检查自定义事件中的中断
+                if data.get("type") == "interrupt" or "interrupt" in data:
+                    is_interrupt = True
+                    interrupt_info = data
+                    logger.info(f"发现中断信号 (方式3): {interrupt_info}")
+            
+            if not is_interrupt:
+                # 方式4：检查整个chunk是否包含中断相关内容
+                chunk_str = str(chunk).lower()
+                if "interrupt" in chunk_str and ("confirmation" in chunk_str or "permission" in chunk_str):
+                    is_interrupt = True
+                    interrupt_info = {"raw_chunk": chunk}
+                    logger.info(f"发现中断信号 (方式4): 在chunk字符串中检测到中断")
+            
+            if is_interrupt:
+                # 更新任务状态为暂停
+                redis_client.hset(f"task:{task_id}", "status", "paused")
+                logger.info(f"任务 {task_id} 状态更新为 paused")
 
-            # 更新任务状态为暂停
-            redis_client.hset(f"task:{task_id}", "status", "paused")
+                # 构建中断事件
+                interrupt_event = {
+                    "type": "interrupt_request",
+                    "task_id": task_id,
+                    "timestamp": datetime.now().isoformat(),
+                    "detected_by": "improved_detection"
+                }
 
-            # 发送中断事件 - 提取真实的中断信息
-            interrupt_event = {
-                "type": "interrupt_request",
-                "task_id": task_id,
-                "timestamp": datetime.now().isoformat()
-            }
+                # 提取中断信息
+                interrupt_data = _extract_interrupt_data(interrupt_info)
+                interrupt_event.update(interrupt_data)
 
-            # 提取中断信息 - 处理 Interrupt 对象
-            interrupt_data = None
+                # 发送中断事件
+                try:
+                    json_data = json.dumps(interrupt_event, ensure_ascii=False, default=str)
+                    redis_client.xadd(
+                        f"events:{task_id}",
+                        {
+                            "timestamp": str(time.time()),
+                            "data": json_data
+                        }
+                    )
+                    logger.info(f"中断事件已发送: {interrupt_event.get('interrupt_type', 'unknown')}")
+                except Exception as e:
+                    logger.error(f"发送中断事件失败: {e}")
 
-            # 处理 tuple 格式的中断信息
-            if isinstance(interrupt_info, tuple) and len(interrupt_info) > 0:
-                # interrupt_info 是 tuple，第一个元素是 Interrupt 对象
-                interrupt_obj = interrupt_info[0]
-                if hasattr(interrupt_obj, 'value'):
-                    interrupt_data = interrupt_obj.value
-                else:
-                    interrupt_data = {"message": str(interrupt_obj)}
+                return True
+        
+        return False
+        
+    except Exception as e:
+        logger.error(f"检查中断时发生错误: {e}")
+        return False
 
-            elif hasattr(interrupt_info, 'value'):
-                # 这是一个直接的 Interrupt 对象，提取其 value
-                interrupt_data = interrupt_info.value
-            elif isinstance(interrupt_info, dict):
-                # 这是一个普通字典
-                interrupt_data = interrupt_info
+def _extract_interrupt_data(interrupt_info):
+    """提取中断数据 - 分离的辅助函数"""
+    interrupt_data = {
+        "interrupt_type": "confirmation",
+        "title": "需要确认",
+        "message": "请确认是否继续",
+        "instructions": "请回复 'yes' 或 'no'",
+        "interrupt_data": {}
+    }
+    
+    try:
+        # 处理不同类型的中断信息
+        if isinstance(interrupt_info, tuple) and len(interrupt_info) > 0:
+            # interrupt_info 是 tuple，第一个元素是 Interrupt 对象
+            interrupt_obj = interrupt_info[0]
+            if hasattr(interrupt_obj, 'value'):
+                raw_data = interrupt_obj.value
             else:
-                # 其他类型，转换为字符串
-                interrupt_data = {"message": str(interrupt_info)}
+                raw_data = {"message": str(interrupt_obj)}
 
-            # 从中断数据中提取具体内容
-            if isinstance(interrupt_data, dict):
-                interrupt_event.update({
-                    "interrupt_type": interrupt_data.get("type", "confirmation"),
-                    "title": interrupt_data.get("type", "需要确认"),
-                    "message": interrupt_data.get("message", "请确认是否继续"),
-                    "instructions": interrupt_data.get("instructions", ""),
-                    "interrupt_data": interrupt_data  # 保留完整的中断数据（已经是可序列化的）
-                })
-            else:
-                # 回退到默认值
-                interrupt_event.update({
-                    "interrupt_type": "confirmation",
-                    "title": "需要确认",
-                    "message": str(interrupt_data) if interrupt_data else "请确认是否继续",
-                    "instructions": "请回复 'yes' 或 'no'",
-                    "interrupt_data": {"raw": str(interrupt_data)}
-                })
+        elif hasattr(interrupt_info, 'value'):
+            # 这是一个直接的 Interrupt 对象
+            raw_data = interrupt_info.value
+        elif isinstance(interrupt_info, dict):
+            # 这是一个普通字典
+            raw_data = interrupt_info
+        else:
+            # 其他类型，转换为字符串
+            raw_data = {"raw": str(interrupt_info)}
 
-            try:
-                json_data = json.dumps(interrupt_event, ensure_ascii=False)
-
-
-                redis_client.xadd(
-                    f"events:{task_id}",
-                    {
-                        "timestamp": str(time.time()),
-                        "data": json_data
-                    }
-                )
-            except Exception as e:
-                logger.error(f"发送中断事件失败: {e}")
-
-            return True
-    return False
+        # 从原始数据中提取结构化信息
+        if isinstance(raw_data, dict):
+            interrupt_data.update({
+                "interrupt_type": raw_data.get("type", "confirmation"),
+                "title": raw_data.get("type", "需要确认"),
+                "message": raw_data.get("message", "请确认是否继续"),
+                "instructions": raw_data.get("instructions", "请回复 'yes' 或 'no'"),
+                "interrupt_data": raw_data
+            })
+        else:
+            interrupt_data.update({
+                "message": str(raw_data) if raw_data else "请确认是否继续",
+                "interrupt_data": {"raw": str(raw_data)}
+            })
+    
+    except Exception as e:
+        logger.error(f"提取中断数据失败: {e}")
+        interrupt_data["interrupt_data"] = {"error": str(e), "raw": str(interrupt_info)}
+    
+    return interrupt_data
 
 @celery_app.task(bind=True)
 def execute_writing_task(self, user_id: str, session_id: str, task_id: str, config_data: Dict[str, Any]):
@@ -307,9 +366,13 @@ def execute_writing_task(self, user_id: str, session_id: str, task_id: str, conf
 
             final_result = None
             interrupted = False
-            # 使用官方推荐的 AsyncRedisSaver 方式
+            # 使用官方推荐的 AsyncRedisSaver 方式 - 修复环境变量问题
             from langgraph.checkpoint.redis.aio import AsyncRedisSaver
-
+            import os
+            
+            # 确保环境变量设置
+            REDIS_URL = "redis://default:mfzstl2v@dbconn.sealoshzh.site:41277"
+            
             async with AsyncRedisSaver.from_conn_string(REDIS_URL) as checkpointer:
                 await checkpointer.asetup()
 
@@ -435,9 +498,13 @@ def resume_writing_task(self, user_id: str, session_id: str, task_id: str, user_
             # 使用与 execute_writing_task 相同的 AsyncRedisSaver 模式
             from langgraph.types import Command
             interrupted = False
-            # 使用官方推荐的 AsyncRedisSaver
+            # 使用官方推荐的 AsyncRedisSaver - 修复环境变量问题
             from langgraph.checkpoint.redis.aio import AsyncRedisSaver
-
+            import os
+            
+            # 确保环境变量设置
+            os.environ["REDIS_URL"] = REDIS_URL
+            
             async with AsyncRedisSaver.from_conn_string(REDIS_URL) as checkpointer:
                 await checkpointer.asetup()
 
@@ -445,11 +512,51 @@ def resume_writing_task(self, user_id: str, session_id: str, task_id: str, user_
                 workflow = create_writing_assistant_graph()
                 graph = workflow.compile(checkpointer=checkpointer)
 
+                chunk_count = 0
+                final_result = None
+                
+                # 先检查当前图状态
+                try:
+                    current_state = await checkpointer.aget_tuple(config)
+                    if current_state:
+                        logger.info(f"恢复前的图状态: {current_state.metadata if hasattr(current_state, 'metadata') else 'unknown'}")
+                        
+                        # 检查next节点
+                        if hasattr(current_state, 'next') and current_state.next:
+                            logger.info(f"🎯 恢复前的next节点: {current_state.next}")
+                        else:
+                            logger.warning("⚠️ 恢复前没有next节点，图可能已完成或出错")
+                            
+                        if hasattr(current_state, 'checkpoint') and current_state.checkpoint:
+                            state_data = current_state.checkpoint.get('channel_values', {})
+                            logger.info(f"恢复前的状态键: {list(state_data.keys())}")
+                            
+                            # 打印状态值概览
+                            state_overview = {}
+                            for key, value in state_data.items():
+                                if value is not None:
+                                    if isinstance(value, str):
+                                        state_overview[key] = f"str({len(value)} chars)"
+                                    elif isinstance(value, list):
+                                        state_overview[key] = f"list({len(value)} items)"
+                                    elif isinstance(value, dict):
+                                        state_overview[key] = f"dict({len(value)} keys)"
+                                    else:
+                                        state_overview[key] = f"{type(value).__name__}"
+                            logger.info(f"状态值概览: {state_overview}")
+                    else:
+                        logger.warning("恢复前无法获取图状态")
+                except Exception as state_error:
+                    logger.error(f"检查恢复前状态失败: {state_error}")
+
                 async for chunk in graph.astream(Command(resume=user_response), config, stream_mode=["updates", "custom"]):
-                    print("--------------------------------")
-                    print("恢复任务收到 chunk", chunk)
-                    print("--------------------------------")
-                    # 简单记录 chunk 内容
+                    chunk_count += 1
+                    logger.info(f"恢复任务收到 chunk #{chunk_count}: {type(chunk)}")
+                    
+                    # 处理流式输出
+                    await _process_stream_chunk(chunk, task_id)
+                    
+                    # 记录 chunk 内容
                     if isinstance(chunk, tuple) and len(chunk) == 2:
                         stream_type, data = chunk
                         logger.info(f"  流类型: {stream_type}")
@@ -460,74 +567,147 @@ def resume_writing_task(self, user_id: str, session_id: str, task_id: str, user_
                                 node_names = [k for k in data.keys() if k != "__interrupt__"]
                                 if node_names:
                                     logger.info(f"  执行节点: {node_names}")
+                                    
+                                # 保存最后的结果
+                                for node_name in node_names:
+                                    if node_name in data and isinstance(data[node_name], dict):
+                                        final_result = (stream_type, data)
 
-                    # 写入事件流
-                    redis_client.xadd(
-                        f"events:{task_id}",
-                        {
-                            "timestamp": str(time.time()),
-                            "data": json.dumps(chunk, default=str, ensure_ascii=False)
-                        }
-                    )
-
-                    # # 检查中断 - 使用统一的中断处理函数
+                    # 检查中断 - 使用统一的中断处理函数
                     is_interrupt = _check_for_interruption(chunk, task_id)
                     if is_interrupt:
                         interrupted = True
+                        logger.info(f"检测到新的中断，chunk #{chunk_count}")
                         return {"interrupted": True, "task_id": task_id}
 
-            # 处理完成结果
-                logger.info(f"🔍 恢复任务结束检查: interrupted={interrupted}, chunk_count={chunk_count}")
-
-                if not interrupted:
-                    logger.info("✅ 任务未中断，开始处理完成结果")
-                    result_data = {}
-
-                    # 如果没有处理任何 chunks，尝试获取当前状态
-                    if chunk_count == 0:
-                        logger.info("⚠️ 没有处理任何 chunks，检查当前图状态...")
-                        try:
-                            # 获取当前状态
-                            current_state = await checkpointer.aget_tuple(config)
-                            if current_state and hasattr(current_state, 'checkpoint') and current_state.checkpoint:
-                                state_data = current_state.checkpoint.get('channel_values', {})
-                                logger.info(f"📊 从 checkpoint 获取状态键: {list(state_data.keys())}")
-
-                                # 提取结果数据
-                                result_data = {
-                                    "outline": state_data.get("outline"),
-                                    "article": state_data.get("article"),
-                                    "search_results": state_data.get("search_results", []),
-                                    "topic": state_data.get("topic"),
-                                    "enhancement_suggestions": state_data.get("enhancement_suggestions", [])
-                                }
-
-                                # 检查是否真的完成了
-                                if result_data.get("article"):
-                                    logger.info("✅ 找到生成的文章，任务确实完成")
-                                else:
-                                    logger.warning("⚠️ 没有找到生成的文章，任务可能未完全完成")
+                logger.info(f"恢复任务处理完成，总共处理了 {chunk_count} 个chunks")
+                
+                # 如果没有处理任何chunks，说明可能已经完成或出错
+                if chunk_count == 0:
+                    logger.warning("⚠️ 没有处理任何chunks，可能图已经完成或发生错误")
+                    # 尝试获取当前完整状态
+                    try:
+                        current_state = await checkpointer.aget_tuple(config)
+                        if current_state and hasattr(current_state, 'checkpoint') and current_state.checkpoint:
+                            state_data = current_state.checkpoint.get('channel_values', {})
+                            logger.info(f"完成后状态键详情: {[(k, type(v)) for k, v in state_data.items()]}")
+                            
+                            # 检查是否真的完成了
+                            if state_data.get('article'):
+                                logger.info("✅ 发现文章内容，任务确实已完成")
+                                final_result = ('completed', state_data)
+                            elif state_data.get('outline'):
+                                logger.warning("⚠️ 只有大纲，可能任务未完全完成")
                             else:
-                                logger.warning("⚠️ 无法获取 checkpoint 状态")
-                        except Exception as e:
-                            logger.error(f"获取 checkpoint 状态失败: {e}")
+                                logger.error("❌ 没有找到任何有效内容")
+                    except Exception as e:
+                        logger.error(f"获取完成状态失败: {e}")
 
-                    redis_client.hset(f"task:{task_id}", mapping={
-                        "status": "completed",
-                        "result": json.dumps(result_data, default=str, ensure_ascii=False)
-                    })
+            # 处理完成结果 - 改进版
+            logger.info(f"🔍 恢复任务结束检查: interrupted={interrupted}, final_result={bool(final_result)}")
 
-                    logger.info(f"📋 任务完成，结果数据键: {list(result_data.keys())}")
-                    if result_data.get("article"):
-                        article_length = len(result_data["article"]) if isinstance(result_data["article"], str) else 0
-                        logger.info(f"✅ 文章生成成功，长度: {article_length} 字符")
-                    else:
-                        logger.warning("⚠️ 任务完成但没有生成文章")
+            if not interrupted:
+                logger.info("✅ 任务未中断，开始处理完成结果")
+                result_data = {}
 
-                    logger.info(f"🎯 返回 completed=True，result 键: {list(result_data.keys())}")
-                    return {"completed": True, "result": result_data}
+                # 方式1：从final_result获取结果
+                if final_result:
+                    logger.info("从final_result提取数据...")
+                    try:
+                        if isinstance(final_result, tuple) and len(final_result) == 2:
+                            stream_type, data = final_result
+                            if stream_type == 'completed' and isinstance(data, dict):
+                                # 直接使用完成的状态数据
+                                result_data = {
+                                    "outline": data.get("outline"),
+                                    "article": data.get("article"),
+                                    "search_results": data.get("search_results", []),
+                                    "topic": data.get("topic"),
+                                    "enhancement_suggestions": data.get("enhancement_suggestions", [])
+                                }
+                                logger.info(f"从completed状态提取结果键: {[k for k, v in result_data.items() if v]}")
+                            elif stream_type == 'updates' and isinstance(data, dict):
+                                # 从更新中提取结果
+                                for node_name, node_data in data.items():
+                                    if isinstance(node_data, dict):
+                                        result_data.update({
+                                            "outline": node_data.get("outline") or result_data.get("outline"),
+                                            "article": node_data.get("article") or result_data.get("article"),
+                                            "search_results": node_data.get("search_results", result_data.get("search_results", [])),
+                                            "topic": node_data.get("topic") or result_data.get("topic"),
+                                            "enhancement_suggestions": node_data.get("enhancement_suggestions", result_data.get("enhancement_suggestions", []))
+                                        })
+                                logger.info(f"从updates提取结果键: {[k for k, v in result_data.items() if v]}")
+                    except Exception as final_error:
+                        logger.error(f"从final_result提取失败: {final_error}")
+
+                # 方式2：从checkpointer获取状态
+                if not any(result_data.values()):
+                    logger.info("从final_result未获取到数据，尝试checkpoint...")
+                    try:
+                        current_state = await checkpointer.aget_tuple(config)
+                        if current_state and hasattr(current_state, 'checkpoint') and current_state.checkpoint:
+                            state_data = current_state.checkpoint.get('channel_values', {})
+                            logger.info(f"📊 从 checkpoint 获取状态键: {list(state_data.keys())}")
+
+                            # 提取结果数据
+                            result_data = {
+                                "outline": state_data.get("outline"),
+                                "article": state_data.get("article"),
+                                "search_results": state_data.get("search_results", []),
+                                "topic": state_data.get("topic"),
+                                "enhancement_suggestions": state_data.get("enhancement_suggestions", [])
+                            }
+                            logger.info(f"从checkpoint提取的结果键: {[k for k, v in result_data.items() if v]}")
+                    except Exception as checkpoint_error:
+                        logger.error(f"从checkpoint获取失败: {checkpoint_error}")
+
+                # 方式3：从Redis获取历史结果
+                if not any(result_data.values()):
+                    logger.info("从checkpoint未获取到数据，尝试Redis...")
+                    try:
+                        task_result = redis_client.hget(f"task:{task_id}", "result")
+                        if task_result:
+                            existing_result = json.loads(task_result)
+                            if existing_result and any(existing_result.values()):
+                                result_data = existing_result
+                                logger.info(f"从Redis获取的结果键: {[k for k, v in result_data.items() if v]}")
+                    except Exception as redis_e:
+                        logger.error(f"从Redis获取结果失败: {redis_e}")
+
+                # 检查结果状态
+                if result_data.get("article"):
+                    logger.info("✅ 找到生成的文章，任务确实完成")
+                elif result_data.get("outline"):
+                    logger.info("✅ 找到大纲，但没有文章 - 任务可能未完全完成")
                 else:
-                    logger.info(f"🔄 任务被中断，返回 interrupted=True")
+                    logger.warning("⚠️ 没有找到任何内容，任务可能失败或未完成")
+                    # 创建默认结果
+                    if not result_data:
+                        result_data = {
+                            "outline": None,
+                            "article": None,
+                            "search_results": [],
+                            "topic": None,
+                            "enhancement_suggestions": []
+                        }
+
+                redis_client.hset(f"task:{task_id}", mapping={
+                    "status": "completed",
+                    "result": json.dumps(result_data, default=str, ensure_ascii=False)
+                })
+
+                logger.info(f"📋 任务完成，结果数据键: {list(result_data.keys())}")
+                if result_data.get("article"):
+                    article_length = len(result_data["article"]) if isinstance(result_data["article"], str) else 0
+                    logger.info(f"✅ 文章生成成功，长度: {article_length} 字符")
+                else:
+                    logger.warning("⚠️ 任务完成但没有生成文章")
+
+                logger.info(f"🎯 返回 completed=True，result 键: {list(result_data.keys())}")
+                return {"completed": True, "result": result_data}
+            else:
+                logger.info(f"🔄 任务被中断，返回 interrupted=True")
 
         except Exception as e:
             redis_client.hset(f"task:{task_id}", mapping={"status": "failed", "error": str(e)})
