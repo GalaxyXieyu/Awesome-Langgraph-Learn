@@ -238,13 +238,13 @@ def create_confirmation_node(config_key: str):
     def confirmation_node(state: WritingState) -> WritingState:
         # from langgraph.types import interrupt  # 兼容性问题，暂时注释
 
-        # 创建一个简单的interrupt替代函数
+        # 创建真正的interrupt函数
         def interrupt(data):
-            """简单的interrupt替代函数"""
-            # 在实际应用中，这里应该实现真正的用户交互逻辑
-            # 现在先返回默认的"yes"响应以便测试
+            """真正的interrupt函数 - 触发LangGraph中断"""
             logging.info(f"Interrupt called with data: {data}")
-            return "yes"  # 默认自动确认
+            # 使用LangGraph的中断机制
+            from langgraph.errors import NodeInterrupt
+            raise NodeInterrupt(data)
         
         mode = state.get("mode", "interactive")
         

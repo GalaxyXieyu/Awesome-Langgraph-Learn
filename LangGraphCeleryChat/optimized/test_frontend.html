@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket测试页面</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .messages { height: 400px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; background: #f9f9f9; }
+        .message { margin: 5px 0; padding: 8px; background: white; border-radius: 3px; border-left: 3px solid #007bff; }
+        button { padding: 10px 15px; margin: 5px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 3px; }
+        input { padding: 8px; margin: 5px; border: 1px solid #ddd; border-radius: 3px; }
+        .connected { color: green; font-weight: bold; }
+        .disconnected { color: red; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 WebSocket调试测试页面</h1>
+        
+        <div class="section">
+            <h3>🎯 创建任务</h3>
+            <input type="text" id="topic" placeholder="文章主题" value="WebSocket调试测试">
+            <button onclick="createTask()">创建任务</button>
+            <div id="taskInfo"></div>
+        </div>
+        
+        <div class="section">
+            <h3>🔗 WebSocket连接</h3>
+            <div>连接状态: <span id="connectionStatus" class="disconnected">未连接</span></div>
+            <button onclick="connectWebSocket()">连接WebSocket</button>
+            <button onclick="disconnect()">断开连接</button>
+        </div>
+        
+        <div class="section">
+            <h3>📨 实时消息</h3>
+            <div id="messages" class="messages"></div>
+            <button onclick="clearMessages()">清空消息</button>
+        </div>
+        
+        <div class="section">
+            <h3>🔍 调试信息</h3>
+            <div id="debugInfo"></div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let currentTaskId = null;
+        let messageCount = 0;
+        
+        function log(message) {
+            console.log(message);
+            const debugDiv = document.getElementById('debugInfo');
+            debugDiv.innerHTML += `<p>${new Date().toLocaleTimeString()}: ${message}</p>`;
+        }
+        
+        async function createTask() {
+            const topic = document.getElementById('topic').value;
+            log(`📝 创建任务: ${topic}`);
+            
+            try {
+                const response = await fetch('http://localhost:8003/api/v1/tasks', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        user_id: 'debug_test_' + Date.now(),
+                        topic: topic,
+                        max_words: 400,
+                        style: 'casual',
+                        language: 'zh',
+                        mode: 'copilot'
+                    })
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    currentTaskId = result.task_id;
+                    
+                    document.getElementById('taskInfo').innerHTML = `
+                        <p>✅ 任务创建成功: ${currentTaskId}</p>
+                        <p>📊 状态: ${result.status}</p>
+                    `;
+                    
+                    log(`✅ 任务创建成功: ${currentTaskId}`);
+                    
+                    // 自动连接WebSocket
+                    setTimeout(connectWebSocket, 1000);
+                } else {
+                    const error = await response.text();
+                    log(`❌ 任务创建失败: ${response.status} - ${error}`);
+                }
+            } catch (e) {
+                log(`❌ 任务创建异常: ${e.message}`);
+            }
+        }
+        
+        function connectWebSocket() {
+            if (!currentTaskId) {
+                log('⚠️ 请先创建任务');
+                return;
+            }
+            
+            if (ws) {
+                ws.close();
+            }
+            
+            const wsUrl = `ws://localhost:8003/ws/${currentTaskId}`;
+            log(`🔗 连接WebSocket: ${wsUrl}`);
+            
+            ws = new WebSocket(wsUrl);
+            
+            ws.onopen = function() {
+                document.getElementById('connectionStatus').textContent = '已连接';
+                document.getElementById('connectionStatus').className = 'connected';
+                log('✅ WebSocket连接成功');
+                addMessage('🔗 WebSocket连接成功');
+            };
+            
+            ws.onmessage = function(event) {
+                messageCount++;
+                log(`📨 收到消息 #${messageCount}: ${event.data.substring(0, 100)}...`);
+                
+                try {
+                    const data = JSON.parse(event.data);
+                    handleMessage(data);
+                } catch (e) {
+                    log(`❌ 解析消息失败: ${e.message}`);
+                    addMessage(`❌ 解析失败: ${event.data}`);
+                }
+            };
+            
+            ws.onclose = function(event) {
+                document.getElementById('connectionStatus').textContent = '已断开';
+                document.getElementById('connectionStatus').className = 'disconnected';
+                log(`❌ WebSocket连接断开: code=${event.code}, reason=${event.reason}`);
+                addMessage('❌ WebSocket连接断开');
+            };
+            
+            ws.onerror = function(error) {
+                log(`❌ WebSocket错误: ${error}`);
+                addMessage(`❌ WebSocket错误: ${error}`);
+            };
+        }
+        
+        function handleMessage(data) {
+            const msgType = data.type || 'unknown';
+            
+            if (msgType === 'connected') {
+                addMessage(`🔗 连接确认: ${data.task_id}`);
+            } else if (msgType === 'task_started') {
+                addMessage(`🚀 任务开始: ${data.message}`);
+            } else if (msgType === 'progress_update') {
+                const step = data.step_name || data.step || 'unknown';
+                const progress = data.progress || 0;
+                const contentInfo = data.content_info || {};
+                
+                let msg = `📋 步骤: ${step} (${progress}%)`;
+                if (contentInfo.content_preview) {
+                    msg += `\\n💬 ${contentInfo.content_preview.substring(0, 100)}...`;
+                }
+                addMessage(msg);
+            } else if (msgType === 'task_complete') {
+                const result = data.result || {};
+                const article = result.article || '';
+                const outline = result.outline || {};
+                
+                let msg = `🎉 任务完成!\\n📖 文章长度: ${article.length} 字符\\n📝 标题: ${outline.title || 'N/A'}`;
+                if (data.message) {
+                    msg += `\\n💬 ${data.message}`;
+                }
+                addMessage(msg);
+            } else if (msgType === 'pong') {
+                addMessage('💓 心跳响应');
+            } else {
+                addMessage(`📨 ${msgType}: ${JSON.stringify(data).substring(0, 200)}...`);
+            }
+        }
+        
+        function disconnect() {
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+        }
+        
+        function addMessage(message) {
+            const messagesDiv = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message';
+            messageDiv.innerHTML = `<small>${new Date().toLocaleTimeString()}</small><br><pre style="white-space: pre-wrap;">${message}</pre>`;
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+        
+        function clearMessages() {
+            document.getElementById('messages').innerHTML = '';
+            messageCount = 0;
+        }
+        
+        // 页面加载完成后的初始化
+        window.onload = function() {
+            log('🚀 页面加载完成');
+        };
+        
+        // 定期发送心跳
+        setInterval(function() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send('ping');
+            }
+        }, 10000);
+    </script>
+</body>
+</html>

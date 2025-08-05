@@ -494,24 +494,74 @@ async def get_user_tasks(user_id: str):
 @app.get("/api/v1/events/{conversation_id}")
 async def get_event_stream(conversation_id: str):
     """获取会话事件流 (Server-Sent Events) - 支持新的 WorkflowAdapter 格式"""
+    logger.info(f"🔗 SSE连接请求: {conversation_id}")
 
     async def event_generator():
         """事件生成器 - 改进错误处理"""
         redis_client = get_redis_client()
         # 使用新的流名称格式
         stream_name = f"conversation_events:{conversation_id}"
+        # 先发送一个测试事件
+        yield f"data: {json.dumps({'type': 'connection_test', 'message': 'SSE连接成功', 'timestamp': datetime.now().isoformat()})}\n\n"
+
+        # 使用 0 读取所有历史消息，然后切换到新消息
         last_id = "0"
+        logger.info(f"📡 开始监听Redis流: {stream_name}")
 
         try:
+            # 先读取所有历史消息
+            try:
+                events = redis_client.xread({stream_name: "0"}, count=100)
+                if events:
+                    logger.info(f"📨 发送历史事件: {len(events[0][1])} 个")
+                    for stream, messages in events:
+                        for message_id, fields in messages:
+                            try:
+                                # 解析新格式的数据
+                                event_type = fields.get("event_type", "unknown")
+                                timestamp = fields.get("timestamp", "")
+                                data_str = fields.get("data", "{}")
+
+                                # 解析 JSON 数据
+                                data = json.loads(data_str) if isinstance(data_str, str) else data_str
+
+                                # 格式化为 SSE 格式
+                                event_data = {
+                                    "id": message_id,
+                                    "event_type": event_type,
+                                    "conversation_id": conversation_id,
+                                    "timestamp": timestamp,
+                                    "step": data.get("step", "unknown"),
+                                    "status": data.get("status", ""),
+                                    "progress": data.get("progress", 0),
+                                    "data": data
+                                }
+
+                                logger.info(f"📤 发送历史SSE事件: {message_id}, 类型: {event_type}")
+                                yield f"data: {json.dumps(event_data, ensure_ascii=False)}\n\n"
+                                last_id = message_id
+
+                            except Exception as e:
+                                logger.error(f"解析历史事件数据失败: {e}, fields: {fields}")
+                                continue
+                else:
+                    logger.info("📭 没有历史事件")
+            except Exception as e:
+                logger.error(f"读取历史事件失败: {e}")
+
+            # 现在监听新事件
             while True:
                 try:
                     # 读取新事件
                     events = redis_client.xread({stream_name: last_id}, count=10, block=1000)
 
                     if events:
+                        logger.info(f"📨 收到 {len(events)} 个流的事件")
                         for stream, messages in events:
+                            logger.info(f"📋 处理流 {stream}, 消息数: {len(messages)}")
                             for message_id, fields in messages:
                                 try:
+                                    logger.debug(f"🔍 处理消息: {message_id}, 字段: {list(fields.keys())}")
                                     # 解析新格式的数据
                                     event_type = fields.get("event_type", "unknown")
                                     timestamp = fields.get("timestamp", "")
@@ -533,8 +583,10 @@ async def get_event_stream(conversation_id: str):
                                     }
 
                                     try:
+                                        logger.info(f"📤 发送SSE事件: {message_id}, 类型: {event_type}")
                                         yield f"data: {json.dumps(event_data, ensure_ascii=False)}\n\n"
                                         last_id = message_id
+                                        logger.debug(f"✅ 更新last_id: {last_id}")
                                     except (ConnectionResetError, BrokenPipeError, OSError) as e:
                                         # 客户端断开连接，正常退出
                                         logger.info(f"客户端断开连接: {conversation_id}")
@@ -544,6 +596,7 @@ async def get_event_stream(conversation_id: str):
                                     logger.error(f"解析事件数据失败: {e}, fields: {fields}")
                                     continue
                     else:
+                        logger.debug(f"⏳ 没有新事件，继续等待...")
                         # 发送心跳
                         try:
                             yield f"data: {json.dumps({'type': 'heartbeat', 'timestamp': datetime.now().isoformat()})}\n\n"

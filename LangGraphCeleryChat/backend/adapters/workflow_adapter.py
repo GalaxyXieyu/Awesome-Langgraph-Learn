@@ -21,7 +21,15 @@ logger = get_logger(__name__)
 
 # 导入您的真正 Graph
 from ..graph.graph import create_writing_assistant_graph
-from langgraph.types import Command
+# from langgraph.types import Command  # 在LangGraph 0.0.62版本中不可用
+
+# 创建一个简单的Command替代类
+class Command:
+    """简单的Command替代类"""
+    def __init__(self, resume=None, **kwargs):
+        self.resume = resume
+        for key, value in kwargs.items():
+            setattr(self, key, value)
 
 class CeleryStreamWriter:
     """
@@ -167,7 +175,7 @@ class InterruptManager:
 
 class WorkflowAdapter:
     """
-    工作流适配器 - 重新设计版本
+    工作流适配器 - 重构版本
 
     核心职责：
     1. 直接调用外部 Interactive-Report-Workflow 图
@@ -176,22 +184,50 @@ class WorkflowAdapter:
     4. 提供统一的执行和恢复接口
 
     设计原则：
-    - 不重新构建图结构
-    - 不修改外部图的 checkpoint
-    - 只负责调用和数据转换
+    - 简化状态管理，避免冲突
+    - 使用LangGraph原生checkpoint机制
+    - 保持流式输出功能
+    - 统一ID管理
     """
 
-    def __init__(self, conversation_id: str, redis_client: RedisClient):
-        self.conversation_id = conversation_id  # 作为 LangGraph 的 thread_id
+    def __init__(self, thread_id: str, redis_client: RedisClient):
+        # 统一使用thread_id作为唯一标识，避免ID混乱
+        self.thread_id = thread_id
         self.redis_client = redis_client
-        self.stream_writer = CeleryStreamWriter(conversation_id, conversation_id, redis_client)
-        self.interrupt_manager = InterruptManager(conversation_id, conversation_id, redis_client)
+        self.stream_writer = CeleryStreamWriter(thread_id, thread_id, redis_client)
+        self.interrupt_manager = InterruptManager(thread_id, thread_id, redis_client)
 
-        # 直接使用外部图（已配置 Redis checkpoint）
+        # 直接使用外部图（已配置checkpoint）
         self.graph = create_writing_assistant_graph()
 
-        logger.info(f"✅ WorkflowAdapter 初始化完成，conversation_id: {conversation_id}")
+        # 设置全局流写入器，让LangGraph节点能够使用
+        self._setup_global_stream_writer()
+
+        logger.info(f"✅ WorkflowAdapter 初始化完成，thread_id: {thread_id}")
         logger.info(f"📊 图类型: {type(self.graph)}")
+
+    def _setup_global_stream_writer(self):
+        """设置全局流写入器，让LangGraph节点能够使用CeleryStreamWriter"""
+        try:
+            from ..graph.graph import set_global_stream_writer
+
+            # 创建一个包装函数，将CeleryStreamWriter的__call__方法作为writer
+            def redis_stream_writer(data):
+                """包装CeleryStreamWriter为简单的writer函数"""
+                try:
+                    # 调用CeleryStreamWriter的__call__方法
+                    self.stream_writer(data)
+                except Exception as e:
+                    logger.error(f"❌ Redis流写入失败: {e}")
+                    # 降级到日志输出
+                    logger.info(f"Stream writer (fallback): {data}")
+
+            # 设置为全局流写入器
+            set_global_stream_writer(redis_stream_writer)
+            logger.info(f"✅ 全局流写入器已配置，使用Redis Streams: {self.thread_id}")
+
+        except Exception as e:
+            logger.error(f"❌ 配置全局流写入器失败: {e}")
 
     async def execute_workflow(
         self,
@@ -199,7 +235,7 @@ class WorkflowAdapter:
         resume_command: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        统一的工作流执行接口
+        统一的工作流执行接口 - 简化版本
 
         Args:
             initial_state: 初始状态（用于新任务）
@@ -209,44 +245,21 @@ class WorkflowAdapter:
             执行结果，包含流式输出、中断信息等
         """
         try:
-            # 配置 LangGraph
+            # 配置 LangGraph - 统一使用thread_id
             config = {
-                "configurable": {"thread_id": self.conversation_id}
+                "configurable": {"thread_id": self.thread_id}
             }
 
-            # 确定输入参数
-            if initial_state is not None and resume_command is not None:
-                # 恢复调用，但需要重建状态
+            # 简化输入逻辑，避免复杂的状态重建
+            if resume_command is not None:
+                # 恢复调用 - 采用ReActAgentsTest的简单模式
                 input_data = Command(resume=resume_command)
-                logger.info(f"🔄 恢复工作流执行: {self.conversation_id}, command: {resume_command}")
-                logger.info(f"📝 重建状态，主题: {initial_state.get('topic', 'unknown')}")
-
-                # 确保 LangGraph 状态中包含所有必需字段
-                # 通过先更新状态，然后发送恢复命令
-                try:
-                    # 先尝试获取当前状态
-                    current_state = await self.graph.aget_state(config)
-                    if current_state and current_state.values:
-                        # 更新现有状态
-                        updated_state = {**current_state.values, **initial_state}
-                        await self.graph.aupdate_state(config, updated_state)
-                        logger.info(f"✅ 状态更新成功，包含字段: {list(updated_state.keys())}")
-                    else:
-                        # 如果没有现有状态，先初始化状态
-                        await self.graph.aupdate_state(config, initial_state)
-                        logger.info(f"✅ 状态初始化成功，包含字段: {list(initial_state.keys())}")
-                except Exception as e:
-                    logger.warning(f"⚠️ 状态更新失败，继续执行: {e}")
-
+                logger.info(f"🔄 恢复工作流执行: {self.thread_id}, command: {resume_command}")
             elif initial_state is not None:
                 # 初始调用
                 input_data = initial_state
-                logger.info(f"🚀 开始新的工作流执行: {self.conversation_id}")
+                logger.info(f"🚀 开始新的工作流执行: {self.thread_id}")
                 logger.info(f"📝 初始状态: {initial_state.get('topic', 'unknown')}")
-            elif resume_command is not None:
-                # 纯恢复调用（不重建状态）
-                input_data = Command(resume=resume_command)
-                logger.info(f"🔄 恢复工作流执行: {self.conversation_id}, command: {resume_command}")
             else:
                 raise ValueError("必须提供 initial_state 或 resume_command 之一")
 
@@ -279,13 +292,14 @@ class WorkflowAdapter:
             async for chunk in self.graph.astream(
                 input_data,
                 cast(Any, config),
-                stream_mode=["custom", "updates"]
+                stream_mode=["updates"]  # 在LangGraph 0.0.62中只使用支持的模式
             ):
                 logger.info(f"📊 流式输出: {chunk}")
 
                 # 处理不同类型的流式输出
                 if isinstance(chunk, tuple) and len(chunk) == 2:
                     stream_type, data = chunk
+                    logger.info(f"🔍 解析流式数据: stream_type={stream_type}, data_keys={list(data.keys()) if isinstance(data, dict) else type(data)}")
 
                     if stream_type == "custom":
                         # 处理自定义流式数据（进度、状态等）
@@ -301,8 +315,11 @@ class WorkflowAdapter:
                             break
                         else:
                             # 正常状态更新
+                            logger.info(f"✅ 准备调用_handle_state_update")
                             await self._handle_state_update(data)
                             final_result = data
+                else:
+                    logger.info(f"⚠️ 跳过非tuple流式数据: {type(chunk)}")
 
                 # 保存最终结果
                 if chunk and not interrupted:
@@ -319,18 +336,19 @@ class WorkflowAdapter:
             raise
 
     async def _handle_custom_stream(self, data: Dict[str, Any]):
-        """处理自定义流式数据 - 直接使用外部图的格式"""
+        """处理自定义流式数据 - 保持原有流式功能不变"""
         try:
             logger.info(f"📥 开始处理流式数据: {data}")
 
-            # 外部图已经提供了正确的格式，直接写入 Redis Streams
-            stream_name = f"conversation_events:{self.conversation_id}"
+            # 使用统一的thread_id作为标识
+            stream_name = f"conversation_events:{self.thread_id}"
             logger.info(f"📝 写入流名称: {stream_name}")
 
-            # 添加 conversation_id 到数据中
+            # 添加 thread_id 到数据中，保持兼容性
             enhanced_data = {
                 **data,
-                "conversation_id": self.conversation_id
+                "conversation_id": self.thread_id,  # 保持字段名兼容
+                "thread_id": self.thread_id
             }
 
             # 准备写入 Redis 的数据
@@ -351,14 +369,16 @@ class WorkflowAdapter:
             logger.error(f"❌ 详细错误: {traceback.format_exc()}")
 
     async def _handle_state_update(self, data: Dict[str, Any]):
-        """处理状态更新 - 直接写入"""
+        """处理状态更新 - 保持流式功能"""
+        logger.info(f"🔄 开始处理状态更新: {list(data.keys())}")
         try:
-            stream_name = f"conversation_events:{self.conversation_id}"
+            stream_name = f"conversation_events:{self.thread_id}"
 
-            # 添加元数据
+            # 添加元数据，保持兼容性
             enhanced_data = {
                 **data,
-                "conversation_id": self.conversation_id,
+                "conversation_id": self.thread_id,  # 保持字段名兼容
+                "thread_id": self.thread_id,
                 "event_type": "state_update"
             }
 
@@ -367,12 +387,12 @@ class WorkflowAdapter:
                 stream_name,
                 {
                     "event_type": "state_update",
-                    "timestamp": datetime.now().timestamp(),
+                    "timestamp": str(datetime.now().timestamp()),
                     "data": json.dumps(enhanced_data, ensure_ascii=False, default=str)
                 }
             )
 
-            logger.debug(f"📤 状态更新已写入: {list(data.keys())}")
+            logger.info(f"📤 状态更新已写入Redis Streams: {stream_name}, 数据键: {list(data.keys())}")
 
         except Exception as e:
             logger.error(f"❌ 处理状态更新失败: {e}")
@@ -394,7 +414,8 @@ class WorkflowAdapter:
             interrupt_id = str(uuid.uuid4())
             interrupt_event = {
                 "event_type": "interrupt_request",
-                "conversation_id": self.conversation_id,
+                "conversation_id": self.thread_id,  # 保持兼容
+                "thread_id": self.thread_id,
                 "timestamp": datetime.now().isoformat(),
                 "data": {
                     "interrupt_id": interrupt_id,
@@ -406,7 +427,7 @@ class WorkflowAdapter:
             }
 
             # 写入 Redis Streams
-            stream_name = f"conversation_events:{self.conversation_id}"
+            stream_name = f"conversation_events:{self.thread_id}"
             self.redis_client.xadd(
                 stream_name,
                 {
@@ -421,6 +442,7 @@ class WorkflowAdapter:
             return {
                 "completed": False,
                 "interrupted": True,
+                "thread_id": self.thread_id,
                 "interrupt_id": interrupt_event["data"]["interrupt_id"],
                 "interrupt_type": interrupt_event["data"]["interrupt_type"],
                 "title": interrupt_event["data"]["title"],
@@ -447,7 +469,8 @@ class WorkflowAdapter:
             result = {
                 "completed": True,
                 "interrupted": False,
-                "conversation_id": self.conversation_id
+                "thread_id": self.thread_id,
+                "conversation_id": self.thread_id  # 保持兼容
             }
 
             if isinstance(data, dict):
@@ -469,7 +492,7 @@ class WorkflowAdapter:
                         "search_results": data.get("search_results", [])
                     })
 
-            logger.info(f"✅ 工作流执行完成: {self.conversation_id}")
+            logger.info(f"✅ 工作流执行完成: {self.thread_id}")
             return result
 
         except Exception as e:
@@ -477,169 +500,14 @@ class WorkflowAdapter:
             return {
                 "completed": True,
                 "interrupted": False,
-                "conversation_id": self.conversation_id,
+                "thread_id": self.thread_id,
+                "conversation_id": self.thread_id,  # 保持兼容
                 "error": f"格式化结果失败: {e}"
             }
 
-    async def execute_writing_workflow(
-        self,
-        initial_state: Dict[str, Any],
-        task_state: WritingTaskState,
-        is_resumed: bool = False
-    ) -> Dict[str, Any]:
-        """
-        执行写作工作流（支持 interrupt 和 streaming）
-
-        Args:
-            initial_state: 初始状态
-            task_state: 任务状态
-
-        Returns:
-            执行结果
-        """
-        try:
-            # 设置配置
-            config = {
-                "configurable": {"thread_id": self.session_id}
-            }
-
-            # 注入流写入器
-            self._inject_stream_writer()
-
-            # 执行工作流
-            logger.info(f"开始执行工作流: {self.task_id}")
-
-            # 使用 astream 执行图，支持中断和流式输出
-            final_result = None
-            interrupted = False
-
-            try:
-                # 使用您的真正 Graph 的调用方式
-                async for chunk in self.graph.astream(initial_state, cast(Any, config), stream_mode=["custom", "updates"]):
-                    logger.info(f"工作流步骤: {chunk}")
-
-                    # 处理流式输出
-                    await self._handle_streaming_output(chunk)
-
-                    # 更新最终结果
-                    if chunk:
-                        final_result = chunk
-
-            except Exception as e:
-                # 检查是否是中断异常
-                if "interrupt" in str(e).lower():
-                    logger.info(f"工作流被中断，等待用户响应: {e}")
-                    interrupted = True
-
-                    # 获取当前状态
-                    current_state = self.graph.get_state(config)
-
-                    # 创建中断数据
-                    interrupt_data = self._create_interrupt_data_from_state(current_state)
-                    interrupt_id = await self.interrupt_manager.send_interrupt_request(interrupt_data)
-
-                    return {
-                        "completed": False,
-                        "paused": True,
-                        "interrupted": True,
-                        "interrupt_id": interrupt_id,
-                        "current_step": "awaiting_user_response",
-                        "progress": 50,
-                        "state": current_state.values if current_state else {}
-                    }
-                else:
-                    raise e
-
-            # 工作流完成
-            if not interrupted:
-                logger.info(f"工作流执行完成: {self.task_id}")
-                return {
-                    "completed": True,
-                    "outline": final_result.get("outline") if final_result else None,
-                    "article": final_result.get("article") if final_result else None,
-                    "search_results": final_result.get("search_results", []) if final_result else [],
-                    "state": final_result or {}
-                }
-
-        except Exception as e:
-            logger.error(f"执行工作流失败: {e}")
-            raise
+    # 移除已废弃的方法，使用统一的execute_workflow接口
     
-    async def resume_writing_workflow(
-        self,
-        task_state: WritingTaskState,
-        user_response: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """
-        恢复写作工作流（使用 LangGraph checkpoint）
-
-        Args:
-            task_state: 任务状态
-            user_response: 用户响应
-
-        Returns:
-            执行结果
-        """
-        try:
-            logger.info(f"恢复工作流: {self.task_id}, 用户响应: {user_response}")
-
-            # 设置配置
-            config = {
-                "configurable": {"thread_id": self.session_id}
-            }
-
-            # 处理用户响应
-            response_type = user_response.get("response", "")
-            approved = user_response.get("approved", False)
-
-            # 根据用户响应决定 resume 参数
-            if response_type == "确认继续" or approved or "yes" in response_type.lower():
-                resume_value = "yes"
-            else:
-                resume_value = "no"
-
-            logger.info(f"🔄 使用 Command 恢复工作流: resume={resume_value}")
-
-            # 使用您的 Graph 的 Command 方式恢复
-            if REAL_GRAPH_AVAILABLE and Command:
-                # 使用 Command(resume="yes") 的方式
-                final_result = None
-                async for chunk in self.graph.astream(Command(resume=resume_value), cast(Any, config), stream_mode=["custom", "updates"]):
-                    logger.info(f"恢复工作流步骤: {chunk}")
-                    if chunk:
-                        final_result = chunk
-
-                result = final_result
-            else:
-                # 回退到传统方式
-                updated_state = {"user_confirmation": resume_value}
-                self.graph.update_state(config, updated_state)
-                result = await self.graph.ainvoke(None, config=config)
-
-            # 检查是否完成
-            if result and result.get("current_step") == "completed":
-                logger.info(f"工作流恢复执行完成: {self.task_id}")
-                return {
-                    "completed": True,
-                    "outline": result.get("outline"),
-                    "article": result.get("article"),
-                    "search_results": result.get("search_results", []),
-                    "state": result
-                }
-            else:
-                # 可能还有其他中断
-                logger.info(f"工作流仍在等待: {result.get('current_step') if result else 'unknown'}")
-                return {
-                    "completed": False,
-                    "paused": True,
-                    "current_step": result.get("current_step", "waiting") if result else "waiting",
-                    "progress": 75,
-                    "state": result or {}
-                }
-
-        except Exception as e:
-            logger.error(f"恢复工作流失败: {e}")
-            raise
+    # 移除已废弃的方法，使用统一的execute_workflow接口
 
     def _rebuild_state_from_task(self, task_state: WritingTaskState, user_response: Dict[str, Any]) -> Dict[str, Any]:
         """从任务状态重建工作流状态"""
@@ -789,14 +657,14 @@ class WorkflowAdapter:
         """处理流式输出，存储到 Redis"""
         try:
             # 简化版本：直接存储到 Redis hash
-            stream_key = f"stream:{self.task_id}"
+            stream_key = f"stream:{self.thread_id}"
 
             # 序列化数据
             import json
             chunk_data = {
                 "data": json.dumps(chunk),
                 "timestamp": datetime.now().isoformat(),
-                "task_id": self.task_id
+                "task_id": self.thread_id
             }
 
             # 存储到 Redis hash（简化版本）
@@ -823,8 +691,8 @@ class WorkflowAdapter:
                 "type": "user_confirmation_required",
                 "message": "需要用户确认以继续执行",
                 "data": state_values,
-                "task_id": self.task_id,
-                "session_id": self.session_id,
+                "task_id": self.thread_id,
+                "session_id": self.thread_id,
                 "timestamp": datetime.now().isoformat()
             }
         except Exception as e:
@@ -832,5 +700,5 @@ class WorkflowAdapter:
             return {
                 "type": "error",
                 "message": f"创建中断数据失败: {e}",
-                "task_id": self.task_id
+                "task_id": self.thread_id
             }

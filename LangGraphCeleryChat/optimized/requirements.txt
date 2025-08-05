@@ -1,0 +1,12 @@
+# LangGraph Celery Chat - 优化版依赖
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+celery>=5.3.0
+redis>=5.0.0
+pydantic>=2.0.0
+python-multipart
+langgraph>=0.0.62
+langchain>=0.1.0
+langchain-openai
+langchain-community
+psycopg[binary]>=3.1.0

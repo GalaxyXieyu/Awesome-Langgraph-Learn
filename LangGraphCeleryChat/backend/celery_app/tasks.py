@@ -63,10 +63,10 @@ def execute_writing_task(self, user_id: str, session_id: str, task_id: str, conf
                 metadata=task_state.dict()
             )
             
-            # 创建工作流适配器（使用 conversation_id 作为统一标识）
-            conversation_id = original_conversation_id or session_id
+            # 创建工作流适配器（使用 thread_id 作为统一标识）
+            thread_id = original_conversation_id or session_id
             workflow_adapter = WorkflowAdapter(
-                conversation_id=conversation_id,
+                thread_id=thread_id,
                 redis_client=get_redis_client()
             )
 
@@ -207,43 +207,26 @@ def resume_writing_task(self, user_id: str, session_id: str, task_id: str, user_
                 metadata=task_state.dict()
             )
             
-            # 创建工作流适配器（使用相同的 conversation_id）
+            # 创建工作流适配器（使用相同的 thread_id）
             metadata = task_data.get("metadata", {})
             original_conversation_id = metadata.get("original_conversation_id")
-            conversation_id = original_conversation_id or session_id
+            thread_id = original_conversation_id or session_id
 
             workflow_adapter = WorkflowAdapter(
-                conversation_id=conversation_id,
+                thread_id=thread_id,
                 redis_client=get_redis_client()
             )
 
-            # 处理用户响应并恢复工作流（使用新的统一接口）
+            # 处理用户响应并恢复工作流（使用新的简化接口）
             logger.info(f"恢复写作任务: {task_id}, 用户响应: {user_response}")
 
-            # 提取用户响应命令
+            # 提取用户响应命令 - 采用ReActAgentsTest的简单模式
             resume_command = user_response.get("response", "yes")  # 默认为 yes
-
-            # 重建工作流状态，确保包含所有必需字段
-            initial_state = {
-                "topic": task_state.config.topic,
-                "user_id": task_state.user_id,
-                "max_words": task_state.config.max_words,
-                "style": task_state.config.style.value,
-                "language": task_state.config.language,
-                "mode": task_state.config.mode.value,
-                "outline": task_state.outline.model_dump() if task_state.outline else None,
-                "article": task_state.article,
-                "search_results": [sr.model_dump() for sr in task_state.search_results] if task_state.search_results else [],
-                "user_confirmation": task_state.user_confirmation,
-                "search_permission": task_state.search_permission,
-                "rag_permission": task_state.rag_permission,
-                "messages": []
-            }
-
-            logger.info(f"🔄 重建工作流状态，主题: {initial_state['topic']}, 模式: {initial_state['mode']}")
+            
+            # 简化为直接恢复，不重建状态
+            logger.info(f"🔄 直接恢复工作流: resume={resume_command}")
 
             result = await workflow_adapter.execute_workflow(
-                initial_state=initial_state,
                 resume_command=resume_command
             )
             
