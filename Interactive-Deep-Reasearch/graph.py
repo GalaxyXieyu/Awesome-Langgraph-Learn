@@ -32,22 +32,17 @@ def safe_get_stream_writer():
 
 # 导入本地模块
 from state import (
-    DeepResearchState, ReportMode, AgentType, InteractionType, TaskStatus,
-    ReportOutline, ReportSection, ResearchResult, AnalysisInsight,
+    DeepResearchState, ReportMode, TaskStatus, InteractionType,
+    ReportOutline, ReportSection, ResearchResult,
     update_performance_metrics, add_research_result,
-    add_analysis_insight, update_task_status, add_user_interaction
+    update_task_status, add_user_interaction
 )
-from tools import (
-    get_research_tools, get_analysis_tools, get_writing_tools, get_validation_tools,
-    advanced_web_search, multi_source_research, content_analyzer, trend_analyzer,
-    section_content_generator, report_formatter, quality_validator
-)
+# 简化工具导入 - 大部分功能由update子图处理
 
-# 导入子图模块
-from subgraph.research.graph import (
-    create_intelligent_section_research_graph,
-    create_intelligent_initial_state,
-    IntelligentSectionState
+# 导入子图模块 - 使用update子图替代research子图
+from subgraph.update.graph import (
+    create_intelligent_research_graph,
+    IntelligentResearchState
 )
 
 # 配置日志
@@ -67,120 +62,129 @@ def create_llm() -> ChatOpenAI:
         api_key="sk-0rnrrSH0OsiaWCiv6b37C1E4E60c4b9394325001Ec19A197",
     )
 
-# 编译子图（全局变量，避免重复编译）
-_intelligent_section_subgraph = None
+# 编译子图（全局变量，避免重复编译）- 使用update子图
+_intelligent_research_subgraph = None
 
-def get_intelligent_section_subgraph():
-    """获取智能章节研究子图实例"""
-    global _intelligent_section_subgraph
-    if _intelligent_section_subgraph is None:
-        workflow = create_intelligent_section_research_graph()
-        _intelligent_section_subgraph = workflow.compile()
-    return _intelligent_section_subgraph
+def get_intelligent_research_subgraph():
+    """获取智能研究子图实例"""
+    global _intelligent_research_subgraph
+    if _intelligent_research_subgraph is None:
+        workflow = create_intelligent_research_graph()
+        _intelligent_research_subgraph = workflow.compile()
+    return _intelligent_research_subgraph
 
-def call_intelligent_section_research(state: DeepResearchState) -> DeepResearchState:
+def create_update_subgraph_state(state: DeepResearchState) -> Dict[str, Any]:
     """
-    调用智能章节研究子图
+    创建update子图的初始状态
+    将主图状态转换为update子图所需的状态格式
+    """
+    outline = state.get("outline", {})
+    sections = outline.get("sections", []) if outline else []
+
+    # 转换章节格式，确保每个章节都有id
+    formatted_sections = []
+    for i, section in enumerate(sections):
+        formatted_section = {
+            "id": section.get("id", f"section_{i}"),
+            "title": section.get("title", f"章节 {i+1}"),
+            "description": section.get("description", ""),
+            "key_points": section.get("key_points", []),
+            "research_queries": section.get("research_queries", [])
+        }
+        formatted_sections.append(formatted_section)
+
+    # 创建update子图状态
+    subgraph_state = {
+        "messages": [],
+        "user_input": f"请为主题'{state.get('topic', '')}'生成深度研究报告",
+        "topic": state.get("topic", ""),
+        "sections": formatted_sections,
+        "current_section_index": 0,
+        "research_results": {},
+        "writing_results": {},
+        "polishing_results": {},
+        "final_report": {},
+        "execution_path": [],
+        "iteration_count": 0,
+        "max_iterations": 10,
+        "next_action": "research",
+        "task_completed": False,
+        "error_log": [],
+        "section_attempts": {}
+    }
+
+    return subgraph_state
+
+async def call_intelligent_research_subgraph(state: DeepResearchState) -> DeepResearchState:
+    """
+    调用智能研究子图（update版本）
 
     这个函数实现了主图和子图之间的状态转换：
-    1. 将 DeepResearchState 转换为 IntelligentSectionState
-    2. 调用子图进行章节研究
+    1. 将 DeepResearchState 转换为 IntelligentResearchState
+    2. 调用update子图进行研究和写作
     3. 将结果转换回 DeepResearchState
     """
     try:
         # 获取子图实例
-        subgraph = get_intelligent_section_subgraph()
+        subgraph = get_intelligent_research_subgraph()
 
-        # 获取当前处理的章节
-        current_section_index = state.get("current_section_index", 0)
-        sections = state.get("sections", [])
+        # 创建子图输入状态
+        subgraph_input = create_update_subgraph_state(state)
 
-        if current_section_index >= len(sections):
-            logger.warning(f"章节索引 {current_section_index} 超出范围，总章节数: {len(sections)}")
-            return state
-
-        current_section = sections[current_section_index]
-
-        # 状态转换：DeepResearchState -> IntelligentSectionState
-        # 准备前面章节的摘要
-        previous_sections_summary = []
-        for i in range(current_section_index):
-            if i < len(sections) and sections[i].get("content"):
-                summary = sections[i].get("content", "")[:200] + "..." if len(sections[i].get("content", "")) > 200 else sections[i].get("content", "")
-                previous_sections_summary.append(f"{sections[i].get('title', '')}: {summary}")
-
-        # 准备后续章节大纲
-        upcoming_sections_outline = []
-        for i in range(current_section_index + 1, len(sections)):
-            if i < len(sections):
-                upcoming_sections_outline.append(f"{sections[i].get('title', '')}: {sections[i].get('description', '')}")
-
-        subgraph_input = create_intelligent_initial_state(
-            topic=state.get("topic", ""),
-            section={
-                "title": current_section.get("title", ""),
-                "description": current_section.get("description", ""),
-                "requirements": current_section.get("requirements", [])
-            },
-            previous_sections_summary=previous_sections_summary,
-            upcoming_sections_outline=upcoming_sections_outline,
-            report_main_thread=state.get("outline", {}).get("executive_summary", ""),
-            writing_style=state.get("writing_style", "professional"),
-            quality_threshold=0.8,
-            max_iterations=3
-        )
-
-        logger.info(f"开始智能章节研究: {current_section.get('title', '未知章节')}")
+        logger.info(f"开始智能研究: {state.get('topic', '未知主题')}")
 
         # 调用子图
-        subgraph_output = subgraph.invoke(subgraph_input)
+        subgraph_output = await subgraph.ainvoke(subgraph_input)
 
-        # 状态转换：IntelligentSectionState -> DeepResearchState
-        if subgraph_output and subgraph_output.get("final_content"):
-            # 更新当前章节内容
-            updated_sections = sections.copy()
-            updated_sections[current_section_index] = {
-                **current_section,
-                "content": subgraph_output["final_content"],
-                "research_data": subgraph_output.get("research_results", []),
-                "quality_score": subgraph_output.get("quality_metrics", {}).get("overall_score", 0.0),
-                "status": "completed"
-            }
+        # 状态转换：IntelligentResearchState -> DeepResearchState
+        if subgraph_output and subgraph_output.get("final_report"):
+            final_report = subgraph_output["final_report"]
+            sections_data = final_report.get("sections", [])
+
+            # 转换章节数据格式
+            updated_sections = []
+            for section_data in sections_data:
+                updated_section = {
+                    "title": section_data.get("title", ""),
+                    "content": section_data.get("content", ""),
+                    "word_count": section_data.get("word_count", 0),
+                    "status": "completed"
+                }
+                updated_sections.append(updated_section)
 
             # 合并研究结果到主状态
             new_research_results = []
-            research_data = subgraph_output.get("research_data", {})
-            initial_research = research_data.get("initial_research", [])
-            supplementary_research = research_data.get("supplementary_research", [])
+            research_results = subgraph_output.get("research_results", {})
 
-            for research_item in initial_research + supplementary_research:
+            for section_id, research_data in research_results.items():
                 new_research_results.append(ResearchResult(
-                    id=research_item.get("id", str(uuid.uuid4())),
-                    query=research_item.get("query", ""),
-                    source_type="web",
-                    title=research_item.get("title", ""),
-                    content=research_item.get("content", ""),
-                    url=research_item.get("url", ""),
-                    relevance_score=research_item.get("relevance_score", 0.8),
-                    timestamp=research_item.get("timestamp", time.time()),
-                    section_id=current_section.get("id", "")
+                    id=str(uuid.uuid4()),
+                    query=f"研究章节: {research_data.get('title', '')}",
+                    source_type="subgraph",
+                    title=research_data.get("title", ""),
+                    content=research_data.get("content", ""),
+                    url="",
+                    relevance_score=0.9,
+                    timestamp=research_data.get("timestamp", time.time()),
+                    section_id=section_id
                 ))
 
             # 更新状态
             updated_state = {
                 **state,
                 "sections": updated_sections,
-                "current_section_index": current_section_index + 1,
                 "research_results": state.get("research_results", []) + new_research_results,
+                "content_creation_completed": True,
+                "completed_sections_count": len(updated_sections),
                 "performance_metrics": {
                     **state.get("performance_metrics", {}),
-                    "sections_completed": current_section_index + 1,
-                    "total_sections": len(sections),
-                    "last_section_quality": subgraph_output.get("quality_metrics", {}).get("overall_score", 0.0)
+                    "sections_completed": len(updated_sections),
+                    "total_sections": len(updated_sections),
+                    "total_words": final_report.get("total_words", 0)
                 }
             }
 
-            logger.info(f"章节研究完成: {current_section.get('title', '未知章节')}, 质量分数: {subgraph_output.get('quality_metrics', {}).get('overall_score', 0.0)}")
+            logger.info(f"智能研究完成: {len(updated_sections)}个章节, 总字数: {final_report.get('total_words', 0)}")
             return updated_state
         else:
             logger.error("子图返回了空结果")
@@ -189,50 +193,6 @@ def call_intelligent_section_research(state: DeepResearchState) -> DeepResearchS
     except Exception as e:
         logger.error(f"调用智能章节研究子图时出错: {e}")
         return state
-
-def prepare_subgraph_state(main_state: DeepResearchState, section: Dict[str, Any], section_index: int, completed_sections: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """准备子图输入状态"""
-
-    # 准备前面章节的摘要
-    previous_sections_summary = []
-    for completed_section in completed_sections:
-        if completed_section.get("content"):
-            summary = completed_section["content"][:200] + "..." if len(completed_section["content"]) > 200 else completed_section["content"]
-            previous_sections_summary.append(f"{completed_section.get('title', '')}: {summary}")
-
-    # 准备后续章节大纲
-    all_sections = main_state.get("outline", {}).get("sections", [])
-    upcoming_sections_outline = []
-    for i in range(section_index + 1, len(all_sections)):
-        if i < len(all_sections):
-            upcoming_sections_outline.append(f"{all_sections[i].get('title', '')}: {all_sections[i].get('description', '')}")
-
-    # 使用子图的状态创建函数
-    return create_intelligent_initial_state(
-        topic=main_state.get("topic", ""),
-        section=section,
-        previous_sections_summary=previous_sections_summary,
-        upcoming_sections_outline=upcoming_sections_outline,
-        report_main_thread=main_state.get("outline", {}).get("executive_summary", "") if main_state.get("outline") else "",
-        writing_style=main_state.get("writing_style", "professional"),
-        quality_threshold=0.8,
-        max_iterations=3
-    )
-
-async def call_intelligent_subgraph(subgraph_state: Dict[str, Any]) -> Dict[str, Any]:
-    """调用智能章节研究子图"""
-    try:
-        # 获取子图实例
-        subgraph = get_intelligent_section_subgraph()
-
-        # 调用子图
-        result = await subgraph.ainvoke(subgraph_state)
-
-        return result
-
-    except Exception as e:
-        logger.error(f"调用智能子图失败: {e}")
-        return {}
 
 def convert_research_data_to_results(research_data: List[Dict[str, Any]]) -> List[ResearchResult]:
     """将子图的研究数据转换为主图的 ResearchResult 格式"""
@@ -260,18 +220,18 @@ def convert_research_data_to_results(research_data: List[Dict[str, Any]]) -> Lis
 
 async def intelligent_section_processing_node(state: DeepResearchState, config=None) -> DeepResearchState:
     """
-    智能章节处理节点 - 逐个调用子图处理每个章节
+    智能章节处理节点 - 使用update子图进行整体研究和写作
 
     这个节点的作用：
     1. 获取大纲中的所有章节
-    2. 逐个调用智能章节研究子图
-    3. 每个章节都经过完整的：研究→分析→生成→质量评估→优化流程
-    4. 汇总所有章节形成完整报告
+    2. 调用update子图进行智能研究和写作
+    3. 子图内部处理：智能Supervisor → 研究 → 写作 → 整合
+    4. 返回完整的研究报告
     """
     writer = safe_get_stream_writer()
     writer({
         "step": "intelligent_section_processing",
-        "status": "🧠 开始智能章节处理（集成子图）",
+        "status": "🧠 开始智能研究处理（使用update子图）",
         "progress": 0
     })
 
@@ -287,89 +247,47 @@ async def intelligent_section_processing_node(state: DeepResearchState, config=N
             })
             return state
 
-        completed_sections = []
-        all_research_data = []
-
         writer({
             "step": "intelligent_section_processing",
-            "status": f"📚 准备处理 {len(sections)} 个章节，每个章节都将经过完整的智能研究流程",
+            "status": f"📚 准备使用智能Supervisor处理 {len(sections)} 个章节",
             "progress": 10,
             "total_sections": len(sections)
         })
 
-        # 逐个处理每个章节
-        for section_index, section in enumerate(sections):
-            writer({
-                "step": "intelligent_section_processing",
-                "status": f"🔬 处理章节 {section_index + 1}/{len(sections)}: {section.get('title', '未知章节')}",
-                "progress": 10 + (section_index / len(sections)) * 80,
-                "current_section": section.get('title', '未知章节'),
-                "section_index": section_index + 1
-            })
-
-            # 准备子图输入状态
-            subgraph_state = prepare_subgraph_state(state, section, section_index, completed_sections)
-
-            # 调用智能章节研究子图
-            subgraph_result = await call_intelligent_subgraph(subgraph_state)
-
-            if subgraph_result and subgraph_result.get("final_content"):
-                # 成功处理章节
-                section_result = {
-                    **section,
-                    "content": subgraph_result["final_content"],
-                    "research_data": subgraph_result.get("research_data", {}),
-                    "quality_metrics": subgraph_result.get("quality_metrics", {}),
-                    "processing_time": subgraph_result.get("processing_time", 0),
-                    "iteration_count": subgraph_result.get("iteration_count", 0),
-                    "status": "completed"
-                }
-                completed_sections.append(section_result)
-
-                # 收集研究数据
-                research_data = subgraph_result.get("research_data", {})
-                if research_data.get("initial_research_results"):
-                    all_research_data.extend(research_data["initial_research_results"])
-                if research_data.get("supplementary_research_results"):
-                    all_research_data.extend(research_data["supplementary_research_results"])
-
-                writer({
-                    "step": "intelligent_section_processing",
-                    "status": f"✅ 章节完成: {section.get('title', '未知章节')} (质量: {subgraph_result.get('quality_metrics', {}).get('final_quality_score', 0):.2f})",
-                    "progress": 10 + ((section_index + 1) / len(sections)) * 80,
-                    "completed_sections": len(completed_sections),
-                    "quality_score": subgraph_result.get('quality_metrics', {}).get('final_quality_score', 0)
-                })
-            else:
-                # 章节处理失败
-                writer({
-                    "step": "intelligent_section_processing",
-                    "status": f"⚠️ 章节处理失败: {section.get('title', '未知章节')}",
-                    "progress": 10 + ((section_index + 1) / len(sections)) * 80
-                })
-                logger.warning(f"章节处理失败: {section.get('title', '未知章节')}")
-
-        # 更新主图状态
-        state["sections"] = completed_sections
-        state["research_results"] = convert_research_data_to_results(all_research_data)
-        state["content_creation_completed"] = True
-        state["completed_sections_count"] = len(completed_sections)
-
-        # 计算整体质量
-        avg_quality = sum(s.get("quality_metrics", {}).get("final_quality_score", 0) for s in completed_sections) / max(len(completed_sections), 1)
-
+        # 调用update子图进行整体处理
         writer({
             "step": "intelligent_section_processing",
-            "status": f"🎉 智能章节处理完成！成功处理 {len(completed_sections)}/{len(sections)} 个章节",
-            "progress": 100,
-            "completed_sections": len(completed_sections),
-            "total_sections": len(sections),
-            "average_quality": avg_quality,
-            "total_research_items": len(all_research_data)
+            "status": "🔬 启动智能研究子图...",
+            "progress": 20
         })
 
-        logger.info(f"智能章节处理完成: {len(completed_sections)}/{len(sections)} 个章节, 平均质量: {avg_quality:.3f}")
-        return state
+        # 直接调用子图（按照官方文档的方式）
+        updated_state = await call_intelligent_research_subgraph(state)
+
+        # 检查处理结果
+        if updated_state.get("content_creation_completed"):
+            completed_sections = updated_state.get("sections", [])
+            total_words = updated_state.get("performance_metrics", {}).get("total_words", 0)
+
+            writer({
+                "step": "intelligent_section_processing",
+                "status": f"🎉 智能研究完成！成功处理 {len(completed_sections)} 个章节",
+                "progress": 100,
+                "completed_sections": len(completed_sections),
+                "total_sections": len(sections),
+                "total_words": total_words
+            })
+
+            logger.info(f"智能研究完成: {len(completed_sections)} 个章节, 总字数: {total_words}")
+            return updated_state
+        else:
+            writer({
+                "step": "intelligent_section_processing",
+                "status": "⚠️ 子图处理未完成，返回原状态",
+                "progress": 50
+            })
+            logger.warning("子图处理未完成")
+            return state
 
     except Exception as e:
         logger.error(f"智能章节处理失败: {str(e)}")
@@ -380,276 +298,6 @@ async def intelligent_section_processing_node(state: DeepResearchState, config=N
         })
 
         state["error_log"] = state.get("error_log", []) + [f"智能章节处理错误: {str(e)}"]
-        return state
-
-def create_specialized_agents():
-    """创建专业化Agent"""
-    llm = create_llm()
-    
-    # 研究专家Agent
-    researcher_agent = create_react_agent(
-        llm,
-        tools=get_research_tools(),
-        prompt="""你是一个专业的研究专家。你的职责包括：
-        1. 深度搜索和收集相关信息
-        2. 评估信息来源的可信度和相关性
-        3. 识别关键趋势和发展模式
-        4. 提供全面且准确的研究数据
-        
-        工作原则：
-        - 使用多个可信来源验证信息
-        - 关注最新发展和趋势
-        - 保持客观和批判性思维
-        - 提供详细的数据支撑
-        
-        请确保研究的深度和广度，为后续分析提供充分的数据基础。"""
-    )
-    
-    # 分析专家Agent
-    analyst_agent = create_react_agent(
-        llm,
-        tools=get_analysis_tools(),
-        prompt="""你是一个专业的分析专家。你的职责包括：
-        1. 深度分析研究数据和信息
-        2. 识别关键洞察、模式和趋势
-        3. 进行预测性分析和风险评估
-        4. 提供数据驱动的结论和建议
-        
-        分析重点：
-        - 趋势识别和模式发现
-        - 因果关系分析
-        - 影响因素评估
-        - 预测性洞察生成
-        
-        请运用严格的分析方法，确保结论的科学性和可靠性。"""
-    )
-    
-    # 写作专家Agent
-    writer_agent = create_react_agent(
-        llm,
-        tools=get_writing_tools(),
-        prompt="""你是一个专业的技术写作专家。你的职责包括：
-        1. 将复杂研究和分析转化为清晰的内容
-        2. 确保内容结构合理、逻辑清晰
-        3. 适应不同读者群体的需求
-        4. 保持一致的专业写作风格
-        
-        写作标准：
-        - 结构清晰、层次分明
-        - 语言准确、表达流畅
-        - 逻辑严密、论证充分
-        - 重点突出、易于理解
-        
-        请确保生成的内容具有专业性、可读性和实用性。"""
-    )
-    
-    # 验证专家Agent
-    validator_agent = create_react_agent(
-        llm,
-        tools=get_validation_tools(),
-        prompt="""你是一个专业的质量验证专家。你的职责包括：
-        1. 验证报告内容的准确性和完整性
-        2. 检查逻辑一致性和论证严密性
-        3. 评估内容质量和可读性
-        4. 识别问题并提供改进建议
-        
-        验证标准：
-        - 内容准确性和完整性
-        - 逻辑一致性和连贯性
-        - 结构合理性和可读性
-        - 专业性和权威性
-        
-        请严格按照质量标准进行验证，确保报告的专业水准。"""
-    )
-    
-    return {
-        AgentType.RESEARCHER: researcher_agent,
-        AgentType.ANALYST: analyst_agent,
-        AgentType.WRITER: writer_agent,
-        AgentType.VALIDATOR: validator_agent
-    }
-
-# ============================================================================
-# 智能协调节点
-# ============================================================================
-
-async def intelligent_supervisor_node(state: DeepResearchState, config=None) -> DeepResearchState:
-    """
-    智能监督协调节点
-    负责整体任务规划、Agent调度和流程控制
-    """
-    writer = safe_get_stream_writer()
-    writer({
-        "step": "supervision",
-        "status": "开始智能任务协调",
-        "progress": 0,
-        "session_id": state["session_id"]
-    })
-    
-    try:
-        start_time = time.time()
-        llm = create_llm()
-        
-        # 构建协调分析提示
-        supervision_prompt = ChatPromptTemplate.from_messages([
-            ("system", """你是一个智能的报告生成监督协调器。分析当前状态并决定下一步行动。
-            
-            可用的Agent类型：
-            - researcher: 深度研究和信息收集
-            - analyst: 数据分析和洞察生成
-            - writer: 内容写作和报告生成
-            - validator: 质量验证和改进
-            
-            可用的行动：
-            - outline_generation: 生成报告大纲
-            - research_execution: 执行深度研究
-            - analysis_generation: 生成分析洞察
-            - content_creation: 创建报告内容
-            - quality_validation: 质量验证
-            - finish: 完成报告生成
-            
-            请分析当前状态并返回推荐的下一步行动（只返回行动名称）。
-            """),
-            ("human", """
-            当前状态分析：
-            - 主题：{topic}
-            - 当前步骤：{current_step}
-            - 执行路径：{execution_path}
-            - 已有大纲：{has_outline}
-            - 研究结果数：{research_count}
-            - 分析洞察数：{insights_count}
-            - 已有最终报告：{has_final_report}
-            - 运行模式：{mode}
-            
-            请根据以上信息推荐下一步行动。
-            """)
-        ])
-        
-        # 准备状态分析数据
-        analysis_data = {
-            "topic": state["topic"],
-            "current_step": state["current_step"],
-            "execution_path": " → ".join(state["execution_path"]) if state["execution_path"] else "无",
-            "has_outline": "是" if state["outline"] else "否",
-            "research_count": len(state["research_results"]),
-            "insights_count": len(state["analysis_insights"]),
-            "has_final_report": "是" if state["final_report"] else "否",
-            "mode": state["mode"]
-        }
-        
-        writer({
-            "step": "supervision",
-            "status": "分析当前状态...",
-            "progress": 30,
-            "analysis_data": analysis_data
-        })
-        
-        # 流式生成协调决策
-        full_response = ""
-        chunk_count = 0
-        async for chunk in llm.astream(supervision_prompt.format_messages(**analysis_data), config=config):
-            if chunk.content:
-                full_response += chunk.content
-                chunk_count += 1
-                
-                # 减少进度更新频率，只在特定的chunk数时更新
-                if chunk_count % 5 == 0:
-                    writer({
-                        "step": "supervision",
-                        "status": "正在制定协调决策...",
-                        "progress": min(80, 60 + (chunk_count // 5) * 4),
-                        "reasoning": full_response[:200] + "..." if len(full_response) > 200 else full_response
-                    })
-        
-        # 解析决策
-        decision_text = full_response.lower().strip()
-        
-        # 智能决策逻辑
-        if not state["outline"]:
-            next_action = "outline_generation"
-            reasoning = "需要首先生成报告大纲"
-        elif len(state["research_results"]) < 5:  # 需要足够的研究数据
-            next_action = "research_execution"
-            reasoning = "需要进行深度研究收集数据"
-        elif len(state["analysis_insights"]) < 3:  # 需要分析洞察
-            next_action = "analysis_generation"
-            reasoning = "需要生成分析洞察"
-        elif not state["final_report"]:
-            next_action = "content_creation"
-            reasoning = "需要创建最终报告内容"
-        elif state["final_report"] and not state.get("validated", False):
-            next_action = "quality_validation"
-            reasoning = "需要进行质量验证"
-        else:
-            next_action = "finish"
-            reasoning = "报告生成流程完成"
-        
-        # 基于响应内容进行微调
-        if "outline" in decision_text and not state["outline"]:
-            next_action = "outline_generation"
-        elif "research" in decision_text:
-            next_action = "research_execution"
-        elif "analysis" in decision_text or "insight" in decision_text:
-            next_action = "analysis_generation"
-        elif "content" in decision_text or "write" in decision_text:
-            next_action = "content_creation"
-        elif "validation" in decision_text or "quality" in decision_text:
-            next_action = "quality_validation"
-        elif "finish" in decision_text or "complete" in decision_text:
-            next_action = "finish"
-        
-        # 更新状态
-        execution_time = time.time() - start_time
-        update_performance_metrics(state, "supervisor", execution_time)
-        
-        state["current_step"] = f"supervised_{next_action}"
-        state["execution_path"] = state["execution_path"] + ["supervisor"]
-        state["agent_results"]["supervisor"] = {
-            "next_action": next_action,
-            "reasoning": reasoning,
-            "execution_time": execution_time
-        }
-        
-        # 添加监督消息
-        supervision_message = f"""
-        🧠 智能监督协调完成：
-        
-        📊 当前状态分析：
-        - 大纲状态：{'已生成' if state['outline'] else '待生成'}
-        - 研究数据：{len(state['research_results'])}条
-        - 分析洞察：{len(state['analysis_insights'])}个
-        - 报告状态：{'已生成' if state['final_report'] else '待生成'}
-        
-        🎯 决策结果：
-        - 下一步行动：{next_action}
-        - 决策理由：{reasoning}
-        - 执行时间：{execution_time:.2f}秒
-        """
-        
-        state["messages"] = state["messages"] + [AIMessage(content=supervision_message)]
-        
-        writer({
-            "step": "supervision",
-            "status": "监督协调完成",
-            "progress": 100,
-            "next_action": next_action,
-            "reasoning": reasoning,
-            "execution_time": execution_time
-        })
-        
-        logger.info(f"监督协调完成: {next_action} - {reasoning}")
-        return state
-        
-    except Exception as e:
-        logger.error(f"监督协调失败: {str(e)}")
-        writer({
-            "step": "supervision",
-            "status": f"监督协调失败: {str(e)}",
-            "progress": -1
-        })
-        
-        state["error_log"] = state["error_log"] + [f"监督协调错误: {str(e)}"]
-        state["current_step"] = "supervision_failed"
         return state
 
 # ============================================================================
@@ -1035,112 +683,13 @@ def format_interaction_message(state: DeepResearchState, interaction_type: Inter
 
 # 创建交互节点实例
 outline_confirmation_node = create_interaction_node(InteractionType.OUTLINE_CONFIRMATION)
-research_permission_node = create_interaction_node(InteractionType.RESEARCH_PERMISSION)
-analysis_approval_node = create_interaction_node(InteractionType.ANALYSIS_APPROVAL)
-content_review_node = create_interaction_node(InteractionType.CONTENT_REVIEW)
-final_approval_node = create_interaction_node(InteractionType.FINAL_APPROVAL)
 
 # ============================================================================
 # 图构建和路由逻辑
 # ============================================================================
 
 
-
-
-# 注意：原来的 content_creation_node 已被删除
-# 现在使用 enhanced_content_creation_node（集成了智能章节研究子图）
-
-
-async def analysis_generation_node(state: DeepResearchState) -> DeepResearchState:
-    """分析洞察生成节点"""
-    writer = safe_get_stream_writer()
-    writer({
-        "step": "analysis_generation",
-        "status": "开始生成分析洞察",
-        "progress": 0
-    })
-    
-    try:
-        start_time = time.time()
-        
-        research_results = state.get("research_results", [])
-        if not research_results:
-            writer({
-                "step": "analysis_generation",
-                "status": "没有研究数据可供分析",
-                "progress": 100
-            })
-            return state
-        
-        writer({
-            "step": "analysis_generation", 
-            "status": "正在进行趋势分析...",
-            "progress": 30
-        })
-        
-        # 使用趋势分析工具
-        insights = trend_analyzer.invoke({
-            "research_results": research_results,
-            "analysis_focus": state.get("report_type", "general")
-        })
-        
-        writer({
-            "step": "analysis_generation",
-            "status": "正在生成洞察报告...",
-            "progress": 70
-        })
-        
-        # 添加洞察到状态
-        for insight in insights:
-            if not insight.get("error"):
-                add_analysis_insight(state, insight)
-        
-        # 更新状态
-        execution_time = time.time() - start_time
-        update_performance_metrics(state, "analyst", execution_time)
-        update_task_status(state, "analysis_generation", TaskStatus.COMPLETED)
-        
-        state["current_step"] = "analysis_completed"
-        state["execution_path"] = state["execution_path"] + ["analysis_generation"]
-        
-        # 添加分析完成消息
-        analysis_message = f"""
-        📈 分析洞察生成完成：
-        
-        🔍 洞察统计：
-        - 生成洞察：{len([i for i in insights if not i.get('error')])}个
-        - 数据来源：{len(research_results)}条研究结果
-        - 执行时间：{execution_time:.2f}秒
-        
-        💡 主要洞察类型：
-        {chr(10).join([f"  • {insight.get('type', '未知')}: {insight.get('title', '未知标题')}" for insight in insights[:3] if not insight.get('error')])}
-        """
-        
-        state["messages"] = state["messages"] + [AIMessage(content=analysis_message)]
-        
-        writer({
-            "step": "analysis_generation",
-            "status": "分析洞察生成完成",
-            "progress": 100,
-            "insights_count": len([i for i in insights if not i.get('error')]),
-            "execution_time": execution_time
-        })
-        
-        logger.info(f"分析生成完成: {len(insights)}个洞察")
-        return state
-        
-    except Exception as e:
-        logger.error(f"分析生成失败: {str(e)}")
-        writer({
-            "step": "analysis_generation",
-            "status": f"分析生成失败: {str(e)}",
-            "progress": -1
-        })
-        
-        state["error_log"] = state["error_log"] + [f"分析生成错误: {str(e)}"]
-        state["current_step"] = "analysis_failed"
-        update_task_status(state, "analysis_generation", TaskStatus.FAILED)
-        return state
+# 删除了analysis_generation_node - 由update子图处理分析功能
 
 # ============================================================================
 # 路由函数 - 简化版本
@@ -1152,21 +701,19 @@ def route_after_outline_confirmation(state: DeepResearchState) -> str:
         return "outline_generation"  # 重新生成大纲
     return "content_creation"  # 直接进入内容创建（集成了子图）
 
-
-
 # ============================================================================
 # 图构建函数
 # ============================================================================
 
-def create_deep_research_graph(checkpointer: Optional[InMemorySaver] = None):
+def create_deep_research_graph():
     """创建深度研究报告生成图 - 集成智能章节研究子图"""
     workflow = StateGraph(DeepResearchState)
 
     # 添加简化的核心节点 - 集成智能章节研究子图
     workflow.add_node("outline_generation", outline_generation_node)
     workflow.add_node("outline_confirmation", outline_confirmation_node)
-    # 使用智能章节处理节点（集成了完整的章节研究子图）
-    workflow.add_node("content_creation", intelligent_section_processing_node)
+    # 直接使用子图调用函数作为节点（按照官方文档方式）
+    workflow.add_node("content_creation", call_intelligent_research_subgraph)
     
     # 设置简化的流程：大纲生成 → 大纲确认 → 内容创建
     workflow.add_edge(START, "outline_generation")
@@ -1184,9 +731,4 @@ def create_deep_research_graph(checkpointer: Optional[InMemorySaver] = None):
     
     workflow.add_edge("content_creation", END)
     
-    # 编译图
-    if checkpointer is None:
-        checkpointer = InMemorySaver()
-    
-    app = workflow.compile(checkpointer=checkpointer)
-    return app
+    return workflow

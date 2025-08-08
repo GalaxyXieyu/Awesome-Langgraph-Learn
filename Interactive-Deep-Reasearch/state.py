@@ -263,6 +263,52 @@ def create_initial_state(
     
     return initial_state
 
+def create_simple_state(topic: str, **kwargs) -> DeepResearchState:
+    """
+    简化的状态创建函数 - 只需要提供主题，其他都有默认值
+
+    Args:
+        topic: 研究主题（必填）
+        **kwargs: 可选参数
+            - user_id: 用户ID（默认: "user"）
+            - mode: 运行模式（默认: COPILOT自动模式）
+            - max_sections: 最大章节数（默认: 3）
+            - target_length: 目标字数（默认: 2000）
+            - language: 语言（默认: "zh"）
+            - style: 写作风格（默认: "professional"）
+
+    Returns:
+        完整的DeepResearchState
+
+    Example:
+        # 最简单的用法
+        state = create_simple_state("人工智能发展趋势")
+
+        # 带可选参数
+        state = create_simple_state(
+            "人工智能发展趋势",
+            max_sections=5,
+            target_length=3000
+        )
+    """
+    # 设置默认值
+    defaults = {
+        "user_id": "user",
+        "mode": ReportMode.COPILOT,  # 自动模式，无需交互
+        "report_type": "research",
+        "target_audience": "专业人士",
+        "depth_level": "medium",
+        "max_sections": 3,
+        "target_length": 2000,
+        "language": "zh",
+        "style": "professional"
+    }
+
+    # 合并用户提供的参数
+    params = {**defaults, **kwargs}
+
+    return create_initial_state(topic=topic, **params)
+
 # ============================================================================
 # 状态更新辅助函数
 # ============================================================================

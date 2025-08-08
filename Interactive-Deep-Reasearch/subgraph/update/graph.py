@@ -17,9 +17,9 @@ from langgraph.config import get_stream_writer
 import logging
 
 # 导入模块化组件
-from tools import ALL_RESEARCH_TOOLS
-from context_builder import build_supervisor_context, determine_next_action_by_state
-from prompts import get_supervisor_prompt, get_researcher_prompt, get_writer_prompt
+from .tools import ALL_RESEARCH_TOOLS
+from .context_builder import build_supervisor_context, determine_next_action_by_state
+from .prompts import get_supervisor_prompt, get_researcher_prompt, get_writer_prompt
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)

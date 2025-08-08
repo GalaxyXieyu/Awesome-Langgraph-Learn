@@ -6,7 +6,6 @@
 # 核心Graph组件
 from .graph import (
     create_intelligent_section_research_graph,
-    create_intelligent_initial_state,
     IntelligentSectionState,
     ContextAwareAgent,
     QualityAssessmentAgent,
@@ -28,7 +27,6 @@ __description__ = "智能章节研究Graph系统 - 上下文感知 + 质量驱�
 __all__ = [
     # 核心Graph组件
     "create_intelligent_section_research_graph",
-    "create_intelligent_initial_state",
     "IntelligentSectionState",
     "ContextAwareAgent",
     "QualityAssessmentAgent",

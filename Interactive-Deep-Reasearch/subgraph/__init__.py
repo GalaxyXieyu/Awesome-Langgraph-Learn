@@ -5,7 +5,6 @@ SubGraph模块
 
 from .research import (
     create_intelligent_section_research_graph,
-    create_intelligent_initial_state,
     IntelligentSectionState,
     ContextAwareAgent,
     QualityAssessmentAgent,
@@ -15,7 +14,6 @@ from .research import (
 __version__ = "2.0.0"
 __all__ = [
     "create_intelligent_section_research_graph",
-    "create_intelligent_initial_state",
     "IntelligentSectionState",
     "ContextAwareAgent",
     "QualityAssessmentAgent",
