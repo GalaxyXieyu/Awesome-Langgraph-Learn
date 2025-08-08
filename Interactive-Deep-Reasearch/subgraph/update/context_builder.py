@@ -16,12 +16,12 @@ def build_status_summary(state: Dict[str, Any]) -> str:
     iteration_count = state.get("iteration_count", 0)
     max_iterations = state.get("max_iterations", 10)
     
-    # 计算完成进度
+    # 计算完成进度 - 移除字数要求，只要有内容就算完成
     completed_sections = 0
     for i, section in enumerate(sections):
         section_id = section.get("id", "")
-        has_research = section_id in research_results and len(research_results[section_id].get("content", "")) >= 500
-        has_writing = section_id in writing_results and writing_results[section_id].get("word_count", 0) >= 300
+        has_research = section_id in research_results and research_results[section_id].get("content", "").strip() != ""
+        has_writing = section_id in writing_results and writing_results[section_id].get("content", "").strip() != ""
         if has_research and has_writing:
             completed_sections += 1
 

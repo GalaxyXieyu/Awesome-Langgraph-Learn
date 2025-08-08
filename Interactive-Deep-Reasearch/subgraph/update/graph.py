@@ -162,13 +162,36 @@ async def supervisor_node(state: IntelligentResearchState, config=None) -> Intel
     # 获取当前进度信息
     sections = state.get("sections", [])
     current_index = state.get("current_section_index", 0)
+    research_results = state.get("research_results", {})
+    writing_results = state.get("writing_results", {})
+
+    # 全局完成检查 - 检查是否所有章节都有研究和写作结果
+    all_sections_completed = True
+    for section in sections:
+        section_id = section.get("id", "")
+        has_research = section_id in research_results and research_results[section_id].get("content", "").strip() != ""
+        has_writing = section_id in writing_results and writing_results[section_id].get("content", "").strip() != ""
+        if not (has_research and has_writing):
+            all_sections_completed = False
+            break
+
+    if all_sections_completed and next_action != "integration":
+        logger.info("🎉 检测到所有章节都已完成，强制进入integration")
+        next_action = "integration"
+        reasoning = "所有章节的研究和写作都已完成，开始最终整合"
 
     # 处理章节索引更新和目标章节设置
     if next_action == "move_to_next_section":
         new_index = current_index + 1
         state["current_section_index"] = new_index
-        next_action = "research"  # 移动到下一章节后开始研究
-        reasoning = f"已从第{current_index + 1}章节移动到第{new_index + 1}章节，开始新章节研究"
+        # 检查是否超出章节范围
+        if new_index >= len(sections):
+            logger.info("🎉 章节索引超出范围，所有章节已完成，进入integration")
+            next_action = "integration"
+            reasoning = "所有章节处理完成，开始最终整合"
+        else:
+            next_action = "research"  # 移动到下一章节后开始研究
+            reasoning = f"已从第{current_index + 1}章节移动到第{new_index + 1}章节，开始新章节研究"
         current_index = new_index  # 更新本地变量用于显示
     elif target_section and target_section != "":
         # 如果Supervisor指定了目标章节，找到对应的索引
