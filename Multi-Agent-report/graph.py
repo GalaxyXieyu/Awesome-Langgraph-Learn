@@ -16,7 +16,7 @@ from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langgraph.checkpoint.memory import InMemorySaver
 from tools import get_search_tools, get_analysis_tools, get_writing_tools
-from enhanced_writer import Collector, create_writer
+from writer import Collector, create_writer
 import logging
 
 # 配置日志

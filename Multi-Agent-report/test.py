@@ -52,46 +52,10 @@ async def test_streaming_multiagent():
 
         try:
             # 流式执行 - 使用messages模式获得token级流式输出
-            async for chunk in app.astream(initial_state, config=config, stream_mode=["updates", "messages", "custom"]):
+            async for chunk in app.astream(initial_state, config=config, stream_mode=["custom"]):
                 step_count += 1
                 current_time = time.time() - start_time
-                # 处理不同的流式模式
-                if isinstance(chunk, tuple) and len(chunk) == 2:
-                    # 多模式流式输出：(mode, data)
-                    mode, data = chunk
-
-                    if mode == "updates":
-                        # 只显示重要的节点更新
-                        for node_name, node_data in data.items():
-                            if isinstance(node_data, dict):
-                                current_agent = node_data.get('current_agent', '')
-                                next_action = node_data.get('next_action', '')
-                                final_result = node_data.get('final_result', '')
-
-                                if current_agent:
-                                    print(f"  🤖 当前Agent: {current_agent}")
-                                if next_action:
-                                    print(f"  ➡️ 下一步: {next_action}")
-                                if final_result:
-                                    print(f"  🎯 最终结果: {final_result[:100]}{'...' if len(final_result) > 100 else ''}")
-
-                    elif mode == "messages":
-                        # 处理LLM token流式输出 - 打字机效果
-                        token, metadata = data
-                        if hasattr(token, 'content') and token.content:
-                            # 显示所有 Agent 相关节点的打字机效果
-                            node_name = metadata.get('langgraph_node', '') if metadata else ''
-                            if node_name in ['agent_execution', 'result_integration', 'supervisor']:
-                                # 直接输出token内容，不换行，实现打字机效果
-                                print(token.content, end='', flush=True)
-
-                    elif mode == "custom":
-                        # 处理自定义流式输出（进度更新等）
-                        if isinstance(data, dict) and data.get("step"):
-                            status = data.get("status", "")
-                            progress = data.get("progress", 0)
-                            if status:
-                                print(f"  📊 {status} (进度: {progress}%)")
+                print(chunk)
 
                 # 只在非 messages 模式时换行
                 if not (isinstance(chunk, tuple) and len(chunk) == 2 and chunk[0] == "messages"):
