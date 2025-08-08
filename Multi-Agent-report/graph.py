@@ -7,16 +7,16 @@
 import json
 import time
 import asyncio
-from typing import Dict, Any, List, TypedDict, Annotated, Literal, Optional, AsyncGenerator
+from typing import Dict, Any, List, TypedDict, Annotated, Optional, AsyncGenerator
 from langgraph.graph import StateGraph, END, START
 from langgraph.graph.message import add_messages
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+from langchain_core.messages import HumanMessage, AIMessage
 from langgraph.prebuilt import create_react_agent
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langgraph.checkpoint.memory import InMemorySaver
-from langgraph.config import get_stream_writer
-from tools import get_all_tools, get_search_tools, get_analysis_tools, get_writing_tools
+from tools import get_search_tools, get_analysis_tools, get_writing_tools
+from enhanced_writer import Collector, create_writer
 import logging
 
 # 配置日志
@@ -135,15 +135,12 @@ def create_agents():
 # ============================================================================
 
 async def intelligent_supervisor_node(state: MultiAgentState, config=None) -> MultiAgentState:
-    """智能Supervisor节点 - 使用真正的流式输出"""
-    # 获取流式写入器
+    """智能Supervisor节点 - 使用统一的增强writer"""
+    # 创建writer
+    writer = create_writer("supervisor", "智能调度器")
+    
     try:
-        writer = get_stream_writer()
-    except Exception:
-        writer = lambda _: None  # 如果无法获取writer，使用空函数
-
-    try:
-        writer({"step": "supervisor", "status": "开始智能调度分析", "progress": 0})
+        writer.step_start("开始智能调度分析")
 
         llm = create_llm()
 
@@ -185,7 +182,7 @@ async def intelligent_supervisor_node(state: MultiAgentState, config=None) -> Mu
             "context": state.get("context", {})
         }
 
-        writer({"step": "supervisor", "status": "正在分析用户需求...", "progress": 30})
+        writer.step_progress("正在分析用户需求...", 30)
 
         # 流式调用LLM进行决策
         full_response = ""
@@ -195,19 +192,20 @@ async def intelligent_supervisor_node(state: MultiAgentState, config=None) -> Mu
             if chunk.content and isinstance(chunk.content, str):
                 full_response += chunk.content
                 chunk_count += 1
-
+                
+                # 发送AI流式输出
+                writer.ai_streaming(chunk.content, chunk_count)
+                
                 # 每5个chunk发送一次进度更新
                 if chunk_count % 5 == 0:
                     progress = min(80, 30 + (chunk_count // 5) * 10)
-                    writer({
-                        "step": "supervisor",
-                        "status": "正在分析决策...",
-                        "progress": progress,
-                        "current_reasoning": full_response[:200] + "..." if len(full_response) > 200 else full_response,
-                        "chunk_count": chunk_count
-                    })
+                    writer.step_progress(
+                        "正在分析决策...", 
+                        progress,
+                        current_reasoning=full_response[:200] + "..." if len(full_response) > 200 else full_response
+                    )
 
-        writer({"step": "supervisor", "status": "解析决策结果...", "progress": 85})
+        writer.step_progress("解析决策结果...", 85)
 
         # 解析LLM响应 - 简化版本，直接从响应中提取关键词
         content = full_response.lower().strip()
@@ -258,14 +256,16 @@ async def intelligent_supervisor_node(state: MultiAgentState, config=None) -> Mu
             AIMessage(content=supervisor_message)
         ]
 
-        writer({
-            "step": "supervisor",
-            "status": "智能调度分析完成",
-            "progress": 100,
-            "decision": next_action,
-            "reasoning": reasoning,
-            "confidence": 0.8
-        })
+        # 发送AI完成消息
+        writer.ai_complete(supervisor_message)
+        
+        # 发送步骤完成
+        writer.step_complete(
+            "智能调度分析完成",
+            decision=next_action,
+            reasoning=reasoning,
+            confidence=0.8
+        )
 
         logger.info(f"Supervisor决策: {next_action} - {reasoning}")
 
@@ -273,7 +273,7 @@ async def intelligent_supervisor_node(state: MultiAgentState, config=None) -> Mu
 
     except Exception as e:
         logger.error(f"Supervisor决策失败: {str(e)}")
-        writer({"step": "supervisor", "status": f"决策失败: {str(e)}", "progress": -1})
+        writer.error(f"决策失败: {str(e)}", "SupervisorError")
         # 错误处理：默认结束流程
         state["next_action"] = "finish"
         state["supervisor_reasoning"] = f"决策失败：{str(e)}"
@@ -284,18 +284,19 @@ async def intelligent_supervisor_node(state: MultiAgentState, config=None) -> Mu
 # Agent执行节点
 # ============================================================================
 
-async def agent_execution_node(state: MultiAgentState, config=None) -> MultiAgentState:
-    """执行选定的agent（流式版本）"""
+async def agent_execution_node(state: MultiAgentState) -> MultiAgentState:
+    """执行选定的agent（增强writer版本）"""
     next_action = state.get("next_action")
     user_input = state.get("user_input", "")
 
     if next_action not in ["search", "writing", "analysis"]:
         return state
 
-    # 获取流式写入器
-    writer = get_stream_writer()
+    # 创建writer
+    writer = create_writer(f"{next_action}_agent", f"{next_action.title()} Agent")
+    
     try:
-        writer({"step": f"{next_action}_agent", "status": f"开始执行{next_action}任务", "progress": 0})
+        writer.step_start(f"开始执行{next_action}任务")
 
         # 创建agents
         agents = create_agents()
@@ -308,7 +309,7 @@ async def agent_execution_node(state: MultiAgentState, config=None) -> MultiAgen
 
         agent_input = f"{user_input}{context_info}"
 
-        writer({"step": f"{next_action}_agent", "status": f"正在执行{next_action}任务...", "progress": 20})
+        writer.step_progress(f"正在执行{next_action}任务...", 20)
 
         # 正确的 Agent 流式执行
         start_time = time.time()
@@ -317,68 +318,19 @@ async def agent_execution_node(state: MultiAgentState, config=None) -> MultiAgen
         agent_input_dict = {"messages": [HumanMessage(content=agent_input)]}
 
         # 使用 Agent 的正常执行，但监控进度
-        writer({"step": f"{next_action}_agent", "status": f"Agent开始执行{next_action}任务...", "progress": 30})
-        # Agent 执行（完善的流式处理）
-        full_response = ""
-        chunk_count = 0
-        tool_calls_count = 0
-        content_chunks = 0
-        current_tool_call = None
-
-        try:
-            async for chunk in agent.astream(agent_input_dict, stream_mode="messages"):
-                chunk_count += 1
-
-                if isinstance(chunk, tuple) and len(chunk) == 2:
-                    message, metadata = chunk
-                    msg_type = type(message).__name__
-
-                    # 处理不同类型的消息
-                    if msg_type == "AIMessageChunk":
-                        if hasattr(message, 'tool_calls') and message.tool_calls:
-                            # 工具调用阶段
-                            tool_calls_count += 1
-                            current_tool_call = message.tool_calls[0].get('name', 'unknown_tool')
-                            writer({
-                                "step": f"{next_action}_agent",
-                                "status": f"正在调用工具: {current_tool_call}",
-                                "progress": 40
-                            })
-
-                        elif hasattr(message, 'content') and message.content:
-                            # AI 最终回复的流式输出
-                            content = str(message.content)
-                            full_response += content
-                            content_chunks += 1
-
-                            writer({
-                                "step": f"{next_action}_agent",
-                                "status": f"Agent生成回复中...",
-                                "progress": 70,
-                                "streaming_content": content
-                            })
-
-                    elif msg_type == "ToolMessage":
-                        # 工具执行结果
-                        if hasattr(message, 'content') and message.content:
-                            tool_result = str(message.content)
-                            full_response += tool_result
-
-                            writer({
-                                "step": f"{next_action}_agent",
-                                "status": f"工具执行完成",
-                                "progress": 60
-                            })
-
-        except Exception as e:
-            logger.error(f"Agent流式执行失败: {e}")
-            full_response = ""
+        writer.step_progress(f"Agent开始执行{next_action}任务...", 30)
+        # Agent 执行（使用流式处理）
+        collector = Collector(writer)
+        full_response = await collector.process_agent_stream(
+            agent.astream(agent_input_dict, stream_mode=["updates","messages"]),
+            next_action
+        )
 
         execution_time = time.time() - start_time
 
-        writer({"step": f"{next_action}_agent", "status": f"Agent执行完成", "progress": 90})
+        writer.step_progress("Agent执行完成", 90)
 
-        writer({"step": f"{next_action}_agent", "status": "处理执行结果...", "progress": 95})
+        writer.step_progress("处理执行结果...", 95)
 
         # 使用流式输出的结果
         result_text = full_response.strip() if full_response.strip() else "Agent执行完成"
@@ -401,14 +353,12 @@ async def agent_execution_node(state: MultiAgentState, config=None) -> MultiAgen
             AIMessage(content=execution_message)
         ]
 
-        writer({
-            "step": f"{next_action}_agent",
-            "status": f"{next_action}任务执行完成",
-            "progress": 100,
-            "execution_time": execution_time,
-            "result_preview": result_text[:200] + "..." if len(result_text) > 200 else result_text,
-            "result_length": len(result_text)
-        })
+        writer.step_complete(
+            f"{next_action}任务执行完成",
+            execution_time=execution_time,
+            result_preview=result_text[:200] + "..." if len(result_text) > 200 else result_text,
+            result_length=len(result_text)
+        )
 
         logger.info(f"{next_action} Agent执行完成，耗时{execution_time:.2f}秒")
 
@@ -419,7 +369,7 @@ async def agent_execution_node(state: MultiAgentState, config=None) -> MultiAgen
         next_action = state.get("next_action", "unknown")
         error_msg = f"{next_action} Agent执行失败：{str(e)}"
 
-        writer({"step": f"{next_action}_agent", "status": f"执行失败: {str(e)}", "progress": -1})
+        writer.error(f"{next_action} Agent执行失败: {str(e)}", "AgentExecutionError")
 
         state["error_log"] = state.get("error_log", []) + [error_msg]
         state["messages"] = state.get("messages", []) + [
@@ -432,15 +382,12 @@ async def agent_execution_node(state: MultiAgentState, config=None) -> MultiAgen
 # ============================================================================
 
 async def result_integration_node(state: MultiAgentState, config=None) -> MultiAgentState:
-    """结果整合节点 - 整合所有Agent的结果（流式版本）"""
-    # 获取流式写入器
+    """结果整合节点 - 整合所有Agent的结果（增强writer版本）"""
+    # 创建增强writer
+    writer = create_writer("result_integration", "结果整合器")
+    
     try:
-        writer = get_stream_writer()
-    except Exception:
-        writer = lambda _: None  # 如果无法获取writer，使用空函数
-
-    try:
-        writer({"step": "result_integration", "status": "开始结果整合", "progress": 0})
+        writer.step_start("开始结果整合")
 
         llm = create_llm()
 
@@ -479,7 +426,7 @@ async def result_integration_node(state: MultiAgentState, config=None) -> MultiA
             "execution_path": " → ".join(state.get("execution_path", []))
         }
 
-        writer({"step": "result_integration", "status": "正在整合结果...", "progress": 20})
+        writer.step_progress("正在整合结果...", 20)
 
         # 流式调用LLM进行结果整合
         final_result = ""
@@ -489,18 +436,19 @@ async def result_integration_node(state: MultiAgentState, config=None) -> MultiA
             if chunk.content and isinstance(chunk.content, str):
                 final_result += chunk.content
                 chunk_count += 1
-
+                
+                # 发送AI流式输出
+                writer.ai_streaming(chunk.content, chunk_count)
+                
                 # 每5个chunk发送一次进度更新
                 if chunk_count % 5 == 0:
                     progress = min(90, 20 + (chunk_count // 5) * 10)
-                    writer({
-                        "step": "result_integration",
-                        "status": "正在生成最终结果...",
-                        "progress": progress,
-                        "current_content": final_result[:300] + "..." if len(final_result) > 300 else final_result,
-                        "total_chars": len(final_result),
-                        "chunk_count": chunk_count
-                    })
+                    writer.step_progress(
+                        "正在生成最终结果...",
+                        progress,
+                        current_content=final_result[:300] + "..." if len(final_result) > 300 else final_result,
+                        total_chars=len(final_result)
+                    )
 
         # 更新状态
         state["final_result"] = final_result
@@ -523,18 +471,20 @@ async def result_integration_node(state: MultiAgentState, config=None) -> MultiA
             AIMessage(content=final_message)
         ]
 
-        writer({
-            "step": "result_integration",
-            "status": "结果整合完成",
-            "progress": 100,
-            "final_result": final_result,
-            "total_chars": len(final_result),
-            "execution_summary": {
-                "execution_path": state.get('execution_path', []),
-                "iteration_count": state.get('iteration_count', 0),
-                "agents_used": list(agent_results.keys())
-            }
-        })
+        # 发送最终结果
+        execution_summary = {
+            "execution_path": state.get('execution_path', []),
+            "iteration_count": state.get('iteration_count', 0),
+            "agents_used": list(agent_results.keys())
+        }
+        
+        writer.final_result(final_result, execution_summary)
+        
+        writer.step_complete(
+            "结果整合完成",
+            final_result_length=len(final_result),
+            execution_summary=execution_summary
+        )
 
         logger.info("结果整合完成")
 
@@ -542,7 +492,7 @@ async def result_integration_node(state: MultiAgentState, config=None) -> MultiA
 
     except Exception as e:
         logger.error(f"结果整合失败: {str(e)}")
-        writer({"step": "result_integration", "status": f"整合失败: {str(e)}", "progress": -1})
+        writer.error(f"结果整合失败: {str(e)}", "ResultIntegrationError")
 
         # 使用简单的结果整合作为后备
         agent_results = state.get("agent_results", {})
