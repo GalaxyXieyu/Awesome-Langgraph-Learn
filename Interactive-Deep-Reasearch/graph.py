@@ -8,42 +8,30 @@ import json
 import time
 import asyncio
 import uuid
-from typing import Dict, Any, List, Optional
-from datetime import datetime
+from typing import Dict, Any, List
 
 from langgraph.graph import StateGraph, END, START
-from langgraph.prebuilt import create_react_agent
 from langchain_openai import ChatOpenAI
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+from langchain_core.messages import AIMessage
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
-from langgraph.checkpoint.memory import InMemorySaver
-from langgraph.config import get_stream_writer
 from langgraph.types import interrupt
 import logging
-
-def safe_get_stream_writer():
-    """安全获取流写入器，避免上下文错误"""
-    try:
-        return get_stream_writer()
-    except Exception:
-        # 如果没有流上下文，返回一个空的写入器
-        return lambda x: None
 
 # 导入本地模块
 from state import (
     DeepResearchState, ReportMode, TaskStatus, InteractionType,
     ReportOutline, ReportSection, ResearchResult,
-    update_performance_metrics, add_research_result,
+    update_performance_metrics, 
     update_task_status, add_user_interaction
 )
-# 简化工具导入 - 大部分功能由update子图处理
 
 # 导入子图模块 - 使用update子图替代research子图
 from subgraph.update.graph import (
-    create_intelligent_research_graph,
-    IntelligentResearchState
+    create_intelligent_research_graph
 )
+# 导入标准化流式输出系统
+from stream_writer import create_stream_writer, create_workflow_processor
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)
@@ -117,57 +105,100 @@ def create_update_subgraph_state(state: DeepResearchState) -> Dict[str, Any]:
 
 async def call_intelligent_research_subgraph(state: DeepResearchState) -> DeepResearchState:
     """
-    调用智能研究子图（update版本）
+    调用智能研究子图 - 统一流式输出
 
-    这个函数实现了主图和子图之间的状态转换：
-    1. 将 DeepResearchState 转换为 IntelligentResearchState
-    2. 调用update子图进行研究和写作
-    3. 将结果转换回 DeepResearchState
+    这个函数实现了主图和子图之间的状态转换，智能识别Agent工作流程
     """
+    # 创建工作流程处理器
+    processor = create_workflow_processor("intelligent_research", "深度研究报告生成")
+    
     try:
+        processor.writer.step_start("开始深度研究报告生成")
+        
         # 获取子图实例
         subgraph = get_intelligent_research_subgraph()
-
-        # 创建子图输入状态
         subgraph_input = create_update_subgraph_state(state)
+        
+        processor.writer.step_progress(
+            "准备研究计划", 
+            10, 
+            sections_count=len(subgraph_input.get("sections", []))
+        )
+        
+        # 用于收集最终结果的变量
+        subgraph_output = {}
+        updated_sections = []
+        new_research_results = []
+        
+        # 流式调用子图，使用增强的processor统一处理嵌套流式输出
+        async for chunk in subgraph.astream(subgraph_input, stream_mode=["updates", "messages"], subgraphs=True):
+            # 使用增强的processor统一处理所有类型的chunk
+            processor.process_chunk(chunk)
+                        
+            # 同时收集实际数据用于状态更新，处理嵌套结构
+            if isinstance(chunk, tuple):
+                if len(chunk) >= 3:
+                    # 嵌套子图格式: (('subgraph_id',), 'updates', data)
+                    _, chunk_type, chunk_data = chunk[0], chunk[1], chunk[2]
+                elif len(chunk) >= 2:
+                    # 普通格式: ('updates', data)
+                    chunk_type, chunk_data = chunk[0], chunk[1]
+                else:
+                    continue
+                
+                if chunk_type == "updates" and isinstance(chunk_data, dict):
+                    for node_output in chunk_data.values():
+                        if node_output and isinstance(node_output, dict):
+                            subgraph_output.update(node_output)
+                            
+                            # 收集章节更新
+                            if "sections" in node_output:
+                                sections_data = node_output["sections"]
+                                if isinstance(sections_data, list):
+                                    for section_data in sections_data:
+                                        updated_section = {
+                                            "title": section_data.get("title", ""),
+                                            "content": section_data.get("content", ""),
+                                            "word_count": section_data.get("word_count", 0),
+                                            "status": "completed"
+                                        }
+                                        if not any(s.get("title") == updated_section["title"] for s in updated_sections):
+                                            updated_sections.append(updated_section)
+                            
+                            # 收集研究结果
+                            if "research_results" in node_output:
+                                research_results = node_output["research_results"]
+                                if isinstance(research_results, dict):
+                                    for research_data in research_results.values():
+                                        research_result = ResearchResult(
+                                            id=str(uuid.uuid4()),
+                                            query=f"研究章节: {research_data.get('title', '')}",
+                                            source_type="subgraph",
+                                            title=research_data.get("title", ""),
+                                            content=research_data.get("content", ""),
+                                            url="",
+                                            relevance_score=0.9,
+                                            timestamp=research_data.get("timestamp", time.time()),
+                                            section_id=research_data.get("id", "")
+                                        )
+                                        if not any(r.title == research_result.title for r in new_research_results):
+                                            new_research_results.append(research_result)
+        # 处理最终结果
+        if subgraph_output.get("final_report"):
 
-        logger.info(f"开始智能研究: {state.get('topic', '未知主题')}")
-
-        # 调用子图
-        subgraph_output = await subgraph.ainvoke(subgraph_input)
-
-        # 状态转换：IntelligentResearchState -> DeepResearchState
-        if subgraph_output and subgraph_output.get("final_report"):
             final_report = subgraph_output["final_report"]
-            sections_data = final_report.get("sections", [])
+            final_sections_data = final_report.get("sections", [])
 
-            # 转换章节数据格式
-            updated_sections = []
-            for section_data in sections_data:
+            # 确保所有章节都被处理
+            for section_data in final_sections_data:
                 updated_section = {
                     "title": section_data.get("title", ""),
                     "content": section_data.get("content", ""),
                     "word_count": section_data.get("word_count", 0),
                     "status": "completed"
                 }
-                updated_sections.append(updated_section)
-
-            # 合并研究结果到主状态
-            new_research_results = []
-            research_results = subgraph_output.get("research_results", {})
-
-            for section_id, research_data in research_results.items():
-                new_research_results.append(ResearchResult(
-                    id=str(uuid.uuid4()),
-                    query=f"研究章节: {research_data.get('title', '')}",
-                    source_type="subgraph",
-                    title=research_data.get("title", ""),
-                    content=research_data.get("content", ""),
-                    url="",
-                    relevance_score=0.9,
-                    timestamp=research_data.get("timestamp", time.time()),
-                    section_id=section_id
-                ))
+                if not any(s.get("title") == updated_section["title"] for s in updated_sections):
+                    updated_sections.append(updated_section)
 
             # 更新状态
             updated_state = {
@@ -184,14 +215,40 @@ async def call_intelligent_research_subgraph(state: DeepResearchState) -> DeepRe
                 }
             }
 
-            logger.info(f"智能研究完成: {len(updated_sections)}个章节, 总字数: {final_report.get('total_words', 0)}")
+            processor.writer.final_result(
+                f"深度研究报告生成完成",
+                {
+                    "sections_count": len(updated_sections),
+                    "total_words": final_report.get("total_words", 0),
+                    "research_findings": len(new_research_results)
+                }
+            )
             return updated_state
         else:
-            logger.error("子图返回了空结果")
-            return state
+            # 返回部分结果
+            updated_state = {
+                **state,
+                "sections": updated_sections,
+                "research_results": state.get("research_results", []) + new_research_results,
+                "content_creation_completed": len(updated_sections) > 0,
+                "completed_sections_count": len(updated_sections),
+                "performance_metrics": {
+                    **state.get("performance_metrics", {}),
+                    "sections_completed": len(updated_sections),
+                    "total_sections": len(updated_sections),
+                    "total_words": sum(section.get("word_count", 0) for section in updated_sections)
+                }
+            }
+            
+            processor.writer.step_complete(
+                "部分内容生成完成",
+                sections_count=len(updated_sections),
+                is_partial=True
+            )
+            return updated_state
 
     except Exception as e:
-        logger.error(f"调用智能章节研究子图时出错: {e}")
+        processor.writer.error(f"研究报告生成失败: {str(e)}", "ResearchGenerationError")
         return state
 
 def convert_research_data_to_results(research_data: List[Dict[str, Any]]) -> List[ResearchResult]:
@@ -228,38 +285,26 @@ async def intelligent_section_processing_node(state: DeepResearchState, config=N
     3. 子图内部处理：智能Supervisor → 研究 → 写作 → 整合
     4. 返回完整的研究报告
     """
-    writer = safe_get_stream_writer()
-    writer({
-        "step": "intelligent_section_processing",
-        "status": "🧠 开始智能研究处理（使用update子图）",
-        "progress": 0
-    })
+    # 使用标准化Writer
+    writer = create_stream_writer("intelligent_section_processing", "智能章节处理")
+    writer.step_start("开始智能研究处理（使用update子图）")
 
     try:
         outline = state.get("outline", {})
         sections = outline.get("sections", []) if outline else []
 
         if not sections:
-            writer({
-                "step": "intelligent_section_processing",
-                "status": "❌ 没有可用的章节信息",
-                "progress": -1
-            })
+            writer.error("没有可用的章节信息", "NoSectionsError")
             return state
 
-        writer({
-            "step": "intelligent_section_processing",
-            "status": f"📚 准备使用智能Supervisor处理 {len(sections)} 个章节",
-            "progress": 10,
-            "total_sections": len(sections)
-        })
+        writer.step_progress(
+            f"准备使用智能Supervisor处理 {len(sections)} 个章节",
+            10,
+            total_sections=len(sections)
+        )
 
         # 调用update子图进行整体处理
-        writer({
-            "step": "intelligent_section_processing",
-            "status": "🔬 启动智能研究子图...",
-            "progress": 20
-        })
+        writer.step_progress("启动智能研究子图", 20)
 
         # 直接调用子图（按照官方文档的方式）
         updated_state = await call_intelligent_research_subgraph(state)
@@ -269,33 +314,23 @@ async def intelligent_section_processing_node(state: DeepResearchState, config=N
             completed_sections = updated_state.get("sections", [])
             total_words = updated_state.get("performance_metrics", {}).get("total_words", 0)
 
-            writer({
-                "step": "intelligent_section_processing",
-                "status": f"🎉 智能研究完成！成功处理 {len(completed_sections)} 个章节",
-                "progress": 100,
-                "completed_sections": len(completed_sections),
-                "total_sections": len(sections),
-                "total_words": total_words
-            })
+            writer.step_complete(
+                "智能研究完成",
+                completed_sections=len(completed_sections),
+                total_sections=len(sections),
+                total_words=total_words
+            )
 
             logger.info(f"智能研究完成: {len(completed_sections)} 个章节, 总字数: {total_words}")
             return updated_state
         else:
-            writer({
-                "step": "intelligent_section_processing",
-                "status": "⚠️ 子图处理未完成，返回原状态",
-                "progress": 50
-            })
+            writer.step_progress("子图处理未完成，返回原状态", 50)
             logger.warning("子图处理未完成")
             return state
 
     except Exception as e:
         logger.error(f"智能章节处理失败: {str(e)}")
-        writer({
-            "step": "intelligent_section_processing",
-            "status": f"❌ 章节处理失败: {str(e)}",
-            "progress": -1
-        })
+        writer.error(f"章节处理失败: {str(e)}", "IntelligentSectionProcessingError")
 
         state["error_log"] = state.get("error_log", []) + [f"智能章节处理错误: {str(e)}"]
         return state
@@ -306,12 +341,8 @@ async def intelligent_section_processing_node(state: DeepResearchState, config=N
 
 async def outline_generation_node(state: DeepResearchState, config=None) -> DeepResearchState:
     """大纲生成节点"""
-    writer = safe_get_stream_writer()
-    writer({
-        "step": "outline_generation",
-        "status": "开始生成深度研究大纲",
-        "progress": 0
-    })
+    processor = create_workflow_processor("outline_generation", "大纲生成器")
+    processor.writer.step_start("开始生成深度研究大纲")
     
     try:
         start_time = time.time()
@@ -352,11 +383,7 @@ async def outline_generation_node(state: DeepResearchState, config=None) -> Deep
             "format_instructions": parser.get_format_instructions()
         }
         
-        writer({
-            "step": "outline_generation",
-            "status": "正在生成专业大纲...",
-            "progress": 30
-        })
+        processor.writer.step_progress("正在生成专业大纲...", 30)
         
         # 创建LLM链并流式执行
         llm_chain = outline_prompt | llm | parser
@@ -383,24 +410,21 @@ async def outline_generation_node(state: DeepResearchState, config=None) -> Deep
                     if len(chunk.sections) > 3:
                         current_outline_display += f"  ... 还有{len(chunk.sections)-3}个章节"
                 
-                writer({
-                    "step": "outline_generation",
-                    "status": "正在构建大纲结构...",
-                    "content": chunk,
-                    "progress": min(90, 30 + (chunk_count // 5) * 10),
-                    "current_outline": current_outline_display,
-                    "chunk_count": chunk_count
-                })
+                processor.writer.step_progress(
+                    "正在构建大纲结构...",
+                    min(90, 30 + (chunk_count // 5) * 10),
+                    current_outline=current_outline_display,
+                    chunk_count=chunk_count
+                )
                 
                 # 如果大纲基本完整，提前显示
                 if hasattr(chunk, 'title') and hasattr(chunk, 'sections') and len(chunk.sections) >= 3:
-                    writer({
-                        "step": "outline_generation",
-                        "status": "大纲结构已生成，正在完善细节...",
-                        "progress": 85,
-                        "partial_outline": chunk,
-                        "streaming_content": current_outline_display
-                    })
+                    processor.writer.step_progress(
+                        "大纲结构已生成，正在完善细节...",
+                        85,
+                        partial_outline=chunk,
+                        streaming_content=current_outline_display
+                    )
         
         # 处理生成结果
         if not outline_data:
@@ -494,29 +518,20 @@ async def outline_generation_node(state: DeepResearchState, config=None) -> Deep
         
         state["messages"] = state["messages"] + [AIMessage(content=outline_message)]
         
-        writer({
-            "step": "outline_generation",
-            "status": "深度研究大纲生成完成",
-            "progress": 100,
-            "sections_count": len(outline_dict.get("sections", [])),
-            "execution_time": execution_time,
-            "content": {
-                "type": "outline",
-                "data": outline_dict,
-                "display_text": outline_message
-            }
-        })
+        processor.writer.step_complete(
+            "深度研究大纲生成完成",
+            sections_count=len(outline_dict.get("sections", [])),
+            execution_time=execution_time,
+            outline_data=outline_dict,
+            display_text=outline_message
+        )
         
         logger.info(f"大纲生成完成: {len(outline_dict.get('sections', []))}个章节")
         return state
         
     except Exception as e:
         logger.error(f"大纲生成失败: {str(e)}")
-        writer({
-            "step": "outline_generation",
-            "status": f"大纲生成失败: {str(e)}",
-            "progress": -1
-        })
+        processor.writer.error(f"大纲生成失败: {str(e)}", "OutlineGenerationError")
         
         state["error_log"] = state["error_log"] + [f"大纲生成错误: {str(e)}"]
         state["current_step"] = "outline_generation_failed"
@@ -532,30 +547,22 @@ def create_interaction_node(interaction_type: InteractionType):
     
     def interaction_node(state: DeepResearchState) -> DeepResearchState:
         """通用交互确认节点"""
-        writer = safe_get_stream_writer()
+        processor = create_workflow_processor(f"interaction_{interaction_type.value}", f"{interaction_type.value}_交互")
         
         interaction_config = get_interaction_config(interaction_type)
         mode = state["mode"]
         
-        writer({
-            "step": f"interaction_{interaction_type.value}",
-            "status": f"处理{interaction_config['title']}",
-            "progress": 0,
-            "interaction_type": interaction_type.value,
-            "mode": mode.value
-        })
+        processor.writer.step_start(f"处理{interaction_config['title']}")
+        processor.writer.step_progress(f"处理{interaction_config['title']}", 0, 
+                                      interaction_type=interaction_type.value,
+                                      mode=mode.value)
         
         # Copilot模式自动通过
         if mode == ReportMode.COPILOT:
             state["approval_status"][interaction_type.value] = True
             state["user_feedback"][interaction_type.value] = {"approved": True, "auto": True}
             
-            writer({
-                "step": f"interaction_{interaction_type.value}",
-                "status": "Copilot模式自动通过",
-                "progress": 100,
-                "auto_approved": True
-            })
+            processor.writer.step_complete(f"Copilot模式自动通过", auto_approved=True)
             
             state["messages"] = state["messages"] + [
                 AIMessage(content=f"🤖 Copilot模式：{interaction_config['copilot_message']}")
@@ -566,12 +573,7 @@ def create_interaction_node(interaction_type: InteractionType):
         # 交互模式需要用户确认
         message_content = format_interaction_message(state, interaction_type, interaction_config)
         
-        writer({
-            "step": f"interaction_{interaction_type.value}",
-            "status": "等待用户确认",
-            "progress": 50,
-            "awaiting_user_input": True
-        })
+        processor.writer.step_progress("等待用户确认", 50, awaiting_user_input=True)
         
         # 使用interrupt等待用户输入
         user_response = interrupt({
@@ -590,13 +592,11 @@ def create_interaction_node(interaction_type: InteractionType):
         # 记录交互历史
         add_user_interaction(state, interaction_type.value, user_response)
         
-        writer({
-            "step": f"interaction_{interaction_type.value}",
-            "status": "用户确认完成",
-            "progress": 100,
-            "user_response": user_response,
-            "approved": approved
-        })
+        processor.writer.step_complete(
+            "用户确认完成",
+            user_response=user_response,
+            approved=approved
+        )
         
         # 添加确认消息
         status_emoji = "✅" if approved else "❌"

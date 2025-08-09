@@ -317,22 +317,22 @@ def format_message_for_frontend(message_dict: Dict[str, Any]) -> str:
     
     # 根据消息类型进行不同的格式化
     if msg_type == "step_start":
-        return f"🚀 开始: {content}"
+        return f"开始: {content}"
     elif msg_type == "step_progress":
         progress = metadata.get("progress", 0)
-        return f"⏳ {content} ({progress}%)"
+        return f"{content} ({progress}%)"
     elif msg_type == "agent_thinking":
-        return f"🧠 思考: {content}"
+        return f"思考: {content}"
     elif msg_type == "tool_call":
         tool_name = metadata.get("tool_name", "")
-        return f"🔧 调用工具: {tool_name}"
+        return f"调用工具: {tool_name}"
     elif msg_type == "tool_result":
-        return f"📊 工具结果: {content}"
+        return f"工具结果: {content}"
     elif msg_type == "ai_streaming":
         return content  # 流式内容直接输出，不换行
     elif msg_type == "final_result":
-        return f"🎯 最终结果: {content}"
+        return f"结果: {content}"
     elif msg_type == "error":
-        return f"❌ 错误: {content}"
+        return f"错误: {content}"
     else:
         return f"[{msg_type.upper()}] {content}"
