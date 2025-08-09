@@ -159,7 +159,6 @@ class StateManager:
             "completed_writing": len(writing_results),
             "task_completed": values.get("task_completed", False),
             "next_action": values.get("next_action", "unknown"),
-            "iteration_count": values.get("iteration_count", 0),
             "current_section_title": sections[current_index].get("title", "") if current_index < len(sections) else "完成"
         }
     
@@ -174,7 +173,6 @@ class StateManager:
             print(f"  已完成研究: {progress['completed_research']}")
             print(f"  已完成写作: {progress['completed_writing']}")
             print(f"  下一步行动: {progress['next_action']}")
-            print(f"  迭代次数: {progress['iteration_count']}")
             print(f"  任务完成: {'✅' if progress['task_completed'] else '❌'}")
             
             if progress['task_completed']:
@@ -211,8 +209,6 @@ async def demo_state_management():
         polishing_results={},
         final_report={},
         execution_path=[],
-        iteration_count=0,
-        max_iterations=8,
         next_action="research",
         task_completed=False,
         error_log=[],

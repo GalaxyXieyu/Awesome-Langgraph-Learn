@@ -1,21 +1,9 @@
-"""
-SubGraph模块
-包含各种可复用的子图组件
-"""
+"""SubGraph 模块占位符.
 
-from .research import (
-    create_intelligent_section_research_graph,
-    IntelligentSectionState,
-    ContextAwareAgent,
-    QualityAssessmentAgent,
-    AdaptiveResearchAgent
-)
+为避免在仅使用 update 子图时引入研究相关依赖,
+此模块不再在导入时自动加载 research 子图。
+"""
 
 __version__ = "2.0.0"
-__all__ = [
-    "create_intelligent_section_research_graph",
-    "IntelligentSectionState",
-    "ContextAwareAgent",
-    "QualityAssessmentAgent",
-    "AdaptiveResearchAgent"
-]
+
+__all__: list[str] = []

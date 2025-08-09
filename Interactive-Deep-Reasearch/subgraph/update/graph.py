@@ -18,12 +18,15 @@ import logging
 
 # 导入模块化组件
 from tools import ALL_RESEARCH_TOOLS
-from context_builder import build_supervisor_context, determine_next_action_by_state
-from prompts import get_supervisor_prompt, get_researcher_prompt, get_writer_prompt
+from .context_builder import build_supervisor_context, determine_next_action_by_state
+from .prompts import get_supervisor_prompt, get_researcher_prompt, get_writer_prompt
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# 单个章节的最大尝试次数
+MAX_SECTION_ATTEMPTS = 3
 
 # ============================================================================
 # 状态定义 - LangGraph核心
@@ -41,8 +44,6 @@ class IntelligentResearchState(TypedDict):
     polishing_results: Dict[str, Any]  # 润色结果
     final_report: Dict[str, Any]  # 最终报告
     execution_path: List[str]  # 执行路径
-    iteration_count: int  # 迭代次数
-    max_iterations: int  # 最大迭代次数
     next_action: str  # 下一步行动
     task_completed: bool  # 任务完成标志
     error_log: List[str]  # 错误日志
@@ -180,6 +181,19 @@ async def supervisor_node(state: IntelligentResearchState, config=None) -> Intel
         next_action = "integration"
         reasoning = "所有章节的研究和写作都已完成，开始最终整合"
 
+    # 检查单个章节的尝试次数限制
+    section_attempts = state.get("section_attempts", {})
+    current_section_id = sections[current_index].get("id", "") if current_index < len(sections) else ""
+    attempts = section_attempts.get(current_section_id, {"research": 0, "writing": 0})
+    if next_action == "research" and attempts.get("research", 0) >= MAX_SECTION_ATTEMPTS:
+        logger.info(f"章节 {current_section_id} 研究尝试已达上限，转入写作阶段")
+        next_action = "writing"
+        reasoning = f"研究尝试次数已达{MAX_SECTION_ATTEMPTS}次，转入写作"
+    elif next_action == "writing" and attempts.get("writing", 0) >= MAX_SECTION_ATTEMPTS:
+        logger.info(f"章节 {current_section_id} 写作尝试已达上限，移动到下一章节")
+        next_action = "move_to_next_section"
+        reasoning = f"写作尝试次数已达{MAX_SECTION_ATTEMPTS}次，转到下一章节"
+
     # 处理章节索引更新和目标章节设置
     if next_action == "move_to_next_section":
         new_index = current_index + 1
@@ -212,7 +226,6 @@ async def supervisor_node(state: IntelligentResearchState, config=None) -> Intel
     state["supervisor_reasoning"] = reasoning
     state["quality_feedback"] = quality_feedback
     state["supervisor_confidence"] = confidence
-    state["iteration_count"] = state.get("iteration_count", 0) + 1
     state["execution_path"] = state.get("execution_path", []) + ["intelligent_supervisor"]
 
     # 添加Supervisor的智能分析消息
@@ -250,14 +263,17 @@ async def research_node(state: IntelligentResearchState, config=None) -> Intelli
 
         logger.info(f"📖 开始处理章节: {title} (ID: {section_id})")
         
-        # 记录研究尝试次数
+        # 记录并检查研究尝试次数
         section_attempts = state.get("section_attempts", {})
-        if section_id not in section_attempts:
-            section_attempts[section_id] = {"research": 0, "writing": 0}
-        section_attempts[section_id]["research"] += 1
+        attempts = section_attempts.get(section_id, {"research": 0, "writing": 0})
+        if attempts.get("research", 0) >= MAX_SECTION_ATTEMPTS:
+            writer({"step": "research", "status": f"研究次数已达上限，跳过: {title}", "progress": -1})
+            return state
+        attempts["research"] += 1
+        section_attempts[section_id] = attempts
         state["section_attempts"] = section_attempts
 
-        current_attempt = section_attempts[section_id]["research"]
+        current_attempt = attempts["research"]
         writer({"step": "research", "status": f"开始研究: {title} (第{current_attempt}次尝试)", "progress": 0})
 
         # 创建研究Agent
@@ -385,14 +401,17 @@ async def writing_node(state: IntelligentResearchState, config=None) -> Intellig
 
         logger.info(f"📝 开始写作章节: {title} (ID: {section_id})")
         
-        # 记录写作尝试次数
+        # 记录并检查写作尝试次数
         section_attempts = state.get("section_attempts", {})
-        if section_id not in section_attempts:
-            section_attempts[section_id] = {"research": 0, "writing": 0}
-        section_attempts[section_id]["writing"] += 1
+        attempts = section_attempts.get(section_id, {"research": 0, "writing": 0})
+        if attempts.get("writing", 0) >= MAX_SECTION_ATTEMPTS:
+            writer({"step": "writing", "status": f"写作次数已达上限，跳过: {title}", "progress": -1})
+            return state
+        attempts["writing"] += 1
+        section_attempts[section_id] = attempts
         state["section_attempts"] = section_attempts
 
-        current_attempt = section_attempts[section_id]["writing"]
+        current_attempt = attempts["writing"]
 
         # 获取研究数据
         research_data = research_results.get(section_id, {})
@@ -576,14 +595,6 @@ async def integration_node(state: IntelligentResearchState, config=None) -> Inte
 def route_after_intelligent_supervisor(state: IntelligentResearchState) -> str:
     """智能Supervisor后的路由决策"""
     next_action = state.get("next_action", "integration")
-
-    # 检查是否超过最大迭代次数
-    iteration_count = state.get("iteration_count", 0)
-    max_iterations = state.get("max_iterations", 10)
-
-    if iteration_count >= max_iterations:
-        logger.warning(f"达到最大迭代次数 {max_iterations}，强制进入整合阶段")
-        return "integration"
 
     if next_action == "research":
         return "research"

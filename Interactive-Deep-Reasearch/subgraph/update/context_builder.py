@@ -13,8 +13,6 @@ def build_status_summary(state: Dict[str, Any]) -> str:
     research_results = state.get("research_results", {})
     writing_results = state.get("writing_results", {})
     topic = state.get("topic", "")
-    iteration_count = state.get("iteration_count", 0)
-    max_iterations = state.get("max_iterations", 10)
     
     # 计算完成进度 - 移除字数要求，只要有内容就算完成
     completed_sections = 0
@@ -32,8 +30,6 @@ def build_status_summary(state: Dict[str, Any]) -> str:
 完全完成的章节: {completed_sections}/{len(sections)}
 已有研究结果的章节: {len(research_results)}
 已有写作结果的章节: {len(writing_results)}
-当前迭代次数: {iteration_count}/{max_iterations}
-
 项目进度: {completed_sections}/{len(sections)} 章节完成
 """
 

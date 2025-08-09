@@ -105,8 +105,6 @@ def create_update_subgraph_state(state: DeepResearchState) -> Dict[str, Any]:
         "polishing_results": {},
         "final_report": {},
         "execution_path": [],
-        "iteration_count": 0,
-        "max_iterations": 10,
         "next_action": "research",
         "task_completed": False,
         "error_log": [],
@@ -115,7 +113,7 @@ def create_update_subgraph_state(state: DeepResearchState) -> Dict[str, Any]:
 
     return subgraph_state
 
-async def call_intelligent_research_subgraph(state: DeepResearchState) -> DeepResearchState:
+async def call_intelligent_research_subgraph(state: DeepResearchState, config=None) -> DeepResearchState:
     """
     调用智能研究子图（update版本）
 
@@ -123,7 +121,9 @@ async def call_intelligent_research_subgraph(state: DeepResearchState) -> DeepRe
     1. 将 DeepResearchState 转换为 IntelligentResearchState
     2. 调用update子图进行研究和写作
     3. 将结果转换回 DeepResearchState
+    同时转发子图的流式输出
     """
+    writer = safe_get_stream_writer()
     try:
         # 获取子图实例
         subgraph = get_intelligent_research_subgraph()
@@ -133,8 +133,17 @@ async def call_intelligent_research_subgraph(state: DeepResearchState) -> DeepRe
 
         logger.info(f"开始智能研究: {state.get('topic', '未知主题')}")
 
-        # 调用子图
-        subgraph_output = await subgraph.ainvoke(subgraph_input)
+        # 调用子图并转发事件
+        subgraph_output = None
+        async for event in subgraph.astream_events(subgraph_input, config=config):
+            event_type = event.get("event")
+            name = event.get("name", "")
+            if event_type == "on_node_start":
+                writer({"step": f"subgraph:{name}", "status": "start"})
+            elif event_type == "on_node_end":
+                writer({"step": f"subgraph:{name}", "status": "end"})
+            elif event_type == "on_graph_end":
+                subgraph_output = event.get("data", {}).get("output")
 
         # 状态转换：IntelligentResearchState -> DeepResearchState
         if subgraph_output and subgraph_output.get("final_report"):
@@ -262,7 +271,7 @@ async def intelligent_section_processing_node(state: DeepResearchState, config=N
         })
 
         # 直接调用子图（按照官方文档的方式）
-        updated_state = await call_intelligent_research_subgraph(state)
+        updated_state = await call_intelligent_research_subgraph(state, config=config)
 
         # 检查处理结果
         if updated_state.get("content_creation_completed"):
