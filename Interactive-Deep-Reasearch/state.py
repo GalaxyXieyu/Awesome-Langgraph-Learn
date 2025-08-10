@@ -8,7 +8,7 @@ from typing import Dict, Any, List, TypedDict, Annotated, Optional
 from enum import Enum
 from langgraph.graph.message import add_messages
 from langchain_core.messages import BaseMessage
-from langchain_core.pydantic_v1 import BaseModel, Field
+from pydantic import BaseModel, Field
 
 # ============================================================================
 # 枚举定义

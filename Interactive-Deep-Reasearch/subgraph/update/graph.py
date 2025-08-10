@@ -80,13 +80,13 @@ class IntelligentResearchState(TypedDict):
 # LLM配置
 # ============================================================================
 
-def create_llm():
+def create_llm() -> ChatOpenAI:
     """创建LLM实例"""
     return ChatOpenAI(
-        model="qwen2.5-72b-instruct-awq",
+        model="gpt-4o-mini",
         temperature=0.7,
-        base_url="https://llm.3qiao.vip:23436/v1",
-        api_key="sk-0rnrrSH0OsiaWCiv6b37C1E4E60c4b9394325001Ec19A197",
+        base_url="https://yunwu.zeabur.app/v1",
+        api_key="sk-GwOrS2hlFEvQwup599AdD613BaF54690B017812988D2810e",
     )
 
 # ============================================================================
@@ -240,26 +240,13 @@ async def supervisor_node(state: IntelligentResearchState, config=None) -> Intel
     state["iteration_count"] = state.get("iteration_count", 0) + 1
     state["execution_path"] = state.get("execution_path", []) + ["intelligent_supervisor"]
 
-    # 添加Supervisor的智能分析消息
-    supervisor_message = f"""
-    🧠 智能调度分析完成：
-    - 决策：{next_action}
-    - 理由：{reasoning}
-    - 质量反馈：{quality_feedback}
-    - 置信度：{confidence:.1%}
-    - 当前进度：{current_index}/{len(sections)}章节
-    """
-
-    # 智能调度分析完成
-    writer.reasoning(supervisor_message.strip())
+    # 智能调度分析完成 - 简化输出
     writer.step_complete("智能调度决策完成", 
                         decision=next_action,
                         confidence=confidence,
                         current_progress=f"{current_index}/{len(sections)}")
     
-    state["messages"] = state.get("messages", []) + [
-        AIMessage(content=supervisor_message)
-    ]
+    # 不再添加详细的supervisor消息到状态中
     return state
 
 async def research_node(state: IntelligentResearchState, config=None) -> IntelligentResearchState:

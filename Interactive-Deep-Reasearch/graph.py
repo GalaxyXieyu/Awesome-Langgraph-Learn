@@ -44,10 +44,10 @@ logger = logging.getLogger(__name__)
 def create_llm() -> ChatOpenAI:
     """创建LLM实例"""
     return ChatOpenAI(
-        model="qwen2.5-72b-instruct-awq",
+        model="gpt-4o-mini",
         temperature=0.7,
-        base_url="https://llm.3qiao.vip:23436/v1",
-        api_key="sk-0rnrrSH0OsiaWCiv6b37C1E4E60c4b9394325001Ec19A197",
+        base_url="https://yunwu.zeabur.app/v1",
+        api_key="sk-GwOrS2hlFEvQwup599AdD613BaF54690B017812988D2810e",
     )
 
 # 编译子图（全局变量，避免重复编译）- 使用update子图
@@ -109,7 +109,7 @@ async def call_intelligent_research_subgraph(state: DeepResearchState) -> DeepRe
 
     这个函数实现了主图和子图之间的状态转换，智能识别Agent工作流程
     """
-    # 创建工作流程处理器
+    # 创建工作流程处理器 - 不使用模板，保持简洁
     processor = create_workflow_processor("intelligent_research", "深度研究报告生成")
     
     try:
@@ -285,7 +285,7 @@ async def intelligent_section_processing_node(state: DeepResearchState, config=N
     3. 子图内部处理：智能Supervisor → 研究 → 写作 → 整合
     4. 返回完整的研究报告
     """
-    # 使用标准化Writer
+    # 使用扁平化Writer - 不使用模板，保持简洁
     writer = create_stream_writer("intelligent_section_processing", "智能章节处理")
     writer.step_start("开始智能研究处理（使用update子图）")
 
@@ -341,6 +341,7 @@ async def intelligent_section_processing_node(state: DeepResearchState, config=N
 
 async def outline_generation_node(state: DeepResearchState, config=None) -> DeepResearchState:
     """大纲生成节点"""
+    # 使用扁平化处理器 - 不使用模板，保持简洁
     processor = create_workflow_processor("outline_generation", "大纲生成器")
     processor.writer.step_start("开始生成深度研究大纲")
     
@@ -547,6 +548,7 @@ def create_interaction_node(interaction_type: InteractionType):
     
     def interaction_node(state: DeepResearchState) -> DeepResearchState:
         """通用交互确认节点"""
+        # 交互节点 - 不使用模板，保持简洁
         processor = create_workflow_processor(f"interaction_{interaction_type.value}", f"{interaction_type.value}_交互")
         
         interaction_config = get_interaction_config(interaction_type)

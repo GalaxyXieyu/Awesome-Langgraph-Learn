@@ -990,14 +990,59 @@ class AgentWorkflowProcessor:
                     tool_name = tool_call.get('name', 'unknown_tool')
                     tool_args = tool_call.get('args', {})
                     
-                    # 使用统一的工具调用处理方法
-                    self._send_agent_message("tool_call", "", agent_name, 
-                                           tool_name=tool_name, args=tool_args)
+                    # 发送带agent信息的工具调用消息
+                    tool_message = {
+                        "message_type": "tool_call",
+                        "content": "",  # 工具调用通常没有内容
+                        "node": self.writer.node_name,
+                        "agent": agent_name,
+                        "timestamp": time.time(),
+                        "duration": round(time.time() - self.writer.step_start_time, 2),
+                        "tool_name": tool_name,
+                        "args": tool_args
+                    }
+                    self.writer.writer(tool_message)
                     
-                    # 使用统一的思考内容生成方法
-                    thinking_content = self._generate_tool_thinking_content(tool_name, tool_args)
+                    # 发送带agent信息的思考过程消息
+                    thinking_content = ""
+                    if tool_name == "trend_analysis_tool":
+                        topic = tool_args.get('topic', '')
+                        thinking_content = f"使用趋势分析工具研究: {topic}"
+                    elif tool_name == "web_search_tool":
+                        query = tool_args.get('query', '')
+                        thinking_content = f"搜索相关信息: {query}"
+                    elif tool_name == "industry_data_tool":
+                        industry = tool_args.get('industry', '')
+                        thinking_content = f"获取行业数据: {industry}"
+                    elif tool_name == "get_research_context_tool":
+                        query = tool_args.get('query', '')
+                        thinking_content = f"查询研究上下文: {query}"
+                    elif tool_name == "advanced_web_search":
+                        query = tool_args.get('query', '')
+                        thinking_content = f"高级搜索: {query}"
+                    elif tool_name == "multi_source_research":
+                        topic = tool_args.get('topic', '')
+                        thinking_content = f"多源研究: {topic}"
+                    elif tool_name == "content_analyzer":
+                        thinking_content = "分析内容质量"
+                    elif tool_name == "content_writer_tool":
+                        title = tool_args.get('title', '')
+                        thinking_content = f"开始生成内容: {title}"
+                    elif tool_name == "enhanced_writer":
+                        thinking_content = "使用高级写作工具生成内容"
+                    else:
+                        thinking_content = f"调用{tool_name}工具"
+                    
                     if thinking_content:
-                        self._send_agent_message("thinking", thinking_content, agent_name)
+                        thinking_message = {
+                            "message_type": "thinking",
+                            "content": thinking_content,
+                            "node": self.writer.node_name,
+                            "agent": agent_name,
+                            "timestamp": time.time(),
+                            "duration": round(time.time() - self.writer.step_start_time, 2)
+                        }
+                        self.writer.writer(thinking_message)
             
             # 检测AI回复内容
             if hasattr(message, 'content') and message.content:
@@ -1007,16 +1052,21 @@ class AgentWorkflowProcessor:
                 if msg_type == "AIMessageChunk":
                     # 流式内容片段 - 直接显示
                     if content and content.strip():
-                        self._send_agent_message("content_streaming", content, agent_name, 
-                                               length=len(content), chunk_index=0)
+                        self._send_agent_content_streaming(content, agent_name)
                 else:
                     # 完整的AI消息
                     if len(content) > 300:
-                        preview_content = content[:500] + "..." if len(content) > 500 else content
-                        self._send_agent_message("content_streaming", preview_content, agent_name,
-                                               length=len(content), chunk_index=0)
+                        self._send_agent_content_streaming(content[:500] + "..." if len(content) > 500 else content, agent_name)
                     elif len(content) > 50:
-                        self._send_agent_message("reasoning", content, agent_name)
+                        reasoning_message = {
+                            "message_type": "reasoning",
+                            "content": content,
+                            "node": self.writer.node_name,
+                            "agent": agent_name,
+                            "timestamp": time.time(),
+                            "duration": round(time.time() - self.writer.step_start_time, 2)
+                        }
+                        self.writer.writer(reasoning_message)
                     
         elif msg_type == "ToolMessage":
             # 检测工具结果 - 展示工具返回的内容
@@ -1024,14 +1074,41 @@ class AgentWorkflowProcessor:
                 tool_name = getattr(message, 'name', 'unknown_tool')
                 result = str(message.content)
                 
-                # 使用统一的工具结果处理方法
-                self._send_agent_message("tool_result", result, agent_name,
-                                        tool_name=tool_name, length=len(result))
+                # 发送带agent信息的工具结果消息
+                tool_result_message = {
+                    "message_type": "tool_result",
+                    "content": result,
+                    "node": self.writer.node_name,
+                    "agent": agent_name,
+                    "timestamp": time.time(),
+                    "duration": round(time.time() - self.writer.step_start_time, 2),
+                    "tool_name": tool_name,
+                    "length": len(result)
+                }
+                self.writer.writer(tool_result_message)
                 
-                # 使用统一的反馈内容生成方法
-                feedback_content = self._generate_tool_feedback_content(tool_name, result)
+                # 根据工具类型提供反馈
+                feedback_content = ""
+                if tool_name == "trends_analysis_tool":
+                    feedback_content = "趋势分析完成，开始整理研究结果"
+                elif tool_name == "web_search_tool":
+                    feedback_content = "搜索完成，分析搜索结果的相关性"
+                elif tool_name in ["content_writer_tool", "enhanced_writer"]:
+                    word_count = len(result.split()) if result else 0
+                    feedback_content = f"内容生成完成 ({word_count}词)，检查质量"
+                else:
+                    feedback_content = f"{tool_name}工具执行完成"
+                
                 if feedback_content:
-                    self._send_agent_message("thinking", feedback_content, agent_name)
+                    thinking_message = {
+                        "message_type": "thinking",
+                        "content": feedback_content,
+                        "node": self.writer.node_name,
+                        "agent": agent_name,
+                        "timestamp": time.time(),
+                        "duration": round(time.time() - self.writer.step_start_time, 2)
+                    }
+                    self.writer.writer(thinking_message)
     
     def get_summary(self) -> Dict[str, Any]:
         """获取工作总结"""
