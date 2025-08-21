@@ -775,29 +775,19 @@ class AgentWorkflowProcessor:
         msg_type = type(message).__name__
         
         if msg_type in ["AIMessage", "AIMessageChunk"]:
-            # 检测工具调用
+            # 检测工具调用 - 使用统一处理方法
             if hasattr(message, 'tool_calls') and message.tool_calls:
                 for tool_call in message.tool_calls:
                     tool_name = tool_call.get('name', 'unknown_tool')
                     tool_args = tool_call.get('args', {})
                     
-                    # 发送工具调用信息
+                    # 使用统一的工具调用处理方法
                     self.writer.tool_call(tool_name, tool_args)
                     
-                    # 根据工具类型提供用户友好的思考过程
-                    if tool_name in ["advanced_web_search", "web_search_tool"]:
-                        query = tool_args.get('query', '')
-                        self.writer.thinking(f"搜索相关信息: {query}")
-                    elif tool_name in ["multi_source_research", "trend_analysis_tool"]:
-                        topic = tool_args.get('topic', '')
-                        self.writer.thinking(f"进行深度研究: {topic}")
-                    elif tool_name == "content_analyzer":
-                        self.writer.thinking("分析内容质量")
-                    elif tool_name in ["content_writer_tool", "enhanced_writer"]:
-                        title = tool_args.get('title', '')
-                        self.writer.thinking(f"开始生成内容: {title}")
-                    else:
-                        self.writer.thinking(f"调用{tool_name}工具")
+                    # 使用统一的思考内容生成方法  
+                    thinking_content = self._generate_tool_thinking_content(tool_name, tool_args)
+                    if thinking_content:
+                        self.writer.thinking(thinking_content)
             
             # 检测AI回复内容
             if hasattr(message, 'content') and message.content:
@@ -817,24 +807,18 @@ class AgentWorkflowProcessor:
                         self.writer.reasoning(content)
                     
         elif msg_type == "ToolMessage":
-            # 检测工具结果
+            # 检测工具结果 - 使用统一处理方法
             if hasattr(message, 'content') and message.content:
                 tool_name = getattr(message, 'name', 'unknown_tool')
                 result = str(message.content)
                 
-                # 发送工具结果
+                # 使用统一的工具结果处理方法
                 self.writer.tool_result(tool_name, result)
                 
-                # 根据工具类型提供反馈
-                if tool_name in ["advanced_web_search", "web_search_tool"]:
-                    self.writer.thinking("搜索完成，分析搜索结果的相关性")
-                elif tool_name in ["multi_source_research", "trend_analysis_tool"]:
-                    self.writer.thinking("研究分析完成，开始整理研究结果")
-                elif tool_name in ["content_writer_tool", "enhanced_writer"]:
-                    word_count = len(result.split()) if result else 0
-                    self.writer.thinking(f"内容生成完成 ({word_count}词)，检查质量")
-                else:
-                    self.writer.thinking(f"{tool_name}工具执行完成")
+                # 使用统一的反馈内容生成方法
+                feedback_content = self._generate_tool_feedback_content(tool_name, result)
+                if feedback_content:
+                    self.writer.thinking(feedback_content)
     
     # 删除_process_workflow_step - 该逻辑已被FlatDataProcessor处理
     
@@ -907,37 +891,13 @@ class AgentWorkflowProcessor:
                     tool_name = tool_call.get('name', 'unknown_tool')
                     tool_args = tool_call.get('args', {})
                     
-                    # 发送工具调用信息
+                    # 使用统一的工具调用处理方法
                     self.writer.tool_call(tool_name, tool_args)
                     
-                    # 根据工具类型提供用户友好的思考过程（不使用扁平化模板）
-                    if tool_name == "trend_analysis_tool":
-                        topic = tool_args.get('topic', '')
-                        self.writer.thinking(f"使用趋势分析工具研究: {topic}")
-                    elif tool_name == "web_search_tool":
-                        query = tool_args.get('query', '')
-                        self.writer.thinking(f"搜索相关信息: {query}")
-                    elif tool_name == "industry_data_tool":
-                        industry = tool_args.get('industry', '')
-                        self.writer.thinking(f"获取行业数据: {industry}")
-                    elif tool_name == "get_research_context_tool":
-                        query = tool_args.get('query', '')
-                        self.writer.thinking(f"查询研究上下文: {query}")
-                    elif tool_name == "advanced_web_search":
-                        query = tool_args.get('query', '')
-                        self.writer.thinking(f"高级搜索: {query}")
-                    elif tool_name == "multi_source_research":
-                        topic = tool_args.get('topic', '')
-                        self.writer.thinking(f"多源研究: {topic}")
-                    elif tool_name == "content_analyzer":
-                        self.writer.thinking("分析内容质量")
-                    elif tool_name == "content_writer_tool":
-                        title = tool_args.get('title', '')
-                        self.writer.thinking(f"开始生成内容: {title}")
-                    elif tool_name == "enhanced_writer":
-                        self.writer.thinking("使用高级写作工具生成内容")
-                    else:
-                        self.writer.thinking(f"调用{tool_name}工具")
+                    # 使用统一的思考内容生成方法
+                    thinking_content = self._generate_tool_thinking_content(tool_name, tool_args)
+                    if thinking_content:
+                        self.writer.thinking(thinking_content)
             
             # 检测AI回复内容
             if hasattr(message, 'content') and message.content:
@@ -961,19 +921,13 @@ class AgentWorkflowProcessor:
                 tool_name = getattr(message, 'name', 'unknown_tool')
                 result = str(message.content)
                 
-                # 发送工具结果
+                # 使用统一的工具结果处理方法
                 self.writer.tool_result(tool_name, result)
                 
-                # 根据工具类型提供反馈
-                if tool_name == "trends_analysis_tool":
-                    self.writer.thinking("趋势分析完成，开始整理研究结果")
-                elif tool_name == "web_search_tool":
-                    self.writer.thinking("搜索完成，分析搜索结果的相关性")
-                elif tool_name in ["content_writer_tool", "enhanced_writer"]:
-                    word_count = len(result.split()) if result else 0
-                    self.writer.thinking(f"内容生成完成 ({word_count}词)，检查质量")
-                else:
-                    self.writer.thinking(f"{tool_name}工具执行完成")
+                # 使用统一的反馈内容生成方法
+                feedback_content = self._generate_tool_feedback_content(tool_name, result)
+                if feedback_content:
+                    self.writer.thinking(feedback_content)
     
     def _process_agent_message_with_agent(self, message: Any, source_node: str, agent_name: str):
         """处理Agent消息，检测工具调用 - 带agent信息版本"""
@@ -1065,115 +1019,6 @@ def create_agent_stream_collector(node_name: str, agent_name: str = "", custom_t
     """创建简化的Agent流式输出收集器"""
     writer = create_stream_writer(node_name, agent_name, custom_templates)
     return AgentStreamCollector(writer, custom_templates)
-
-
-# ============================================================================
-# 前端渲染辅助函数
-# ============================================================================
-
-def format_message_for_frontend(message_dict: Dict[str, Any]) -> Dict[str, Any]:
-    """前端消息格式化 - 去除emoji版本"""
-    msg_type = message_dict["message_type"] 
-    content = message_dict["content"]
-    metadata = message_dict.get("metadata", {})
-    timestamp = message_dict.get("timestamp", time.time())
-    
-    # 基础格式化信息
-    formatted = {
-        "type": msg_type,
-        "content": content,
-        "timestamp": timestamp,
-        "metadata": metadata
-    }
-    
-    # 根据消息类型添加特定格式
-    if msg_type == "step_start":
-        formatted["display"] = f"开始: {content}"
-        formatted["icon"] = "play"
-        
-    elif msg_type == "step_progress":
-        progress = metadata.get("progress", 0)
-        formatted["display"] = f"{content} ({progress}%)"
-        formatted["progress"] = progress
-        formatted["icon"] = "progress"
-        
-    elif msg_type == "step_complete":
-        duration = metadata.get("duration", 0)
-        formatted["display"] = f"完成: {content} ({duration:.1f}s)"
-        formatted["icon"] = "check"
-        
-    elif msg_type == "thinking":
-        formatted["display"] = f"思考: {content}"
-        formatted["icon"] = "brain"
-        
-    elif msg_type == "reasoning":
-        formatted["display"] = f"分析: {content}"
-        formatted["icon"] = "lightbulb"
-        
-    elif msg_type == "tool_call":
-        tool_name = metadata.get("tool_name", "")
-        formatted["display"] = f"调用工具: {tool_name}"
-        formatted["tool_name"] = tool_name
-        formatted["icon"] = "tool"
-        
-    elif msg_type == "tool_result":
-        tool_name = metadata.get("tool_name", "")
-        result_length = metadata.get("result_length", 0)
-        formatted["display"] = f"工具结果: {tool_name}"
-        if result_length > 0:
-            formatted["display"] += f" ({result_length}字符)"
-        formatted["tool_name"] = tool_name
-        formatted["result_length"] = result_length
-        formatted["icon"] = "result"
-        
-    elif msg_type == "content_streaming":
-        formatted["display"] = content
-        formatted["icon"] = "edit"
-        formatted["is_streaming"] = True
-        
-    elif msg_type == "content_complete":
-        word_count = metadata.get("word_count", 0)
-        formatted["display"] = f"完成: {content}"
-        if word_count > 0:
-            formatted["display"] += f" ({word_count}字)"
-        formatted["word_count"] = word_count
-        formatted["icon"] = "document"
-        
-    elif msg_type == "error":
-        formatted["display"] = f"错误: {content}"
-        formatted["icon"] = "error"
-        formatted["level"] = "error"
-        
-    else:
-        formatted["display"] = f"[{msg_type.upper()}] {content}"
-        formatted["icon"] = "info"
-    
-    return formatted
-
-
-def get_message_types_for_frontend() -> Dict[str, Dict[str, str]]:
-    """获取所有消息类型的前端配置"""
-    return {
-        msg_type.value: {
-            "name": msg_type.value,
-            "description": f"消息类型: {msg_type.value}",
-            "category": _get_message_category(msg_type)
-        }
-        for msg_type in MessageType
-    }
-
-def _get_message_category(msg_type: MessageType) -> str:
-    """获取消息类型的分类"""
-    if msg_type.value.startswith("step_"):
-        return "step"
-    elif msg_type.value.startswith("ai_"):
-        return "ai"
-    elif msg_type.value.startswith("tool_"):
-        return "tool"
-    elif msg_type.value.startswith("subgraph_"):
-        return "subgraph"
-    else:
-        return "general"
 
 
 # ============================================================================

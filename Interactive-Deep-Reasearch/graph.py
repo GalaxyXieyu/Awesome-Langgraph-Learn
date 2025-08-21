@@ -31,7 +31,7 @@ from subgraph.update.graph import (
     create_intelligent_research_graph
 )
 # 导入标准化流式输出系统
-from stream_writer import create_stream_writer, create_workflow_processor
+from writer import create_stream_writer, create_workflow_processor
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)
