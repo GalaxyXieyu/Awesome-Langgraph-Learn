@@ -12,7 +12,7 @@ from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.pydantic_v1 import BaseModel, Field
-from tools import tavily_search, validate_outline, format_article
+from report_workflow.tools import tavily_search, validate_outline, format_article
 import logging
 import time
 from langgraph.config import get_stream_writer
@@ -619,13 +619,11 @@ def create_writing_assistant_graph():
     # 文章生成完成后结束
     workflow.add_edge("article_generation", END)
 
-    # 配置checkpointer以支持状态持久化
-    memory = InMemorySaver()
-
     # 编译图
-    app = workflow.compile(
-        checkpointer=memory
-    )
+    app = workflow.compile()
 
     return app
+
+# 导出给LangGraph Studio使用的graph实例
+graph = create_writing_assistant_graph()
 

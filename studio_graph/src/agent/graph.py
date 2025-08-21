@@ -4,6 +4,8 @@
 支持异步执行和流式输出
 """
 
+
+
 import json
 import time
 import asyncio
@@ -14,9 +16,8 @@ from langchain_core.messages import HumanMessage, AIMessage
 from langgraph.prebuilt import create_react_agent
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
-from langgraph.checkpoint.memory import InMemorySaver
-from tools import get_search_tools, get_analysis_tools, get_writing_tools
-from writer import Collector, create_writer
+from agent.tools.tools import get_search_tools, get_analysis_tools, get_writing_tools
+from agent.writer.writer import Collector, create_writer
 import logging
 
 # 配置日志
@@ -547,8 +548,8 @@ def should_end(state: MultiAgentState) -> str:
 # 图构建
 # ============================================================================
 
-def create_multi_agent_graph(checkpointer: Optional[InMemorySaver] = None):
-    """创建多智能体工作流图，支持InMemorySaver持久化"""
+def create_multi_agent_graph():
+    """创建多智能体工作流图，LangGraph Studio会自动处理持久化"""
     workflow = StateGraph(MultiAgentState)
 
     # 添加节点
@@ -578,16 +579,11 @@ def create_multi_agent_graph(checkpointer: Optional[InMemorySaver] = None):
         }
     )
 
-
-
     # 结果整合后结束
     workflow.add_edge("result_integration", END)
 
-    # 编译图，支持checkpointer
-    if checkpointer is None:
-        checkpointer = InMemorySaver()
-
-    app = workflow.compile(checkpointer=checkpointer)
+    # 编译图，不使用自定义checkpointer（LangGraph Studio会自动处理）
+    app = workflow.compile()
 
     return app
 
@@ -614,9 +610,8 @@ async def run_multi_agent_system_async(
         执行结果
     """
     try:
-        # 创建带有checkpointer的图
-        checkpointer = InMemorySaver()
-        app = create_multi_agent_graph(checkpointer)
+        # 创建图（不使用checkpointer，LangGraph Studio会自动处理）
+        app = create_multi_agent_graph()
 
         # 初始化状态
         initial_state = {
@@ -635,12 +630,12 @@ async def run_multi_agent_system_async(
             "task_completed": False
         }
 
-        # 配置
-        config = {"configurable": {"thread_id": thread_id or f"thread_{int(time.time())}"}}
+        # 配置（如果需要thread_id）
+        config = {"configurable": {"thread_id": thread_id or f"thread_{int(time.time())}"}} if thread_id else {}
 
         # 异步运行工作流
         start_time = time.time()
-        result = await app.ainvoke(initial_state, config=config)
+        result = await app.ainvoke(initial_state, config=config if config else None)
         execution_time = time.time() - start_time
 
         # 构建返回结果
@@ -691,9 +686,8 @@ async def stream_multi_agent_system(
         流式执行结果
     """
     try:
-        # 创建带有checkpointer的图
-        checkpointer = InMemorySaver()
-        app = create_multi_agent_graph(checkpointer)
+        # 创建图（不使用checkpointer，LangGraph Studio会自动处理）
+        app = create_multi_agent_graph()
 
         # 初始化状态
         initial_state = {
@@ -713,12 +707,12 @@ async def stream_multi_agent_system(
             "task_completed": False
         }
 
-        # 配置
-        config = {"configurable": {"thread_id": thread_id or f"thread_{int(time.time())}"}}
+        # 配置（如果需要thread_id）
+        config = {"configurable": {"thread_id": thread_id or f"thread_{int(time.time())}"}} if thread_id else {}
 
         # 异步流式执行
         start_time = time.time()
-        async for chunk in app.astream(initial_state, config=config):
+        async for chunk in app.astream(initial_state, config=config if config else None):
             # 计算当前执行时间
             current_time = time.time() - start_time
 
@@ -767,6 +761,9 @@ def run_multi_agent_system(
         执行结果
     """
     return asyncio.run(run_multi_agent_system_async(user_input, max_iterations, context))
+
+# 导出给LangGraph Studio使用的graph实例
+graph = create_multi_agent_graph()
 
 if __name__ == "__main__":
     result = run_multi_agent_system("计算 2+3*4 的结果", max_iterations=2)

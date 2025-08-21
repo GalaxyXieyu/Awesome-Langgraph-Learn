@@ -836,7 +836,6 @@ async def resume_task(task_id: str, request: ResumeRequest):
 @app.get("/api/v1/events/{task_id}")
 async def get_event_stream(task_id: str):
     """事件流 - 真正的异步版本 (aioredis)"""
-
     async def event_generator():
         stream_name = f"events:{task_id}"
         last_id = "0"

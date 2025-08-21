@@ -1,0 +1,24 @@
+[project]
+name = "report-workflow"
+version = "0.0.1"
+description = "A LangGraph project for iterative report workflow."
+authors = [
+    { name = "Your Name", email = "your.email@example.com" },
+]
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.9"
+dependencies = [
+    "langgraph>=0.2.6",
+    "python-dotenv>=1.0.1",
+    "langchain-openai",
+    "tavily-python"
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
