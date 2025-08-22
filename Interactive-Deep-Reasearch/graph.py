@@ -32,7 +32,7 @@ from state import (
 )
 
 # 导入子图模块
-from subgraphs.intelligent_research.graph import (
+from subgraphs.deepresearch.graph import (
     create_intelligent_research_graph
 )
 # 导入标准化流式输出系统
@@ -91,6 +91,7 @@ def create_update_subgraph_state(state: DeepResearchState) -> Dict[str, Any]:
         "messages": [],
         "user_input": f"请为主题'{state.get('topic', '')}'生成深度研究报告",
         "topic": state.get("topic", ""),
+        "mode": state.get("mode", "copilot"),  # 🎯 传递mode信息到子图
         "sections": formatted_sections,
         "current_section_index": 0,
         "research_results": {},
@@ -684,14 +685,7 @@ def format_interaction_message(state: DeepResearchState, interaction_type: Inter
 outline_confirmation_node = create_interaction_node(InteractionType.OUTLINE_CONFIRMATION)
 
 # ============================================================================
-# 图构建和路由逻辑
-# ============================================================================
-
-
-# 删除了analysis_generation_node - 由update子图处理分析功能
-
-# ============================================================================
-# 路由函数 - 简化版本
+# 路由函数
 # ============================================================================
 
 def route_after_outline_confirmation(state: DeepResearchState) -> str:

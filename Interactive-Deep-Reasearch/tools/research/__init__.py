@@ -1,8 +1,5 @@
-"""
-研究工具模块
-提供搜索、分析、数据获取等研究相关工具
-"""
+"""研究工具模块"""
 
-from .tools import *
+from .tools import RESEARCH_TOOLS
 
-__all__ = []  # 将在tools.py中定义具体导出
+__all__ = ['RESEARCH_TOOLS']

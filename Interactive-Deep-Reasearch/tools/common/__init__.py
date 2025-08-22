@@ -1,8 +1,5 @@
-"""
-通用工具模块
-提供基础工具和实用函数
-"""
+"""通用工具模块"""
 
-from .tools import *
+from .tools import COMMON_TOOLS
 
-__all__ = []  # 将在tools.py中定义具体导出
+__all__ = ['COMMON_TOOLS']

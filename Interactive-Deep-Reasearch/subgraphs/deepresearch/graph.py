@@ -18,8 +18,10 @@ from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langgraph.prebuilt import create_react_agent
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import InMemorySaver
-# 导入模块化组件
-from .tools import ALL_RESEARCH_TOOLS
+# 导入新的工具系统
+import sys
+sys.path.append('/Users/galaxyxieyu/Documents/Coding/langgraph/Interactive-Deep-Reasearch')
+from tools import get_research_tools
 from .context_builder import build_supervisor_context, determine_next_action_by_state
 from .prompts import get_supervisor_prompt, get_researcher_prompt, get_writer_prompt
 
@@ -32,6 +34,7 @@ class IntelligentResearchState(TypedDict):
     messages: Annotated[List, add_messages]  # 消息历史
     user_input: str  # 用户输入
     topic: str  # 研究主题
+    mode: str  # 🎯 执行模式：copilot/interactive
     sections: List[Dict[str, Any]]  # 章节列表
     current_section_index: int  # 当前处理的章节索引
     research_results: Dict[str, Any]  # 研究结果
@@ -65,21 +68,28 @@ def create_llm() -> ChatOpenAI:
 # Agent创建 - 专业化Agent
 # ============================================================================
 
-def create_research_agents():
-    """创建专业化的研究Agent"""
+async def create_research_agents(state: IntelligentResearchState):
+    """创建专业化的研究Agent - 使用新的工具系统"""
     llm = create_llm()
+    
+    # 🎯 使用新工具系统：自动检测mode，自动包装
+    research_tools = get_research_tools(state)
+    
+    # 处理异步返回的工具列表
+    if hasattr(research_tools, '__await__'):
+        research_tools = await research_tools
     
     # 研究员Agent
     researcher_agent = create_react_agent(
         llm,
-        tools=ALL_RESEARCH_TOOLS,
+        tools=research_tools,  # 使用包装后的工具
         prompt=get_researcher_prompt()
     )
     
     # 写作员Agent - 也可以使用工具获取更多数据
     writer_agent = create_react_agent(
         llm,
-        tools=ALL_RESEARCH_TOOLS,  # 写作员也可以调用工具补充数据
+        tools=research_tools,  # 使用包装后的工具
         prompt=get_writer_prompt()
     )
     
@@ -231,8 +241,8 @@ async def research_node(state: IntelligentResearchState, config=None) -> Intelli
         current_attempt = section_attempts[section_id]["research"]
 
 
-        # 创建研究Agent
-        agents = create_research_agents()
+        # 创建研究Agent - 使用新的工具系统
+        agents = await create_research_agents(state)
         researcher = agents["researcher"]
         
         # 构建研究任务
@@ -371,8 +381,8 @@ async def writing_node(state: IntelligentResearchState, config=None) -> Intellig
 
         # 开始写作
 
-        # 创建写作Agent
-        agents = create_research_agents()
+        # 创建写作Agent - 使用新的工具系统
+        agents = await create_research_agents(state)
         writer_agent = agents["writer"]
         
         # 获取其他章节的研究结果作为参考
