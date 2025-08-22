@@ -28,7 +28,7 @@ from state import (
     DeepResearchState, ReportMode, TaskStatus, InteractionType,
     ReportOutline, ReportSection, ResearchResult,
     update_performance_metrics, 
-    update_task_status, add_user_interaction, add_node_output
+    update_task_status, add_user_interaction
 )
 
 # 导入子图模块
@@ -345,7 +345,7 @@ async def intelligent_section_processing_node(state: DeepResearchState, config=N
 # ============================================================================
 
 async def outline_generation_node(state: DeepResearchState, config=None) -> DeepResearchState:
-    """大纲生成节点 - 支持流式输出汇总"""
+    """大纲生成节点"""
     # 使用扁平化处理器 - 不使用模板，保持简洁
     processor = create_workflow_processor("outline_generation", "大纲生成器")
     processor.writer.step_start("开始生成深度研究大纲")
@@ -397,19 +397,10 @@ async def outline_generation_node(state: DeepResearchState, config=None) -> Deep
         outline_data = None
         chunk_count = 0
         current_outline_display = ""
-        raw_chunks_content = ""  # 🔥 只累计原始LLM输出的content
         
         async for chunk in llm_chain.astream(input_data, config=config):
             outline_data = chunk
             chunk_count += 1
-        
-            if hasattr(chunk, 'content'):
-                raw_chunks_content = chunk.content
-            elif isinstance(chunk, str):
-                raw_chunks_content = chunk
-            elif hasattr(chunk, '__str__'):
-                raw_chunks_content = str(chunk)
-            
             # 实时显示大纲内容（每5个chunk更新一次以减少频率）
             if chunk_count % 5 == 0:
                 # 构建当前大纲的显示文本
@@ -440,7 +431,60 @@ async def outline_generation_node(state: DeepResearchState, config=None) -> Deep
                         partial_outline=chunk,
                         streaming_content=current_outline_display
                     )
-              
+        
+        # 处理生成结果
+        if not outline_data:
+            # 创建默认大纲
+            outline_data = ReportOutline(
+                title=f"{state['topic']} - 深度研究报告",
+                executive_summary=f"本报告对{state['topic']}进行全面深入的研究分析，为{state['target_audience']}提供专业洞察。",
+                sections=[
+                    ReportSection(
+                        id="background",
+                        title="研究背景与现状",
+                        description="分析研究背景、发展历程和当前状态",
+                        key_points=["历史发展", "现状分析", "关键特征"],
+                        research_queries=[f"{state['topic']} 发展历史", f"{state['topic']} 现状分析", f"{state['topic']} 市场规模"],
+                        priority=5
+                    ),
+                    ReportSection(
+                        id="deep_analysis",
+                        title="深度分析与洞察",
+                        description="进行深入分析，识别关键趋势和模式",
+                        key_points=["核心驱动因素", "发展趋势", "影响因素"],
+                        research_queries=[f"{state['topic']} 趋势分析", f"{state['topic']} 影响因素", f"{state['topic']} 发展预测"],
+                        priority=5
+                    ),
+                    ReportSection(
+                        id="case_studies",
+                        title="案例研究与应用",
+                        description="分析典型案例和实际应用情况",
+                        key_points=["成功案例", "应用场景", "实施经验"],
+                        research_queries=[f"{state['topic']} 案例研究", f"{state['topic']} 应用实例", f"{state['topic']} 最佳实践"],
+                        priority=4
+                    ),
+                    ReportSection(
+                        id="challenges_opportunities",
+                        title="挑战与机遇分析",
+                        description="识别面临的挑战和发展机遇",
+                        key_points=["主要挑战", "发展机遇", "风险评估"],
+                        research_queries=[f"{state['topic']} 挑战分析", f"{state['topic']} 发展机会", f"{state['topic']} 风险评估"],
+                        priority=4
+                    ),
+                    ReportSection(
+                        id="future_outlook",
+                        title="未来展望与建议",
+                        description="预测未来发展并提出专业建议",
+                        key_points=["发展预测", "战略建议", "行动计划"],
+                        research_queries=[f"{state['topic']} 未来发展", f"{state['topic']} 发展建议", f"{state['topic']} 战略规划"],
+                        priority=3
+                    )
+                ],
+                methodology="采用文献研究、案例分析、趋势预测和专家洞察相结合的综合研究方法",
+                target_audience=state["target_audience"],
+                estimated_length=state["target_length"]
+            )
+        
         # 转换为字典格式
         if hasattr(outline_data, 'dict'):
             outline_dict = outline_data.dict()
@@ -480,16 +524,6 @@ async def outline_generation_node(state: DeepResearchState, config=None) -> Deep
         
         state["messages"] = state["messages"] + [AIMessage(content=outline_message)]
         
-        # 🔥 将原始累计内容汇总到 node_outputs
-        add_node_output(
-            state, 
-            "outline_generation", 
-            raw_chunks_content,  # 只存储原始累计的content
-            execution_time=execution_time,
-            word_count=len(raw_chunks_content),
-            status="completed"
-        )
-        
         processor.writer.step_complete(
             "深度研究大纲生成完成",
             sections_count=len(outline_dict.get("sections", [])),
@@ -498,38 +532,12 @@ async def outline_generation_node(state: DeepResearchState, config=None) -> Deep
             display_text=outline_message
         )
         
-        # 🔥 如果是非流式节点，发送最简单的原始累计内容
-        from writer.config import get_writer_config
-        config = get_writer_config()
-        if not config.is_node_streaming_enabled("outline_generation"):
-            from langgraph.config import get_stream_writer
-            writer = get_stream_writer()
-            if writer:
-                aggregated_message = {
-                    "message_type": "node_output_complete",
-                    "content": raw_chunks_content,  # 🔥 只发送最原始的累计content
-                    "node": "outline_generation",
-                    "timestamp": time.time(),
-                    "duration": execution_time,
-                    "word_count": len(raw_chunks_content)
-                }
-                writer(aggregated_message)
-        
         logger.info(f"大纲生成完成: {len(outline_dict.get('sections', []))}个章节")
         return state
         
     except Exception as e:
         logger.error(f"大纲生成失败: {str(e)}")
         processor.writer.error(f"大纲生成失败: {str(e)}", "OutlineGenerationError")
-        
-        # 错误情况也记录到 node_outputs
-        add_node_output(
-            state, 
-            "outline_generation", 
-            f"错误：{str(e)}",
-            status="failed",
-            error=str(e)
-        )
         
         state["error_log"] = state["error_log"] + [f"大纲生成错误: {str(e)}"]
         state["current_step"] = "outline_generation_failed"

@@ -143,22 +143,23 @@ class DeepResearchState(TypedDict):
     analysis_insights: List[Dict[str, Any]]      # 分析洞察列表
     final_report: Optional[str]                  # 最终报告内容
     
-    # ========== 节点输出汇总 ==========
-    node_outputs: Dict[str, Dict[str, Any]]      # 节点完整输出：{node_name: {content, timestamp, word_count}}
-    
     # ========== 执行状态 ==========
     current_step: str                            # 当前执行步骤
+    execution_plan: Optional[Dict[str, Any]]     # 执行计划
     execution_path: List[str]                    # 执行路径记录
+    agent_results: Dict[str, Any]                # 各Agent执行结果
     task_status: Dict[str, str]                  # 任务状态映射
     
     # ========== 交互状态 ==========
+    pending_interactions: List[str]              # 待处理交互列表
     user_feedback: Dict[str, Any]                # 用户反馈记录
     approval_status: Dict[str, bool]             # 审批状态记录
     interaction_history: List[Dict[str, Any]]    # 交互历史记录
     
     # ========== 系统状态 ==========
     error_log: List[str]                         # 错误日志
-    performance_metrics: Dict[str, Any]          # 性能指标（简化版）
+    performance_metrics: Dict[str, Any]          # 性能指标
+    metadata: Dict[str, Any]                     # 元数据信息
     
     # ========== 消息历史 ==========
     messages: Annotated[List[BaseMessage], add_messages]  # 对话消息历史
@@ -222,9 +223,6 @@ def create_initial_state(
         "research_results": [],
         "analysis_insights": [],
         "final_report": None,
-        
-        # 节点输出汇总
-        "node_outputs": {},
         
         # 执行状态
         "current_step": "initialized",
@@ -343,31 +341,6 @@ def add_user_interaction(state: DeepResearchState, interaction_type: str, user_r
     }
     state["interaction_history"].append(interaction_record)
     state["performance_metrics"]["interaction_count"] += 1
-
-def add_node_output(state: DeepResearchState, node_name: str, content: str, **metadata) -> None:
-    """
-    添加节点完整输出到汇总中
-    
-    Args:
-        state: 状态对象
-        node_name: 节点名称
-        content: 完整内容
-        **metadata: 额外元数据(如word_count, status等)
-    """
-    output_data = {
-        "content": content,
-        "timestamp": time.time(),
-        **metadata
-    }
-    state["node_outputs"][node_name] = output_data
-
-def get_node_output(state: DeepResearchState, node_name: str) -> Optional[Dict[str, Any]]:
-    """获取指定节点的完整输出"""
-    return state["node_outputs"].get(node_name)
-
-def get_all_node_outputs(state: DeepResearchState) -> Dict[str, Dict[str, Any]]:
-    """获取所有节点的输出汇总"""
-    return state["node_outputs"].copy()
 
 def finalize_performance_metrics(state: DeepResearchState) -> None:
     """完成性能指标统计"""

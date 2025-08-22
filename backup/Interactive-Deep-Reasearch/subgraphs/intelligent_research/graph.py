@@ -6,50 +6,22 @@
 import json
 import time
 import asyncio
+import os
 from typing import Dict, Any, List, TypedDict, Annotated, Optional
+
+# 加载环境变量
+from dotenv import load_dotenv
+load_dotenv()
 from langgraph.graph import StateGraph, END, START
 from langgraph.graph.message import add_messages
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langgraph.prebuilt import create_react_agent
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import InMemorySaver
-from langgraph.config import get_stream_writer
-
-# 导入模块化组件 - 使用绝对导入
-try:
-    # 当作为子图导入时使用相对路径
-    from .tools import ALL_RESEARCH_TOOLS
-    from .context_builder import build_supervisor_context, determine_next_action_by_state
-    from .prompts import get_supervisor_prompt, get_researcher_prompt, get_writer_prompt
-except ImportError:
-    # 当直接运行时使用当前目录
-    from tools import ALL_RESEARCH_TOOLS
-    from context_builder import build_supervisor_context, determine_next_action_by_state
-    from prompts import get_supervisor_prompt, get_researcher_prompt, get_writer_prompt
-
-# 导入流式输出系统
-try:
-    from ..stream_writer import create_stream_writer, create_workflow_processor
-except ImportError:
-    try:
-        from stream_writer import create_stream_writer, create_workflow_processor
-    except ImportError:
-        # 创建dummy函数以防导入失败
-        def create_stream_writer(node_name: str, agent_name: str = ""):
-            class DummyWriter:
-                def step_start(self, msg): pass
-                def step_progress(self, msg, progress, **kwargs): pass  
-                def step_complete(self, msg, **kwargs): pass
-                def thinking(self, msg): pass
-                def reasoning(self, msg, **kwargs): pass
-            return DummyWriter()
-        
-        def create_workflow_processor(node_name: str, agent_name: str = ""):
-            class DummyProcessor:
-                def __init__(self):
-                    self.writer = create_stream_writer(node_name, agent_name)
-                def process_chunk(self, chunk): pass
-            return DummyProcessor()
+# 导入模块化组件
+from tools import ALL_RESEARCH_TOOLS
+from context_builder import build_supervisor_context, determine_next_action_by_state
+from prompts import get_supervisor_prompt, get_researcher_prompt, get_writer_prompt
 
 # ============================================================================
 # 状态定义 - LangGraph核心
@@ -83,10 +55,10 @@ class IntelligentResearchState(TypedDict):
 def create_llm() -> ChatOpenAI:
     """创建LLM实例"""
     return ChatOpenAI(
-        model="gpt-4o-mini",
-        temperature=0.7,
-        base_url="https://yunwu.zeabur.app/v1",
-        api_key="sk-GwOrS2hlFEvQwup599AdD613BaF54690B017812988D2810e",
+        model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+        temperature=float(os.getenv("OPENAI_TEMPERATURE", "0.7")),
+        base_url=os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1"),
+        api_key=os.getenv("OPENAI_API_KEY"),
     )
 
 # ============================================================================
@@ -123,9 +95,6 @@ def create_research_agents():
 async def supervisor_node(state: IntelligentResearchState, config=None) -> IntelligentResearchState:
     """智能Supervisor节点 - 使用LLM进行智能决策和质量评估"""
     
-    # 创建流式输出writer
-    writer = create_stream_writer("intelligent_supervisor", "智能调度分析")
-    writer.thinking("开始智能调度分析...")
 
     llm = create_llm()
 
@@ -134,9 +103,6 @@ async def supervisor_node(state: IntelligentResearchState, config=None) -> Intel
 
     # 构建Supervisor的智能决策提示
     supervisor_prompt = get_supervisor_prompt()
-
-    # 智能分析进行中
-    writer.step_progress("分析当前状态和进度", 30)
 
     formatted_messages = supervisor_prompt.format_messages(**input_data)
     # 流式调用LLM进行智能决策
@@ -149,7 +115,6 @@ async def supervisor_node(state: IntelligentResearchState, config=None) -> Intel
             chunk_count += 1
     
     # 决策结果解析中
-    writer.step_progress("解析智能决策结果", 70)
     import re
     try:
         json_matches = re.findall(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', full_response, re.DOTALL)
@@ -240,12 +205,6 @@ async def supervisor_node(state: IntelligentResearchState, config=None) -> Intel
     state["iteration_count"] = state.get("iteration_count", 0) + 1
     state["execution_path"] = state.get("execution_path", []) + ["intelligent_supervisor"]
 
-    # 智能调度分析完成 - 简化输出
-    writer.step_complete("智能调度决策完成", 
-                        decision=next_action,
-                        confidence=confidence,
-                        current_progress=f"{current_index}/{len(sections)}")
-    
     # 不再添加详细的supervisor消息到状态中
     return state
 
@@ -254,11 +213,6 @@ async def research_node(state: IntelligentResearchState, config=None) -> Intelli
     try:
         sections = state.get("sections", [])
         current_index = state.get("current_section_index", 0)
-        
-        # 创建流式输出writer
-        writer = create_stream_writer("research", "章节研究员")
-        writer.step_start(f"开始研究分析 (章节 {current_index + 1}/{len(sections)})")
-
         if current_index >= len(sections):
             return state
 
@@ -275,9 +229,7 @@ async def research_node(state: IntelligentResearchState, config=None) -> Intelli
         state["section_attempts"] = section_attempts
 
         current_attempt = section_attempts[section_id]["research"]
-        # 开始研究
-        writer.step_progress(f"准备研究章节: {title}", 20, 
-                           attempt=current_attempt, section_id=section_id)
+
 
         # 创建研究Agent
         agents = create_research_agents()
@@ -295,9 +247,6 @@ async def research_node(state: IntelligentResearchState, config=None) -> Intelli
         2. 如果数据不足，主动使用多个工具补充
         3. 提供详细的分析报告
         """
-        
-        # Agent研究进行中
-        writer.thinking(f"调用研究Agent处理: {title}")
         
         # Agent执行研究
         agent_input = {"messages": [HumanMessage(content=research_task)]}
@@ -371,8 +320,6 @@ async def research_node(state: IntelligentResearchState, config=None) -> Intelli
         
         # 研究内容完成
         word_count = len(full_response.split()) if full_response else 0
-        writer.step_progress(f"研究数据收集完成: {title}", 90, 
-                           content_length=len(full_response), word_count=word_count)
         
         # 保存研究结果
         research_results = state.get("research_results", {})
@@ -385,10 +332,6 @@ async def research_node(state: IntelligentResearchState, config=None) -> Intelli
         state["execution_path"] = state.get("execution_path", []) + ["research"]
         
         # 研究步骤完成
-        writer.step_complete(f"研究完成: {title}", 
-                           result_length=len(full_response), 
-                           word_count=word_count,
-                           section_id=section_id)
         
         return state
         
@@ -405,9 +348,6 @@ async def writing_node(state: IntelligentResearchState, config=None) -> Intellig
         current_index = state.get("current_section_index", 0)
         research_results = state.get("research_results", {})
         
-        # 创建流式输出writer
-        writer = create_stream_writer("writing", "章节写作员")
-        writer.step_start(f"开始内容创作 (章节 {current_index + 1}/{len(sections)})")
 
         if current_index >= len(sections):
             return state
@@ -430,9 +370,6 @@ async def writing_node(state: IntelligentResearchState, config=None) -> Intellig
         research_content = research_data.get("content", "")
 
         # 开始写作
-        writer.step_progress(f"准备写作章节: {title}", 20, 
-                           attempt=current_attempt, 
-                           research_length=len(research_content))
 
         # 创建写作Agent
         agents = create_research_agents()
@@ -463,8 +400,6 @@ async def writing_node(state: IntelligentResearchState, config=None) -> Intellig
         """
         
         # Agent写作进行中
-        writer.thinking(f"调用写作Agent处理: {title}")
-        writer.step_progress("写作Agent分析研究数据", 50)
         
         # Agent执行写作
         agent_input = {"messages": [HumanMessage(content=writing_task)]}
@@ -556,10 +491,6 @@ async def writing_node(state: IntelligentResearchState, config=None) -> Intellig
         state["execution_path"] = state.get("execution_path", []) + ["writing"]
         
         # 写作步骤完成
-        writer.step_complete(f"写作完成: {title}", 
-                           word_count=word_count,
-                           content_length=len(full_response),
-                           section_id=section_id)
         
         return state
         
@@ -572,16 +503,12 @@ async def integration_node(state: IntelligentResearchState, config=None) -> Inte
     """整合节点 - 生成最终报告"""
     
     try:
-        # 创建流式输出writer
-        writer = create_stream_writer("integration", "报告整合员")
-        writer.step_start("开始整合最终报告")
 
         topic = state.get("topic", "")
         writing_results = state.get("writing_results", {})
         sections = state.get("sections", [])
 
         # 构建最终报告
-        writer.step_progress("收集章节内容", 30, total_sections=len(sections))
         final_sections = []
         total_words = 0
 
@@ -591,8 +518,6 @@ async def integration_node(state: IntelligentResearchState, config=None) -> Inte
                 section_data = writing_results[section_id]
                 final_sections.append(section_data)
                 total_words += section_data.get("word_count", 0)
-                writer.step_progress(f"整合章节: {section_data.get('title', '')}", 
-                                   30 + (len(final_sections) / len(sections)) * 40)
 
         final_report = {
             "title": f"{topic} - 智能研究报告",
@@ -610,12 +535,6 @@ async def integration_node(state: IntelligentResearchState, config=None) -> Inte
         state["execution_path"] = state.get("execution_path", []) + ["integration"]
 
         # 报告整合完成
-        writer.final_result(f"智能研究报告生成完成", {
-            "total_sections": len(final_sections),
-            "total_words": total_words,
-            "topic": topic,
-            "generation_method": "langgraph_intelligent_research"
-        })
 
         return state
 
@@ -719,4 +638,5 @@ def create_intelligent_research_graph(checkpointer: Optional[InMemorySaver] = No
             END: END
         }
     )
+
     return workflow

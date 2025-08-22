@@ -5,79 +5,10 @@
 """
 
 import time
-import json
 from typing import Dict, Any, List, Optional
 from enum import Enum
 from langgraph.config import get_stream_writer
-
-
-# ============================================================================  
-# 工具配置系统 - 消除硬编码的工具处理逻辑
-# ============================================================================
-
-# 工具处理配置 - 统一管理所有工具的处理逻辑
-TOOL_PROCESSING_CONFIG = {
-    # 搜索类工具
-    "web_search_tool": {
-        "param_key": "query",
-        "thinking_template": "搜索相关信息: {query}",
-        "feedback_template": "搜索完成，分析搜索结果的相关性"
-    },
-    "advanced_web_search": {
-        "param_key": "query", 
-        "thinking_template": "高级搜索: {query}",
-        "feedback_template": "高级搜索完成"
-    },
-    
-    # 研究类工具  
-    "trend_analysis_tool": {
-        "param_key": "topic",
-        "thinking_template": "使用趋势分析工具研究: {topic}",
-        "feedback_template": "趋势分析完成，开始整理研究结果"
-    },
-    "multi_source_research": {
-        "param_key": "topic",
-        "thinking_template": "多源研究: {topic}", 
-        "feedback_template": "多源研究完成"
-    },
-    "get_research_context_tool": {
-        "param_key": "query",
-        "thinking_template": "查询研究上下文: {query}",
-        "feedback_template": "研究上下文查询完成"
-    },
-    
-    # 数据类工具
-    "industry_data_tool": {
-        "param_key": "industry",
-        "thinking_template": "获取行业数据: {industry}",
-        "feedback_template": "行业数据获取完成"
-    },
-    
-    # 内容类工具
-    "content_writer_tool": {
-        "param_key": "title", 
-        "thinking_template": "开始生成内容: {title}",
-        "feedback_template": "内容生成完成 ({word_count}词)，检查质量"
-    },
-    "enhanced_writer": {
-        "param_key": None,
-        "thinking_template": "使用高级写作工具生成内容",
-        "feedback_template": "内容生成完成 ({word_count}词)，检查质量"
-    },
-    "content_analyzer": {
-        "param_key": None,
-        "thinking_template": "分析内容质量", 
-        "feedback_template": "内容分析完成"
-    }
-}
-
-# 默认工具处理配置
-DEFAULT_TOOL_CONFIG = {
-    "param_key": None,
-    "thinking_template": "调用{tool_name}工具",
-    "feedback_template": "{tool_name}工具执行完成" 
-}
-
+from writer.config import WriterConfig, get_writer_config
 
 # ============================================================================
 # 数据扁平化处理器 - 核心组件
@@ -85,56 +16,42 @@ DEFAULT_TOOL_CONFIG = {
 
 class FlatDataProcessor:
     """数据扁平化处理器 - 将复杂嵌套数据转换为简单扁平字典"""
-    
-    def __init__(self, custom_templates: Optional[Dict[str, str]] = None):
+    def __init__(self):
         """
         初始化扁平化处理器
-        
-        Args:
-            custom_templates: 自定义模板，例如 {'web_search_tool': '🔍 正在搜索: {query}'}
         """
-        self.custom_templates = custom_templates or {}
-        self.default_templates = {
-            'web_search_tool': '正在搜索: {query}',
-            'industry_data_tool': '正在获取行业数据: {industry}',
-            'trend_analysis_tool': '正在分析趋势: {topic}', 
-            'content_writer_tool': '正在生成内容: {title}',
-            'enhanced_writer': '正在使用高级写作工具',
-            'content_analyzer': '正在分析内容质量',
-            'multi_source_research': '正在进行多源研究: {topic}',
-            'default': '正在使用{tool_name}工具'
-        }
-    
+        pass
+
     def flatten_chunk(self, chunk: Any) -> Optional[Dict[str, Any]]:
         """
         扁平化单个chunk数据
-        
+
         Args:
             chunk: LangGraph的chunk数据
-            
+
         Returns:
             扁平化的字典 {message_type, tool_name, content, length, duration, node}
         """
         if not chunk:
             return None
-            
+
         # 处理custom消息格式 ('custom', data)
         if isinstance(chunk, tuple) and len(chunk) == 2 and chunk[0] == 'custom':
             return self._flatten_custom_data(chunk[1])
-        
+
         # 处理子图嵌套格式 (('subgraph_id',), 'updates'/'messages', data)
         if isinstance(chunk, tuple) and len(chunk) == 3:
-            subgraph_id, chunk_type, chunk_data = chunk
+            _, chunk_type, _ = chunk
             # 子图数据暂时不扁平化，交给原有逻辑处理
             return None
-            
-        # 处理普通格式 ('updates'/'messages', data)  
+
+        # 处理普通格式 ('updates'/'messages', data)
         if isinstance(chunk, tuple) and len(chunk) == 2:
-            chunk_type, chunk_data = chunk
+            chunk_type, _ = chunk
             if chunk_type in ['updates', 'messages']:
                 # 这些格式需要特殊处理，不做扁平化
                 return None
-        
+
         return None
     
     def _flatten_custom_data(self, data: Dict[str, Any]) -> Dict[str, Any]:
@@ -200,34 +117,9 @@ class FlatDataProcessor:
             
         return flat_data
     
-    def _get_tool_call_content(self, tool_name: str, tool_args: Dict[str, Any]) -> str:
-        """生成工具调用的内容描述"""
-        # 如果没有自定义模板，返回空字符串（不输出）
-        if not self.custom_templates:
-            return ""
-        
-        # 优先使用自定义模板，没有则使用默认模板
-        template = self.custom_templates.get(tool_name) or self.default_templates.get(tool_name)
-        
-        if not template:
-            return ""
-        
-        try:
-            # 尝试格式化模板
-            if '{query}' in template and 'query' in tool_args:
-                return template.format(query=tool_args['query'])
-            elif '{topic}' in template and 'topic' in tool_args:
-                return template.format(topic=tool_args['topic'])
-            elif '{title}' in template and 'title' in tool_args:
-                return template.format(title=tool_args['title'])
-            elif '{industry}' in template and 'industry' in tool_args:
-                return template.format(industry=tool_args['industry'])
-            elif '{tool_name}' in template:
-                return template.format(tool_name=tool_name)
-            else:
-                return template
-        except Exception:
-            return ""
+    def _get_tool_call_content(self, tool_name: str) -> str:
+        """生成简化的工具调用内容描述"""
+        return f"调用了 {tool_name} 工具"
     
     def _clean_tool_result(self, content: str) -> str:
         """清理工具结果内容，移除工具名前缀"""
@@ -250,7 +142,6 @@ class FlatDataProcessor:
                     return content[index + len(prefix):].strip()
         
         return content.strip()
-
 
 class MessageType(Enum):
     """Agent工作流程消息类型枚举"""
@@ -275,16 +166,22 @@ class MessageType(Enum):
     FINAL_RESULT = "final_result"
     ERROR = "error"
 
-
 class StreamWriter:
     """标准化流式输出Writer - 扁平化数据版本"""
     
-    def __init__(self, node_name: str = "", agent_name: str = "", custom_templates: Optional[Dict[str, str]] = None):
+    def __init__(self, node_name: str = "", agent_name: str = "", custom_templates: Optional[Dict[str, str]] = None, config: Optional[WriterConfig] = None):
         self.node_name = node_name
         self.agent_name = agent_name
         self.step_start_time = time.time()
         self.writer = self._get_safe_writer()
-        self.flat_processor = FlatDataProcessor(custom_templates)
+        self.flat_processor = FlatDataProcessor()
+        self.config = config or get_writer_config()
+
+        # 消息缓冲区（用于非流式模式）
+        self.message_buffer = []
+
+        # 标记未使用的参数以维持向后兼容性
+        _ = custom_templates
         
     def _get_safe_writer(self):
         """安全获取writer"""
@@ -294,7 +191,11 @@ class StreamWriter:
             return lambda _: None
     
     def _send_message(self, msg_type: MessageType, content: str, **kwargs):
-        """发送扁平化格式消息"""
+        """发送扁平化格式消息 - 支持配置控制"""
+        # 检查消息类型是否应该被处理
+        if not self.config.should_process_message_type(msg_type.value):
+            return
+        
         # 构建扁平化消息
         message = {
             "message_type": msg_type.value,
@@ -304,12 +205,29 @@ class StreamWriter:
             "duration": round(time.time() - self.step_start_time, 2)
         }
         
+        # 根据配置决定是否添加元数据
+        if self.config.should_show_timing():
+            message["timestamp"] = time.time()
+            message["duration"] = round(time.time() - self.step_start_time, 2)
+        
         # 添加特定字段
         for key, value in kwargs.items():
             if key not in message:  # 避免覆盖核心字段
                 message[key] = value
         
-        self.writer(message)
+        # 根据流式配置决定如何发送
+        if self.config.is_stream_enabled():
+            self.writer(message)
+        else:
+            self.message_buffer.append(message)
+            if len(self.message_buffer) >= self.config.get_batch_size():
+                self.flush_buffer()
+    
+    def flush_buffer(self):
+        """刷新消息缓冲区"""
+        for message in self.message_buffer:
+            self.writer(message)
+        self.message_buffer.clear()
     
     # 基础步骤方法
     def step_start(self, description: str):
@@ -358,13 +276,13 @@ class StreamWriter:
     
     # 工具相关方法 - 扁平化版本
     def tool_call(self, tool_name: str, tool_args: Dict[str, Any], custom_content: Optional[str] = None):
-        """工具调用 - 支持自定义内容"""
-        # 使用自定义内容或自动生成
+        """工具调用 - 简化版本"""
+        # 使用自定义内容或简化格式
         if custom_content:
             content = custom_content
         else:
-            content = self.flat_processor._get_tool_call_content(tool_name, tool_args)
-        
+            content = f"调用了 {tool_name} 工具"
+
         self._send_message(
             MessageType.TOOL_CALL,
             content,
@@ -399,14 +317,12 @@ class StreamWriter:
         """错误信息"""
         self._send_message(MessageType.ERROR, error_msg, error_type=error_type)
     
-
-
 class AgentWorkflowProcessor:
     """Agent工作流程处理器 - 使用扁平化数据格式"""
     
-    def __init__(self, writer: StreamWriter, custom_templates: Optional[Dict[str, str]] = None):
+    def __init__(self, writer: StreamWriter, custom_templates: Optional[Dict[str, str]] = None, config: Optional[WriterConfig] = None):
         self.writer = writer
-        self.flat_processor = FlatDataProcessor(custom_templates)
+        self.flat_processor = FlatDataProcessor()
         self.chunk_count = 0
         self.current_step = ""
         self.sections_completed = []
@@ -414,6 +330,10 @@ class AgentWorkflowProcessor:
         self.final_output = {}
         # 添加去重缓存 - 基于内容hash去重reasoning消息
         self.processed_reasoning = set()
+        self.config = config or get_writer_config()
+
+        # 标记未使用的参数以维持向后兼容性
+        _ = custom_templates
     
     def process_chunk(self, chunk: Any) -> Dict[str, Any]:
         """统一智能处理工作流程数据 - 扁平化+原有逻辑兼容"""
@@ -488,44 +408,12 @@ class AgentWorkflowProcessor:
         return agent_names if agent_names else ["unknown"]
     
     # ========================================================================
-    # 统一工具处理方法 - 消除重复代码（新增，不影响现有代码）
+    # 简化工具处理方法 - 使用统一格式
     # ========================================================================
-    
-    def _get_tool_config(self, tool_name: str) -> Dict[str, str]:
-        """获取工具配置，如果不存在则返回默认配置"""
-        return TOOL_PROCESSING_CONFIG.get(tool_name, DEFAULT_TOOL_CONFIG)
-    
-    def _generate_tool_thinking_content(self, tool_name: str, tool_args: Dict[str, Any]) -> str:
-        """统一生成工具调用的思考内容"""
-        config = self._get_tool_config(tool_name)
-        template = config["thinking_template"]
-        param_key = config["param_key"]
-        
-        try:
-            if param_key and param_key in tool_args:
-                param_value = tool_args[param_key]
-                return template.format(**{param_key: param_value})
-            else:
-                return template.format(tool_name=tool_name)
-        except Exception:
-            # 如果格式化失败，使用默认模板
-            return DEFAULT_TOOL_CONFIG["thinking_template"].format(tool_name=tool_name)
-    
-    def _generate_tool_feedback_content(self, tool_name: str, result: str = "") -> str:
-        """统一生成工具结果的反馈内容"""
-        config = self._get_tool_config(tool_name)
-        template = config["feedback_template"]
-        
-        try:
-            # 对于内容生成类工具，计算字数
-            if "{word_count}" in template:
-                word_count = len(result.split()) if result else 0
-                return template.format(word_count=word_count)
-            else:
-                return template.format(tool_name=tool_name)
-        except Exception:
-            # 如果格式化失败，使用默认模板
-            return DEFAULT_TOOL_CONFIG["feedback_template"].format(tool_name=tool_name)
+
+    def _generate_simple_tool_message(self, tool_name: str) -> str:
+        """生成简化的工具调用消息"""
+        return f"调用了 {tool_name} 工具"
     
     def _create_agent_message(self, message_type: str, content: str, agent_name: str = None, 
                              agent_hierarchy: List[str] = None, **extras) -> Dict[str, Any]:
@@ -533,15 +421,20 @@ class AgentWorkflowProcessor:
         message = {
             "message_type": message_type,
             "content": content,
-            "node": self.writer.node_name,
-            "timestamp": time.time(),
-            "duration": round(time.time() - self.writer.step_start_time, 2)
+            "node": self.writer.node_name
         }
         
-        # 添加agent信息（如果提供）
+        # 根据配置决定是否添加时间信息
+        if self.config.should_show_timing():
+            message["timestamp"] = time.time()
+            message["duration"] = round(time.time() - self.writer.step_start_time, 2)
+        
+        # 始终添加agent信息（这是核心标识）
         if agent_name:
             message["agent"] = agent_name
-        if agent_hierarchy:
+        
+        # 根据配置决定是否添加agent层级信息
+        if agent_hierarchy and self.config.should_show_agent_hierarchy():
             message["agent_hierarchy"] = agent_hierarchy
         
         # 添加额外字段
@@ -569,11 +462,19 @@ class AgentWorkflowProcessor:
     
     def _process_subgraph_chunk(self, chunk_type: str, chunk_data: Any, agent_name: str = "unknown", agent_hierarchy: List[str] = None) -> Dict[str, Any]:
         """处理子图的嵌套流式输出"""
+        # 检查是否应该处理该子图节点
+        if not self.config.should_process_subgraph_node(agent_name):
+            return {"chunk_count": self.chunk_count, "current_step": self.current_step, "filtered_node": agent_name}
+        
+        # 检查是否应该处理该Agent
+        if not self.config.should_process_agent(agent_name):
+            return {"chunk_count": self.chunk_count, "current_step": self.current_step, "filtered_agent": agent_name}
+        
         if chunk_type == "messages":
             # 处理子图的messages格式
             if isinstance(chunk_data, tuple) and len(chunk_data) == 2:
                 # 格式: (AIMessageChunk, metadata) 
-                message, metadata = chunk_data
+                message, _ = chunk_data
                 
                 # 检查是否是AIMessageChunk并直接输出内容
                 if hasattr(message, '__class__') and type(message).__name__ == "AIMessageChunk":
@@ -598,17 +499,27 @@ class AgentWorkflowProcessor:
     
     def _send_agent_content_streaming(self, content: str, agent_name: str, agent_hierarchy: List[str] = None):
         """发送带agent信息的content_streaming消息"""
+        # 检查是否应该处理该消息类型
+        if not self.config.should_process_message_type("content_streaming"):
+            return
+        
         message = {
             "message_type": "content_streaming",
             "content": content,
             "node": self.writer.node_name,
             "agent": agent_name,  # 最具体的agent
-            "agent_hierarchy": agent_hierarchy or [agent_name],  # 完整层级
-            "timestamp": time.time(),
-            "duration": round(time.time() - self.writer.step_start_time, 2),
             "length": len(content),
             "chunk_index": 0
         }
+        
+        # 根据配置决定是否添加元数据
+        if self.config.should_show_timing():
+            message["timestamp"] = time.time()
+            message["duration"] = round(time.time() - self.writer.step_start_time, 2)
+        
+        if self.config.should_show_agent_hierarchy():
+            message["agent_hierarchy"] = agent_hierarchy or [agent_name]  # 完整层级
+        
         self.writer.writer(message)
     
     def _process_content_updates_with_agent(self, updates_data: Dict[str, Any], agent_name: str):
@@ -775,29 +686,18 @@ class AgentWorkflowProcessor:
         msg_type = type(message).__name__
         
         if msg_type in ["AIMessage", "AIMessageChunk"]:
-            # 检测工具调用
+            # 检测工具调用 - 使用统一处理方法
             if hasattr(message, 'tool_calls') and message.tool_calls:
                 for tool_call in message.tool_calls:
                     tool_name = tool_call.get('name', 'unknown_tool')
                     tool_args = tool_call.get('args', {})
                     
-                    # 发送工具调用信息
+                    # 使用统一的工具调用处理方法
                     self.writer.tool_call(tool_name, tool_args)
-                    
-                    # 根据工具类型提供用户友好的思考过程
-                    if tool_name in ["advanced_web_search", "web_search_tool"]:
-                        query = tool_args.get('query', '')
-                        self.writer.thinking(f"搜索相关信息: {query}")
-                    elif tool_name in ["multi_source_research", "trend_analysis_tool"]:
-                        topic = tool_args.get('topic', '')
-                        self.writer.thinking(f"进行深度研究: {topic}")
-                    elif tool_name == "content_analyzer":
-                        self.writer.thinking("分析内容质量")
-                    elif tool_name in ["content_writer_tool", "enhanced_writer"]:
-                        title = tool_args.get('title', '')
-                        self.writer.thinking(f"开始生成内容: {title}")
-                    else:
-                        self.writer.thinking(f"调用{tool_name}工具")
+
+                    # 使用简化的工具消息
+                    tool_message = self._generate_simple_tool_message(tool_name)
+                    self.writer.thinking(tool_message)
             
             # 检测AI回复内容
             if hasattr(message, 'content') and message.content:
@@ -817,24 +717,17 @@ class AgentWorkflowProcessor:
                         self.writer.reasoning(content)
                     
         elif msg_type == "ToolMessage":
-            # 检测工具结果
+            # 检测工具结果 - 使用统一处理方法
             if hasattr(message, 'content') and message.content:
                 tool_name = getattr(message, 'name', 'unknown_tool')
                 result = str(message.content)
                 
-                # 发送工具结果
+                # 使用统一的工具结果处理方法
                 self.writer.tool_result(tool_name, result)
-                
-                # 根据工具类型提供反馈
-                if tool_name in ["advanced_web_search", "web_search_tool"]:
-                    self.writer.thinking("搜索完成，分析搜索结果的相关性")
-                elif tool_name in ["multi_source_research", "trend_analysis_tool"]:
-                    self.writer.thinking("研究分析完成，开始整理研究结果")
-                elif tool_name in ["content_writer_tool", "enhanced_writer"]:
-                    word_count = len(result.split()) if result else 0
-                    self.writer.thinking(f"内容生成完成 ({word_count}词)，检查质量")
-                else:
-                    self.writer.thinking(f"{tool_name}工具执行完成")
+
+                # 使用简化的工具完成消息
+                completion_message = f"{tool_name} 工具执行完成"
+                self.writer.thinking(completion_message)
     
     # 删除_process_workflow_step - 该逻辑已被FlatDataProcessor处理
     
@@ -889,11 +782,12 @@ class AgentWorkflowProcessor:
             # 检测到最终报告
             if "final_report" in node_data:
                 self.final_output = node_data["final_report"]
-                total_words = self.final_output.get("total_words", 0)
+                _ = self.final_output.get("total_words", 0)
     
     def _process_agent_message(self, message: Any, source_node: str):
         """处理Agent消息，检测工具调用 - 恢复完整逻辑处理子图中的工具调用"""
         # source_node参数保留用于后续扩展，当前版本未使用
+        _ = source_node  # 标记为有意未使用
         if not hasattr(message, '__class__'):
             return
             
@@ -907,37 +801,12 @@ class AgentWorkflowProcessor:
                     tool_name = tool_call.get('name', 'unknown_tool')
                     tool_args = tool_call.get('args', {})
                     
-                    # 发送工具调用信息
+                    # 使用统一的工具调用处理方法
                     self.writer.tool_call(tool_name, tool_args)
-                    
-                    # 根据工具类型提供用户友好的思考过程（不使用扁平化模板）
-                    if tool_name == "trend_analysis_tool":
-                        topic = tool_args.get('topic', '')
-                        self.writer.thinking(f"使用趋势分析工具研究: {topic}")
-                    elif tool_name == "web_search_tool":
-                        query = tool_args.get('query', '')
-                        self.writer.thinking(f"搜索相关信息: {query}")
-                    elif tool_name == "industry_data_tool":
-                        industry = tool_args.get('industry', '')
-                        self.writer.thinking(f"获取行业数据: {industry}")
-                    elif tool_name == "get_research_context_tool":
-                        query = tool_args.get('query', '')
-                        self.writer.thinking(f"查询研究上下文: {query}")
-                    elif tool_name == "advanced_web_search":
-                        query = tool_args.get('query', '')
-                        self.writer.thinking(f"高级搜索: {query}")
-                    elif tool_name == "multi_source_research":
-                        topic = tool_args.get('topic', '')
-                        self.writer.thinking(f"多源研究: {topic}")
-                    elif tool_name == "content_analyzer":
-                        self.writer.thinking("分析内容质量")
-                    elif tool_name == "content_writer_tool":
-                        title = tool_args.get('title', '')
-                        self.writer.thinking(f"开始生成内容: {title}")
-                    elif tool_name == "enhanced_writer":
-                        self.writer.thinking("使用高级写作工具生成内容")
-                    else:
-                        self.writer.thinking(f"调用{tool_name}工具")
+
+                    # 使用简化的工具消息
+                    tool_message = self._generate_simple_tool_message(tool_name)
+                    self.writer.thinking(tool_message)
             
             # 检测AI回复内容
             if hasattr(message, 'content') and message.content:
@@ -961,22 +830,16 @@ class AgentWorkflowProcessor:
                 tool_name = getattr(message, 'name', 'unknown_tool')
                 result = str(message.content)
                 
-                # 发送工具结果
+                # 使用统一的工具结果处理方法
                 self.writer.tool_result(tool_name, result)
-                
-                # 根据工具类型提供反馈
-                if tool_name == "trends_analysis_tool":
-                    self.writer.thinking("趋势分析完成，开始整理研究结果")
-                elif tool_name == "web_search_tool":
-                    self.writer.thinking("搜索完成，分析搜索结果的相关性")
-                elif tool_name in ["content_writer_tool", "enhanced_writer"]:
-                    word_count = len(result.split()) if result else 0
-                    self.writer.thinking(f"内容生成完成 ({word_count}词)，检查质量")
-                else:
-                    self.writer.thinking(f"{tool_name}工具执行完成")
+
+                # 使用简化的工具完成消息
+                completion_message = f"{tool_name} 工具执行完成"
+                self.writer.thinking(completion_message)
     
     def _process_agent_message_with_agent(self, message: Any, source_node: str, agent_name: str):
         """处理Agent消息，检测工具调用 - 带agent信息版本"""
+        _ = source_node  # 标记为有意未使用
         if not hasattr(message, '__class__'):
             return
             
@@ -990,59 +853,13 @@ class AgentWorkflowProcessor:
                     tool_name = tool_call.get('name', 'unknown_tool')
                     tool_args = tool_call.get('args', {})
                     
-                    # 发送带agent信息的工具调用消息
-                    tool_message = {
-                        "message_type": "tool_call",
-                        "content": "",  # 工具调用通常没有内容
-                        "node": self.writer.node_name,
-                        "agent": agent_name,
-                        "timestamp": time.time(),
-                        "duration": round(time.time() - self.writer.step_start_time, 2),
-                        "tool_name": tool_name,
-                        "args": tool_args
-                    }
-                    self.writer.writer(tool_message)
-                    
-                    # 发送带agent信息的思考过程消息
-                    thinking_content = ""
-                    if tool_name == "trend_analysis_tool":
-                        topic = tool_args.get('topic', '')
-                        thinking_content = f"使用趋势分析工具研究: {topic}"
-                    elif tool_name == "web_search_tool":
-                        query = tool_args.get('query', '')
-                        thinking_content = f"搜索相关信息: {query}"
-                    elif tool_name == "industry_data_tool":
-                        industry = tool_args.get('industry', '')
-                        thinking_content = f"获取行业数据: {industry}"
-                    elif tool_name == "get_research_context_tool":
-                        query = tool_args.get('query', '')
-                        thinking_content = f"查询研究上下文: {query}"
-                    elif tool_name == "advanced_web_search":
-                        query = tool_args.get('query', '')
-                        thinking_content = f"高级搜索: {query}"
-                    elif tool_name == "multi_source_research":
-                        topic = tool_args.get('topic', '')
-                        thinking_content = f"多源研究: {topic}"
-                    elif tool_name == "content_analyzer":
-                        thinking_content = "分析内容质量"
-                    elif tool_name == "content_writer_tool":
-                        title = tool_args.get('title', '')
-                        thinking_content = f"开始生成内容: {title}"
-                    elif tool_name == "enhanced_writer":
-                        thinking_content = "使用高级写作工具生成内容"
-                    else:
-                        thinking_content = f"调用{tool_name}工具"
-                    
-                    if thinking_content:
-                        thinking_message = {
-                            "message_type": "thinking",
-                            "content": thinking_content,
-                            "node": self.writer.node_name,
-                            "agent": agent_name,
-                            "timestamp": time.time(),
-                            "duration": round(time.time() - self.writer.step_start_time, 2)
-                        }
-                        self.writer.writer(thinking_message)
+                    # 使用统一的工具调用处理方法
+                    self._send_agent_message("tool_call", "", agent_name,
+                                           tool_name=tool_name, args=tool_args)
+
+                    # 使用简化的工具消息
+                    tool_message = self._generate_simple_tool_message(tool_name)
+                    self._send_agent_message("thinking", tool_message, agent_name)
             
             # 检测AI回复内容
             if hasattr(message, 'content') and message.content:
@@ -1052,21 +869,16 @@ class AgentWorkflowProcessor:
                 if msg_type == "AIMessageChunk":
                     # 流式内容片段 - 直接显示
                     if content and content.strip():
-                        self._send_agent_content_streaming(content, agent_name)
+                        self._send_agent_message("content_streaming", content, agent_name, 
+                                               length=len(content), chunk_index=0)
                 else:
                     # 完整的AI消息
                     if len(content) > 300:
-                        self._send_agent_content_streaming(content[:500] + "..." if len(content) > 500 else content, agent_name)
+                        preview_content = content[:500] + "..." if len(content) > 500 else content
+                        self._send_agent_message("content_streaming", preview_content, agent_name,
+                                               length=len(content), chunk_index=0)
                     elif len(content) > 50:
-                        reasoning_message = {
-                            "message_type": "reasoning",
-                            "content": content,
-                            "node": self.writer.node_name,
-                            "agent": agent_name,
-                            "timestamp": time.time(),
-                            "duration": round(time.time() - self.writer.step_start_time, 2)
-                        }
-                        self.writer.writer(reasoning_message)
+                        self._send_agent_message("reasoning", content, agent_name)
                     
         elif msg_type == "ToolMessage":
             # 检测工具结果 - 展示工具返回的内容
@@ -1074,41 +886,13 @@ class AgentWorkflowProcessor:
                 tool_name = getattr(message, 'name', 'unknown_tool')
                 result = str(message.content)
                 
-                # 发送带agent信息的工具结果消息
-                tool_result_message = {
-                    "message_type": "tool_result",
-                    "content": result,
-                    "node": self.writer.node_name,
-                    "agent": agent_name,
-                    "timestamp": time.time(),
-                    "duration": round(time.time() - self.writer.step_start_time, 2),
-                    "tool_name": tool_name,
-                    "length": len(result)
-                }
-                self.writer.writer(tool_result_message)
-                
-                # 根据工具类型提供反馈
-                feedback_content = ""
-                if tool_name == "trends_analysis_tool":
-                    feedback_content = "趋势分析完成，开始整理研究结果"
-                elif tool_name == "web_search_tool":
-                    feedback_content = "搜索完成，分析搜索结果的相关性"
-                elif tool_name in ["content_writer_tool", "enhanced_writer"]:
-                    word_count = len(result.split()) if result else 0
-                    feedback_content = f"内容生成完成 ({word_count}词)，检查质量"
-                else:
-                    feedback_content = f"{tool_name}工具执行完成"
-                
-                if feedback_content:
-                    thinking_message = {
-                        "message_type": "thinking",
-                        "content": feedback_content,
-                        "node": self.writer.node_name,
-                        "agent": agent_name,
-                        "timestamp": time.time(),
-                        "duration": round(time.time() - self.writer.step_start_time, 2)
-                    }
-                    self.writer.writer(thinking_message)
+                # 使用统一的工具结果处理方法
+                self._send_agent_message("tool_result", result, agent_name,
+                                        tool_name=tool_name, length=len(result))
+
+                # 使用简化的工具完成消息
+                completion_message = f"{tool_name} 工具执行完成"
+                self._send_agent_message("thinking", completion_message, agent_name)
     
     def get_summary(self) -> Dict[str, Any]:
         """获取工作总结"""
@@ -1120,138 +904,24 @@ class AgentWorkflowProcessor:
             "final_output": self.final_output
         }
 
-
-# ============================================================================
-# 便捷函数 - 支持扁平化数据格式
-# ============================================================================
-
-def create_stream_writer(node_name: str, agent_name: str = "", custom_templates: Optional[Dict[str, str]] = None) -> StreamWriter:
+def create_stream_writer(node_name: str, agent_name: str = "", custom_templates: Optional[Dict[str, str]] = None, config: Optional[WriterConfig] = None) -> StreamWriter:
     """创建扁平化流式writer"""
-    return StreamWriter(node_name, agent_name, custom_templates)
+    return StreamWriter(node_name, agent_name, custom_templates, config)
 
-def create_workflow_processor(node_name: str, agent_name: str = "", custom_templates: Optional[Dict[str, str]] = None) -> AgentWorkflowProcessor:
+def create_workflow_processor(node_name: str, agent_name: str = "", custom_templates: Optional[Dict[str, str]] = None, config: Optional[WriterConfig] = None) -> AgentWorkflowProcessor:
     """创建扁平化Agent工作流程处理器"""
-    writer = create_stream_writer(node_name, agent_name, custom_templates)
-    return AgentWorkflowProcessor(writer, custom_templates)
+    writer = create_stream_writer(node_name, agent_name, custom_templates, config)
+    return AgentWorkflowProcessor(writer, custom_templates, config)
 
 def create_flat_processor(custom_templates: Optional[Dict[str, str]] = None) -> FlatDataProcessor:
     """创建纯扁平化数据处理器（无writer输出）"""
-    return FlatDataProcessor(custom_templates)
+    _ = custom_templates  # 保持向后兼容性
+    return FlatDataProcessor()
 
 def create_agent_stream_collector(node_name: str, agent_name: str = "", custom_templates: Optional[Dict[str, str]] = None):
     """创建简化的Agent流式输出收集器"""
     writer = create_stream_writer(node_name, agent_name, custom_templates)
     return AgentStreamCollector(writer, custom_templates)
-
-
-# ============================================================================
-# 前端渲染辅助函数
-# ============================================================================
-
-def format_message_for_frontend(message_dict: Dict[str, Any]) -> Dict[str, Any]:
-    """前端消息格式化 - 去除emoji版本"""
-    msg_type = message_dict["message_type"] 
-    content = message_dict["content"]
-    metadata = message_dict.get("metadata", {})
-    timestamp = message_dict.get("timestamp", time.time())
-    
-    # 基础格式化信息
-    formatted = {
-        "type": msg_type,
-        "content": content,
-        "timestamp": timestamp,
-        "metadata": metadata
-    }
-    
-    # 根据消息类型添加特定格式
-    if msg_type == "step_start":
-        formatted["display"] = f"开始: {content}"
-        formatted["icon"] = "play"
-        
-    elif msg_type == "step_progress":
-        progress = metadata.get("progress", 0)
-        formatted["display"] = f"{content} ({progress}%)"
-        formatted["progress"] = progress
-        formatted["icon"] = "progress"
-        
-    elif msg_type == "step_complete":
-        duration = metadata.get("duration", 0)
-        formatted["display"] = f"完成: {content} ({duration:.1f}s)"
-        formatted["icon"] = "check"
-        
-    elif msg_type == "thinking":
-        formatted["display"] = f"思考: {content}"
-        formatted["icon"] = "brain"
-        
-    elif msg_type == "reasoning":
-        formatted["display"] = f"分析: {content}"
-        formatted["icon"] = "lightbulb"
-        
-    elif msg_type == "tool_call":
-        tool_name = metadata.get("tool_name", "")
-        formatted["display"] = f"调用工具: {tool_name}"
-        formatted["tool_name"] = tool_name
-        formatted["icon"] = "tool"
-        
-    elif msg_type == "tool_result":
-        tool_name = metadata.get("tool_name", "")
-        result_length = metadata.get("result_length", 0)
-        formatted["display"] = f"工具结果: {tool_name}"
-        if result_length > 0:
-            formatted["display"] += f" ({result_length}字符)"
-        formatted["tool_name"] = tool_name
-        formatted["result_length"] = result_length
-        formatted["icon"] = "result"
-        
-    elif msg_type == "content_streaming":
-        formatted["display"] = content
-        formatted["icon"] = "edit"
-        formatted["is_streaming"] = True
-        
-    elif msg_type == "content_complete":
-        word_count = metadata.get("word_count", 0)
-        formatted["display"] = f"完成: {content}"
-        if word_count > 0:
-            formatted["display"] += f" ({word_count}字)"
-        formatted["word_count"] = word_count
-        formatted["icon"] = "document"
-        
-    elif msg_type == "error":
-        formatted["display"] = f"错误: {content}"
-        formatted["icon"] = "error"
-        formatted["level"] = "error"
-        
-    else:
-        formatted["display"] = f"[{msg_type.upper()}] {content}"
-        formatted["icon"] = "info"
-    
-    return formatted
-
-
-def get_message_types_for_frontend() -> Dict[str, Dict[str, str]]:
-    """获取所有消息类型的前端配置"""
-    return {
-        msg_type.value: {
-            "name": msg_type.value,
-            "description": f"消息类型: {msg_type.value}",
-            "category": _get_message_category(msg_type)
-        }
-        for msg_type in MessageType
-    }
-
-def _get_message_category(msg_type: MessageType) -> str:
-    """获取消息类型的分类"""
-    if msg_type.value.startswith("step_"):
-        return "step"
-    elif msg_type.value.startswith("ai_"):
-        return "ai"
-    elif msg_type.value.startswith("tool_"):
-        return "tool"
-    elif msg_type.value.startswith("subgraph_"):
-        return "subgraph"
-    else:
-        return "general"
-
 
 # ============================================================================
 # Agent流式输出处理器 - 参考Multi-Agent-report设计
@@ -1262,10 +932,13 @@ class AgentStreamCollector:
     
     def __init__(self, writer: StreamWriter, custom_templates: Optional[Dict[str, str]] = None):
         self.writer = writer
-        self.flat_processor = FlatDataProcessor(custom_templates)
+        self.flat_processor = FlatDataProcessor()
         self.full_response = ""
         self.tools_used = []
         self.chunk_count = 0
+
+        # 标记未使用的参数以维持向后兼容性
+        _ = custom_templates
     
     async def process_agent_stream(self, agent_stream, agent_name: str):
         """处理agent的混合流式输出 - 简化版本"""

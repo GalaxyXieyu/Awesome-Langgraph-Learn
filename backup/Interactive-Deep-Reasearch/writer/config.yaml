@@ -1,0 +1,36 @@
+# Writer 输出控制配置
+# 隐藏intelligent_supervisor，只显示核心工作流程
+
+# 节点输出控制
+nodes:
+  # 子图节点控制
+  subgraph:
+    # 只显示核心工作节点
+    include: ["research", "writing", "integration"]
+    # 隐藏监督和调试节点
+    exclude: ["supervisor", "intelligent_supervisor", "debug", "internal"]
+  
+  # 主图节点控制  
+  main:
+    include: []
+    exclude: ["debug", "internal"]
+
+# 消息类型控制
+messages:
+  # 显示哪些消息类型
+  include: []
+  # 隐藏思考过程，保留核心工作流
+  exclude: ["reasoning"]
+  # 保留: tool_call, tool_result, thinking, content_streaming, step_progress, step_complete
+
+# 流式控制
+streaming:
+  # 流式模式开关
+  enabled: true
+
+# Agent控制
+agents:
+  # 只显示研究和写作Agent
+  include: ["research", "writing"]
+  # 隐藏监督和内容创建Agent
+  exclude: ["intelligent_supervisor", "content_creation", "supervisor"]
