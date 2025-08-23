@@ -296,7 +296,7 @@ def create_simple_state(topic: str, **kwargs) -> DeepResearchState:
     # 设置默认值
     defaults = {
         "user_id": "user",
-        "mode": ReportMode.COPILOT,  # 自动模式，无需交互
+        "mode": ReportMode.INTERACTIVE,  # 自动模式，无需交互
         "report_type": "research",
         "target_audience": "专业人士",
         "depth_level": "medium",

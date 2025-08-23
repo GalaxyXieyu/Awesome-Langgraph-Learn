@@ -32,16 +32,13 @@ streaming:
   nodes:
     # 主图节点
     outline_generation: true          # 大纲生成：非流式
-    outline_confirmation: false       # 大纲确认：非流式
     content_creation: false          # 内容创建：非流式
     intelligent_section_processing: false  # 智能章节处理：非流式
     
     # 子图节点（精确控制）
     intelligent_research: false      # 智能研究子图：非流式 
     intelligent_supervisor: false    # 智能监督器：非流式
-    
-    # 交互节点
-    interaction_outline_confirmation: false  # 交互确认：非流式
+  
 
 # Agent控制
 agents:

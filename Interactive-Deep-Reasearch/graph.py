@@ -85,7 +85,6 @@ def create_update_subgraph_state(state: DeepResearchState) -> Dict[str, Any]:
             "research_queries": section.get("research_queries", [])
         }
         formatted_sections.append(formatted_section)
-
     # 创建update子图状态
     subgraph_state = {
         "messages": [],
@@ -480,8 +479,6 @@ async def outline_generation_node(state: DeepResearchState, config=None) -> Deep
         """
         
         state["messages"] = state["messages"] + [AIMessage(content=outline_message)]
-        
-        # 🔥 将原始累计内容汇总到 node_outputs
         add_node_output(
             state, 
             "outline_generation", 
@@ -499,7 +496,6 @@ async def outline_generation_node(state: DeepResearchState, config=None) -> Deep
             display_text=outline_message
         )
         
-        # 🔥 如果是非流式节点，发送最简单的原始累计内容
         from writer.config import get_writer_config
         config = get_writer_config()
         if not config.is_node_streaming_enabled("outline_generation"):
@@ -515,8 +511,6 @@ async def outline_generation_node(state: DeepResearchState, config=None) -> Deep
                     "word_count": len(raw_chunks_content)
                 }
                 writer(aggregated_message)
-        
-        logger.info(f"大纲生成完成: {len(outline_dict.get('sections', []))}个章节")
         return state
         
     except Exception as e:
@@ -552,10 +546,7 @@ def create_interaction_node(interaction_type: InteractionType):
         interaction_config = get_interaction_config(interaction_type)
         mode = state["mode"]
         
-        processor.writer.step_start(f"处理{interaction_config['title']}")
-        processor.writer.step_progress(f"处理{interaction_config['title']}", 0, 
-                                      interaction_type=interaction_type.value,
-                                      mode=mode.value)
+        processor.writer.step_start(f"等待用户确认: {interaction_config['title']}")
         
         # Copilot模式自动通过
         if mode == ReportMode.COPILOT:
@@ -572,11 +563,11 @@ def create_interaction_node(interaction_type: InteractionType):
         
         # 交互模式需要用户确认
         message_content = format_interaction_message(state, interaction_type, interaction_config)
-        
-        processor.writer.step_progress("等待用户确认", 50, awaiting_user_input=True)
+
         
         # 使用interrupt等待用户输入
         user_response = interrupt({
+            "message_type": "interrupt",
             "type": interaction_type.value,
             "title": interaction_config["title"],
             "message": message_content,

@@ -18,12 +18,13 @@ from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langgraph.prebuilt import create_react_agent
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import InMemorySaver
+from .context_builder import build_supervisor_context, determine_next_action_by_state
+from .prompts import get_supervisor_prompt, get_researcher_prompt, get_writer_prompt
+
 # 导入新的工具系统
 import sys
 sys.path.append('/Users/galaxyxieyu/Documents/Coding/langgraph/Interactive-Deep-Reasearch')
 from tools import get_research_tools
-from .context_builder import build_supervisor_context, determine_next_action_by_state
-from .prompts import get_supervisor_prompt, get_researcher_prompt, get_writer_prompt
 
 # ============================================================================
 # 状态定义 - LangGraph核心
