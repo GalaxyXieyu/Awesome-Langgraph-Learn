@@ -27,7 +27,7 @@ import logging
 from state import (
     DeepResearchState, ReportMode, TaskStatus, InteractionType,
     ReportOutline, ReportSection, ResearchResult,
-    update_performance_metrics, 
+    update_performance_metrics,
     update_task_status, add_user_interaction, add_node_output
 )
 
@@ -49,10 +49,10 @@ logger = logging.getLogger(__name__)
 def create_llm() -> ChatOpenAI:
     """创建LLM实例"""
     return ChatOpenAI(
-        model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
-        temperature=float(os.getenv("OPENAI_TEMPERATURE", "0.7")),
-        base_url=os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1"),
-        api_key=os.getenv("OPENAI_API_KEY"),
+            model="qwen2.5-72b-instruct-awq",
+            temperature=0.7,
+            base_url="https://llm.3qiao.vip:23436/v1",
+            api_key="sk-0rnrrSH0OsiaWCiv6b37C1E4E60c4b9394325001Ec19A197",
     )
 
 # 编译子图（全局变量，避免重复编译）- 使用update子图

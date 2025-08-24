@@ -33,11 +33,11 @@ Interactive Deep Research - 智能交互式深度研究系统
 __version__ = "1.0.0"
 
 # 核心模块导出 - 主文件在根目录
-from graph import create_deep_research_graph
-from state import DeepResearchState, create_simple_state
-from writer.core import create_workflow_processor, create_stream_writer
-from writer.config import WriterConfig
-from subgraphs import create_intelligent_research_graph, IntelligentResearchState
+from .graph import create_deep_research_graph
+from .state import DeepResearchState, create_simple_state
+from .writer.core import create_workflow_processor, create_stream_writer
+from .writer.config import WriterConfig
+from .subgraphs import create_intelligent_research_graph, IntelligentResearchState
 
 __all__ = [
     'create_deep_research_graph',

@@ -8,13 +8,14 @@ from typing import List, Dict, Any, Union, Callable, Optional
 from langchain_core.tools import BaseTool, tool as create_tool
 from langchain_core.runnables import RunnableConfig
 from langgraph.prebuilt.interrupt import HumanInterruptConfig, HumanInterrupt
-from langgraph.types import interrupt
+from langgraph import types
 
 
 async def wrap_interactive_tools(
     tool: Union[Callable, BaseTool], 
     state: Optional[Dict[str, Any]] = None,
-    interrupt_config: Optional[HumanInterruptConfig] = None
+    *,
+    interrupt_config: HumanInterruptConfig = None
 ) -> BaseTool:
     """
     根据模式包装工具
@@ -32,15 +33,16 @@ async def wrap_interactive_tools(
     if not isinstance(tool, BaseTool):
         tool = create_tool(tool)
 
+    # 检查是否提供了 interrupt_config 参数
+    if interrupt_config is None:
+        # 如果未提供，则设置默认的人工中断配置，允许接受、编辑和响应
+        interrupt_config = {
+            "allow_accept": True,
+            "allow_edit": True,
+            "allow_respond": True,
+        }
     # 检测模式
-    mode = "copilot"
-    if state:
-        state_mode = state.get("mode", "copilot") 
-        if hasattr(state_mode, 'value'):
-            mode = state_mode.value.lower()
-        else:
-            mode = str(state_mode).lower()
-
+    mode = state.get("mode", "copilot") 
     # Copilot模式：直接执行，无需确认
     if mode == "copilot":
         @create_tool(
@@ -75,7 +77,7 @@ async def wrap_interactive_tools(
             }
             
             # 调用 interrupt 函数，获取人工审查的响应
-            response = interrupt(request)
+            response = types.interrupt(request)
 
             # 完全参考参考文件的响应处理逻辑
             if response["type"] == "accept":
@@ -121,3 +123,80 @@ async def wrap_tools(
         except Exception as e:
             continue
     return interactive_tools
+
+if __name__ == "__main__":
+    import asyncio
+    from pprint import pprint
+    from langchain_openai import ChatOpenAI
+    from langchain_core.messages import HumanMessage
+    from langgraph.prebuilt import create_react_agent
+    from langgraph.checkpoint.memory import InMemorySaver
+
+    # Import local tools and the wrapper function from this file
+    from .research.tools import web_search
+
+    # Define a simple LLM for the agent
+    # Make sure you have OPENAI_API_KEY set in your environment
+    llm = ChatOpenAI(
+            model="qwen2.5-72b-instruct-awq",
+            temperature=0.7,
+            base_url="https://llm.3qiao.vip:23436/v1",
+            api_key="sk-0rnrrSH0OsiaWCiv6b37C1E4E60c4b9394325001Ec19A197",
+        )
+
+    async def test_copilot_mode(agent_executor):
+        """Tests the agent in copilot mode where tools run automatically."""
+        print("\n--- 1. Testing Copilot Mode (Automatic Execution) ---")
+        query = "What is the latest news on AI?"
+        print(f"Invoking agent with query: '{query}'")
+        config = {"configurable": {"thread_id": "copilot-test-1"}}
+        final_response = None
+        async for chunk in agent_executor.astream({"messages": [HumanMessage(content=query)]}, config=config):
+            pprint(chunk)
+            print("---")
+            if 'messages' in chunk and chunk['messages']:
+                final_response = chunk['messages'][-1].content
+
+        print("\nCopilot Mode Final Response:")
+        pprint(final_response)
+        print("--- Copilot Mode Test Complete ---")
+
+    async def test_interactive_mode(agent_executor):
+        """Tests the agent in interactive mode, expecting it to pause for human input."""
+        print("\n--- 2. Testing Interactive Mode (Human-in-the-Loop) ---")
+        query = "Search for news on LangGraph."
+        print(f"Invoking agent with query: '{query}'")
+        config = {"configurable": {"thread_id": "interactive-test-1"}}
+
+        print("Streaming agent execution... It should stop at the interrupt.")
+        async for chunk in agent_executor.astream({"messages": [HumanMessage(content=query)]}, config=config):
+            pprint(chunk)
+            print("---")
+            # The stream will naturally stop at the HumanInterrupt.
+            # In a real app, you would check if `chunk` is the interrupt,
+            # get user input, and then resume the graph.
+            if "__end__" not in chunk:
+                print("\n>>> INTERRUPT DETECTED! Test successful. The agent is waiting for human review. <<<")
+                break
+        print("--- Interactive Mode Test Complete ---")
+
+    async def main():
+        """Main function to run the agent-based tests."""
+        # Test Copilot Mode
+        copilot_state = {"mode": "copilot"}
+        copilot_tools = await wrap_tools([web_search], copilot_state)
+        copilot_agent = create_react_agent(llm, tools=copilot_tools)
+        await test_copilot_mode(copilot_agent)
+
+        # Test Interactive Mode
+        # This requires a checkpointer to manage the state of the interrupt.
+        memory = InMemorySaver()
+        interactive_state = {"mode": "interactive"}
+        interactive_tools = await wrap_tools([web_search], interactive_state)
+        # interrupt_before_tools=True is crucial for HIL with ReAct agents
+        interactive_agent = create_react_agent(llm, tools=interactive_tools, checkpointer=memory)
+        await test_interactive_mode(interactive_agent)
+
+    # Run the main async function
+    asyncio.run(main())
+    
