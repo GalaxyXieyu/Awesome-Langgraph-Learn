@@ -20,7 +20,7 @@ from langchain_openai import ChatOpenAI
 from langchain_core.messages import AIMessage
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
-from langgraph.types import Interrupt, interrupt
+from langgraph.types import interrupt
 import logging
 
 # 导入本地模块
@@ -252,9 +252,6 @@ async def call_intelligent_research_subgraph(state: DeepResearchState) -> DeepRe
             )
             return updated_state
 
-    except Interrupt as e:
-        # Re-raise the interrupt to be caught by the LangGraph engine and pause the graph
-        raise e
     except Exception as e:
         processor.writer.error(f"研究报告生成失败: {str(e)}", "ResearchGenerationError")
         return state
@@ -284,7 +281,6 @@ def convert_research_data_to_results(research_data: List[Dict[str, Any]]) -> Lis
     return results
 
 async def intelligent_section_processing_node(state: DeepResearchState, config=None) -> DeepResearchState:
-    _ = config  # LangGraph passes a config, but it's not used in this node.
     """
     智能章节处理节点 - 使用update子图进行整体研究和写作
 
