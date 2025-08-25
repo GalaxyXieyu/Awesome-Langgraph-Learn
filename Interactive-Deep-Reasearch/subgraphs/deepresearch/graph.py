@@ -59,8 +59,6 @@ class IntelligentResearchState(TypedDict):
     error_log: List[str]  # 错误日志
     section_attempts: Dict[str, Dict[str, int]]  # 每个章节的尝试次数记录 {"section_id": {"research": 2, "writing": 1}}
 
-
-
 # ============================================================================
 # LLM配置
 # ============================================================================

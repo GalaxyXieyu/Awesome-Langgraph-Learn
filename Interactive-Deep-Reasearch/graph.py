@@ -90,7 +90,7 @@ def create_update_subgraph_state(state: DeepResearchState) -> Dict[str, Any]:
         "messages": [],
         "user_input": f"请为主题'{state.get('topic', '')}'生成深度研究报告",
         "topic": state.get("topic", ""),
-        "mode": state.get("mode", "copilot"),  # 🎯 传递mode信息到子图
+        "mode": "interactive",
         "sections": formatted_sections,
         "current_section_index": 0,
         "research_results": {},
@@ -116,145 +116,138 @@ async def call_intelligent_research_subgraph(state: DeepResearchState) -> DeepRe
     """
     # 创建工作流程处理器 - 不使用模板，保持简洁
     processor = create_workflow_processor("intelligent_research", "深度研究报告生成")
+    processor.writer.step_start("开始深度研究报告生成")
     
-    try:
-        processor.writer.step_start("开始深度研究报告生成")
-        
-        # 获取子图实例
-        subgraph = get_intelligent_research_subgraph()
-        subgraph_input = create_update_subgraph_state(state)
-        
-        processor.writer.step_progress(
-            "准备研究计划", 
-            10, 
-            sections_count=len(subgraph_input.get("sections", []))
+    # 获取子图实例
+    subgraph = get_intelligent_research_subgraph()
+    subgraph_input = create_update_subgraph_state(state)
+    
+    processor.writer.step_progress(
+        "准备研究计划", 
+        10, 
+        sections_count=len(subgraph_input.get("sections", []))
+    )
+    
+    # 用于收集最终结果的变量
+    subgraph_output = {}
+    updated_sections = []
+    new_research_results = []
+    
+    # 流式调用子图，使用增强的processor统一处理嵌套流式输出
+    async for chunk in subgraph.astream(subgraph_input, stream_mode=["updates", "messages"], subgraphs=True):
+        # 使用增强的processor统一处理所有类型的chunk
+        processor.process_chunk(chunk)
+        # 同时收集实际数据用于状态更新，处理嵌套结构
+        if isinstance(chunk, tuple):
+            if len(chunk) >= 3:
+                # 嵌套子图格式: (('subgraph_id',), 'updates', data)
+                _, chunk_type, chunk_data = chunk[0], chunk[1], chunk[2]
+            elif len(chunk) >= 2:
+                # 普通格式: ('updates', data)
+                chunk_type, chunk_data = chunk[0], chunk[1]
+            else:
+                continue
+            
+            if chunk_type == "updates" and isinstance(chunk_data, dict):
+                for node_output in chunk_data.values():
+                    if node_output and isinstance(node_output, dict):
+                        subgraph_output.update(node_output)
+                        
+                        # 收集章节更新
+                        if "sections" in node_output:
+                            sections_data = node_output["sections"]
+                            if isinstance(sections_data, list):
+                                for section_data in sections_data:
+                                    updated_section = {
+                                        "title": section_data.get("title", ""),
+                                        "content": section_data.get("content", ""),
+                                        "word_count": section_data.get("word_count", 0),
+                                        "status": "completed"
+                                    }
+                                    if not any(s.get("title") == updated_section["title"] for s in updated_sections):
+                                        updated_sections.append(updated_section)
+                        
+                        # 收集研究结果
+                        if "research_results" in node_output:
+                            research_results = node_output["research_results"]
+                            if isinstance(research_results, dict):
+                                for research_data in research_results.values():
+                                    research_result = ResearchResult(
+                                        id=str(uuid.uuid4()),
+                                        query=f"研究章节: {research_data.get('title', '')}",
+                                        source_type="subgraph",
+                                        title=research_data.get("title", ""),
+                                        content=research_data.get("content", ""),
+                                        url="",
+                                        relevance_score=0.9,
+                                        timestamp=research_data.get("timestamp", time.time()),
+                                        section_id=research_data.get("id", "")
+                                    )
+                                    if not any(r.title == research_result.title for r in new_research_results):
+                                        new_research_results.append(research_result)
+    # 处理最终结果
+    if subgraph_output.get("final_report"):
+
+        final_report = subgraph_output["final_report"]
+        final_sections_data = final_report.get("sections", [])
+
+        # 确保所有章节都被处理
+        for section_data in final_sections_data:
+            updated_section = {
+                "title": section_data.get("title", ""),
+                "content": section_data.get("content", ""),
+                "word_count": section_data.get("word_count", 0),
+                "status": "completed"
+            }
+            if not any(s.get("title") == updated_section["title"] for s in updated_sections):
+                updated_sections.append(updated_section)
+
+        # 更新状态
+        updated_state = {
+            **state,
+            "sections": updated_sections,
+            "research_results": state.get("research_results", []) + new_research_results,
+            "content_creation_completed": True,
+            "completed_sections_count": len(updated_sections),
+            "performance_metrics": {
+                **state.get("performance_metrics", {}),
+                "sections_completed": len(updated_sections),
+                "total_sections": len(updated_sections),
+                "total_words": final_report.get("total_words", 0)
+            }
+        }
+
+        processor.writer.final_result(
+            f"深度研究报告生成完成",
+            {
+                "sections_count": len(updated_sections),
+                "total_words": final_report.get("total_words", 0),
+                "research_findings": len(new_research_results)
+            }
         )
-        
-        # 用于收集最终结果的变量
-        subgraph_output = {}
-        updated_sections = []
-        new_research_results = []
-        
-        # 流式调用子图，使用增强的processor统一处理嵌套流式输出
-        async for chunk in subgraph.astream(subgraph_input, stream_mode=["updates", "messages"], subgraphs=True):
-            # 使用增强的processor统一处理所有类型的chunk
-            processor.process_chunk(chunk)
-            
-            # 同时收集实际数据用于状态更新，处理嵌套结构
-            if isinstance(chunk, tuple):
-                if len(chunk) >= 3:
-                    # 嵌套子图格式: (('subgraph_id',), 'updates', data)
-                    _, chunk_type, chunk_data = chunk[0], chunk[1], chunk[2]
-                elif len(chunk) >= 2:
-                    # 普通格式: ('updates', data)
-                    chunk_type, chunk_data = chunk[0], chunk[1]
-                else:
-                    continue
-                
-                if chunk_type == "updates" and isinstance(chunk_data, dict):
-                    for node_output in chunk_data.values():
-                        if node_output and isinstance(node_output, dict):
-                            subgraph_output.update(node_output)
-                            
-                            # 收集章节更新
-                            if "sections" in node_output:
-                                sections_data = node_output["sections"]
-                                if isinstance(sections_data, list):
-                                    for section_data in sections_data:
-                                        updated_section = {
-                                            "title": section_data.get("title", ""),
-                                            "content": section_data.get("content", ""),
-                                            "word_count": section_data.get("word_count", 0),
-                                            "status": "completed"
-                                        }
-                                        if not any(s.get("title") == updated_section["title"] for s in updated_sections):
-                                            updated_sections.append(updated_section)
-                            
-                            # 收集研究结果
-                            if "research_results" in node_output:
-                                research_results = node_output["research_results"]
-                                if isinstance(research_results, dict):
-                                    for research_data in research_results.values():
-                                        research_result = ResearchResult(
-                                            id=str(uuid.uuid4()),
-                                            query=f"研究章节: {research_data.get('title', '')}",
-                                            source_type="subgraph",
-                                            title=research_data.get("title", ""),
-                                            content=research_data.get("content", ""),
-                                            url="",
-                                            relevance_score=0.9,
-                                            timestamp=research_data.get("timestamp", time.time()),
-                                            section_id=research_data.get("id", "")
-                                        )
-                                        if not any(r.title == research_result.title for r in new_research_results):
-                                            new_research_results.append(research_result)
-        # 处理最终结果
-        if subgraph_output.get("final_report"):
-
-            final_report = subgraph_output["final_report"]
-            final_sections_data = final_report.get("sections", [])
-
-            # 确保所有章节都被处理
-            for section_data in final_sections_data:
-                updated_section = {
-                    "title": section_data.get("title", ""),
-                    "content": section_data.get("content", ""),
-                    "word_count": section_data.get("word_count", 0),
-                    "status": "completed"
-                }
-                if not any(s.get("title") == updated_section["title"] for s in updated_sections):
-                    updated_sections.append(updated_section)
-
-            # 更新状态
-            updated_state = {
-                **state,
-                "sections": updated_sections,
-                "research_results": state.get("research_results", []) + new_research_results,
-                "content_creation_completed": True,
-                "completed_sections_count": len(updated_sections),
-                "performance_metrics": {
-                    **state.get("performance_metrics", {}),
-                    "sections_completed": len(updated_sections),
-                    "total_sections": len(updated_sections),
-                    "total_words": final_report.get("total_words", 0)
-                }
+        return updated_state
+    else:
+        # 返回部分结果
+        updated_state = {
+            **state,
+            "sections": updated_sections,
+            "research_results": state.get("research_results", []) + new_research_results,
+            "content_creation_completed": len(updated_sections) > 0,
+            "completed_sections_count": len(updated_sections),
+            "performance_metrics": {
+                **state.get("performance_metrics", {}),
+                "sections_completed": len(updated_sections),
+                "total_sections": len(updated_sections),
+                "total_words": sum(section.get("word_count", 0) for section in updated_sections)
             }
-
-            processor.writer.final_result(
-                f"深度研究报告生成完成",
-                {
-                    "sections_count": len(updated_sections),
-                    "total_words": final_report.get("total_words", 0),
-                    "research_findings": len(new_research_results)
-                }
-            )
-            return updated_state
-        else:
-            # 返回部分结果
-            updated_state = {
-                **state,
-                "sections": updated_sections,
-                "research_results": state.get("research_results", []) + new_research_results,
-                "content_creation_completed": len(updated_sections) > 0,
-                "completed_sections_count": len(updated_sections),
-                "performance_metrics": {
-                    **state.get("performance_metrics", {}),
-                    "sections_completed": len(updated_sections),
-                    "total_sections": len(updated_sections),
-                    "total_words": sum(section.get("word_count", 0) for section in updated_sections)
-                }
-            }
-            
-            processor.writer.step_complete(
-                "部分内容生成完成",
-                sections_count=len(updated_sections),
-                is_partial=True
-            )
-            return updated_state
-
-    except Exception as e:
-        processor.writer.error(f"研究报告生成失败: {str(e)}", "ResearchGenerationError")
-        return state
+        }
+        
+        processor.writer.step_complete(
+            "部分内容生成完成",
+            sections_count=len(updated_sections),
+            is_partial=True
+        )
+        return updated_state
 
 def convert_research_data_to_results(research_data: List[Dict[str, Any]]) -> List[ResearchResult]:
     """将子图的研究数据转换为主图的 ResearchResult 格式"""

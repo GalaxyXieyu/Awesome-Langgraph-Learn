@@ -149,19 +149,25 @@ class MessageType(Enum):
     STEP_START = "step_start"
     STEP_PROGRESS = "step_progress"
     STEP_COMPLETE = "step_complete"
-    
+
     # 工具使用 - Agent使用工具的过程
     TOOL_CALL = "tool_call"
     TOOL_RESULT = "tool_result"
-    
+
     # 思考过程 - Agent的推理
     THINKING = "thinking"
     REASONING = "reasoning"
-    
+
     # 内容输出 - 实际产出
     CONTENT_STREAMING = "content_streaming"
     CONTENT_COMPLETE = "content_complete"
-    
+
+    # 中断处理 - 用户交互
+    INTERRUPT_REQUEST = "interrupt_request"
+    INTERRUPT_RESPONSE = "interrupt_response"
+    INTERRUPT_WAITING = "interrupt_waiting"
+    INTERRUPT_RESOLVED = "interrupt_resolved"
+
     # 结果状态
     FINAL_RESULT = "final_result"
     ERROR = "error"
@@ -345,6 +351,45 @@ class StreamWriter:
     def error(self, error_msg: str, error_type: str = "GeneralError"):
         """错误信息"""
         self._send_message(MessageType.ERROR, error_msg, error_type=error_type)
+
+    # 中断处理方法
+    def interrupt_request(self, action: str, args: dict, description: str, interrupt_id: Optional[str] = None):
+        """发送中断请求 - 需要用户确认的操作"""
+        self._send_message(
+            MessageType.INTERRUPT_REQUEST,
+            description,
+            action=action,
+            args=args,
+            interrupt_id=interrupt_id,
+            requires_approval=True
+        )
+
+    def interrupt_waiting(self, description: str, interrupt_id: Optional[str] = None):
+        """等待用户响应中断"""
+        self._send_message(
+            MessageType.INTERRUPT_WAITING,
+            description,
+            interrupt_id=interrupt_id,
+            status="waiting"
+        )
+
+    def interrupt_response(self, response: str, approved: bool, interrupt_id: Optional[str] = None):
+        """用户对中断的响应"""
+        self._send_message(
+            MessageType.INTERRUPT_RESPONSE,
+            response,
+            approved=approved,
+            interrupt_id=interrupt_id
+        )
+
+    def interrupt_resolved(self, result: str, interrupt_id: Optional[str] = None):
+        """中断已解决"""
+        self._send_message(
+            MessageType.INTERRUPT_RESOLVED,
+            result,
+            interrupt_id=interrupt_id,
+            status="resolved"
+        )
     
 class AgentWorkflowProcessor:
     """Agent工作流程处理器 - 使用扁平化数据格式"""
@@ -365,20 +410,32 @@ class AgentWorkflowProcessor:
         _ = custom_templates
     
     def process_chunk(self, chunk: Any) -> Dict[str, Any]:
-        """统一智能处理工作流程数据 - 扁平化+原有逻辑兼容"""
+        """统一智能处理工作流程数据 - 扁平化+原有逻辑兼容+中断处理"""
         self.chunk_count += 1
-        
+
+        # 首先检查是否是中断数据
+        interrupt_result = self._handle_interrupt_chunk(chunk)
+        if interrupt_result:
+            return interrupt_result
+
         # 首先尝试使用扁平化处理器（仅处理custom消息）
         flat_data = self.flat_processor.flatten_chunk(chunk)
         if flat_data:
             self._handle_flat_data(flat_data)
             return {"chunk_count": self.chunk_count, "current_step": self.current_step, "flat_data": flat_data}
-        
+
         # 处理子图和其他格式的数据 - 保留原有逻辑
         if isinstance(chunk, tuple):
             if len(chunk) == 3:
                 # 嵌套子图格式: (('subgraph_id',), 'messages'/'updates', data)
                 subgraph_ids, chunk_type, chunk_data = chunk
+
+                # 检查是否包含中断信息
+                if chunk_type == 'updates' and isinstance(chunk_data, dict):
+                    interrupt_handled = self._check_for_interrupts_in_updates(chunk_data, subgraph_ids)
+                    if interrupt_handled:
+                        return {"chunk_count": self.chunk_count, "current_step": self.current_step, "interrupt_handled": True}
+
                 # 提取agent信息
                 agent_name = self._extract_agent_name(subgraph_ids)
                 agent_hierarchy = self._extract_agent_hierarchy(subgraph_ids)
@@ -395,7 +452,7 @@ class AgentWorkflowProcessor:
         elif isinstance(chunk, dict):
             # 直接的数据格式
             return self._process_custom_data(chunk)
-        
+
         return {"chunk_count": self.chunk_count, "current_step": self.current_step}
     
     def _extract_agent_name(self, subgraph_ids: tuple) -> str:
@@ -444,37 +501,37 @@ class AgentWorkflowProcessor:
         """生成简化的工具调用消息"""
         return f"调用了 {tool_name} 工具"
     
-    def _create_agent_message(self, message_type: str, content: str, agent_name: str = None, 
-                             agent_hierarchy: List[str] = None, **extras) -> Dict[str, Any]:
+    def _create_agent_message(self, message_type: str, content: str, agent_name: Optional[str] = None,
+                             agent_hierarchy: Optional[List[str]] = None, **extras) -> Dict[str, Any]:
         """统一创建带agent信息的消息"""
         message = {
             "message_type": message_type,
             "content": content,
             "node": self.writer.node_name
         }
-        
+
         # 根据配置决定是否添加时间信息
         if self.config.should_show_timing():
             message["timestamp"] = time.time()
             message["duration"] = round(time.time() - self.writer.step_start_time, 2)
-        
+
         # 始终添加agent信息（这是核心标识）
         if agent_name:
             message["agent"] = agent_name
-        
+
         # 根据配置决定是否添加agent层级信息
         if agent_hierarchy and self.config.should_show_agent_hierarchy():
             message["agent_hierarchy"] = agent_hierarchy
-        
+
         # 添加额外字段
         for key, value in extras.items():
             if key not in message:  # 避免覆盖核心字段
                 message[key] = value
-        
+
         return message
-    
-    def _send_agent_message(self, message_type: str, content: str, agent_name: str = None, 
-                           agent_hierarchy: List[str] = None, **extras):
+
+    def _send_agent_message(self, message_type: str, content: str, agent_name: Optional[str] = None,
+                           agent_hierarchy: Optional[List[str]] = None, **extras):
         """统一发送带agent信息的消息"""
         message = self._create_agent_message(message_type, content, agent_name, agent_hierarchy, **extras)
         self.writer.writer(message)
@@ -482,29 +539,98 @@ class AgentWorkflowProcessor:
     def _handle_flat_data(self, flat_data: Dict[str, Any]):
         """处理扁平化数据 - 直接输出扁平格式"""
         message_type = flat_data.get('message_type', '')
-        
+
         # 直接输出扁平化数据，不再重复处理
         # 这是最简洁的方式 - 扁平数据直接传给前端
         if message_type in ['tool_call', 'tool_result', 'content_streaming', 'thinking', 'reasoning']:
             # 数据已经是扁平格式，可以直接使用
             pass
+
+    def _handle_interrupt_chunk(self, chunk: Any) -> Optional[Dict[str, Any]]:
+        """处理中断chunk数据"""
+        # 检查是否是中断格式: (('subgraph_id',), 'updates', {'__interrupt__': (Interrupt(...),)})
+        if isinstance(chunk, tuple) and len(chunk) == 3:
+            subgraph_ids, chunk_type, chunk_data = chunk
+
+            if chunk_type == 'updates' and isinstance(chunk_data, dict):
+                if '__interrupt__' in chunk_data:
+                    interrupt_data = chunk_data['__interrupt__']
+                    if isinstance(interrupt_data, tuple) and len(interrupt_data) > 0:
+                        interrupt_obj = interrupt_data[0]
+                        return self._process_interrupt_object(interrupt_obj, subgraph_ids)
+
+        return None
+
+    def _process_interrupt_object(self, interrupt_obj: Any, subgraph_ids: tuple) -> Dict[str, Any]:
+        """处理中断对象"""
+        try:
+            # 提取中断信息
+            interrupt_value = getattr(interrupt_obj, 'value', {})
+            interrupt_id = getattr(interrupt_obj, 'id', 'unknown')
+
+            if isinstance(interrupt_value, dict):
+                action_request = interrupt_value.get('action_request', {})
+                config = interrupt_value.get('config', {})
+                description = interrupt_value.get('description', '')
+
+                if action_request:
+                    action = action_request.get('action', '')
+                    args = action_request.get('args', {})
+
+                    # 提取agent信息
+                    agent_name = self._extract_agent_name(subgraph_ids)
+
+                    # 发送中断请求消息
+                    self._send_agent_message(
+                        "interrupt_request",
+                        description,
+                        agent_name,
+                        action=action,
+                        args=args,
+                        interrupt_id=interrupt_id,
+                        config=config
+                    )
+
+                    return {
+                        "chunk_count": self.chunk_count,
+                        "current_step": "interrupt_waiting",
+                        "interrupt_processed": True,
+                        "interrupt_id": interrupt_id,
+                        "action": action,
+                        "args": args
+                    }
+
+        except Exception as e:
+            self.writer.error(f"处理中断时出错: {str(e)}", "InterruptProcessingError")
+
+        return {"chunk_count": self.chunk_count, "current_step": self.current_step}
+
+    def _check_for_interrupts_in_updates(self, updates_data: Dict[str, Any], subgraph_ids: tuple) -> bool:
+        """检查updates数据中是否包含中断信息"""
+        if '__interrupt__' in updates_data:
+            interrupt_data = updates_data['__interrupt__']
+            if isinstance(interrupt_data, tuple) and len(interrupt_data) > 0:
+                interrupt_obj = interrupt_data[0]
+                self._process_interrupt_object(interrupt_obj, subgraph_ids)
+                return True
+        return False
     
-    def _process_subgraph_chunk(self, chunk_type: str, chunk_data: Any, agent_name: str = "unknown", agent_hierarchy: List[str] = None) -> Dict[str, Any]:
+    def _process_subgraph_chunk(self, chunk_type: str, chunk_data: Any, agent_name: str = "unknown", agent_hierarchy: Optional[List[str]] = None) -> Dict[str, Any]:
         """处理子图的嵌套流式输出"""
         # 检查是否应该处理该子图节点
         if not self.config.should_process_subgraph_node(agent_name):
             return {"chunk_count": self.chunk_count, "current_step": self.current_step, "filtered_node": agent_name}
-        
+
         # 检查是否应该处理该Agent
         if not self.config.should_process_agent(agent_name):
             return {"chunk_count": self.chunk_count, "current_step": self.current_step, "filtered_agent": agent_name}
-        
+
         if chunk_type == "messages":
             # 处理子图的messages格式
             if isinstance(chunk_data, tuple) and len(chunk_data) == 2:
-                # 格式: (AIMessageChunk, metadata) 
+                # 格式: (AIMessageChunk, metadata)
                 message, _ = chunk_data
-                
+
                 # 检查是否是AIMessageChunk并直接输出内容
                 if hasattr(message, '__class__') and type(message).__name__ == "AIMessageChunk":
                     if hasattr(message, 'content') and message.content:
@@ -514,7 +640,7 @@ class AgentWorkflowProcessor:
                             self._send_agent_content_streaming(content, agent_name, agent_hierarchy)
                             # 对于AIMessageChunk，不再继续调用_process_message_chunk避免重复
                             return {"chunk_count": self.chunk_count, "current_step": self.current_step}
-                
+
                 # 继续使用原有逻辑处理其他类型
                 self._process_message_chunk(message)
             else:
@@ -523,15 +649,15 @@ class AgentWorkflowProcessor:
         elif chunk_type == "updates" and isinstance(chunk_data, dict):
             # 对于updates类型，也传递agent信息
             self._process_content_updates_with_agent(chunk_data, agent_name)
-        
+
         return {"chunk_count": self.chunk_count, "current_step": self.current_step}
-    
-    def _send_agent_content_streaming(self, content: str, agent_name: str, agent_hierarchy: List[str] = None):
+
+    def _send_agent_content_streaming(self, content: str, agent_name: str, agent_hierarchy: Optional[List[str]] = None):
         """发送带agent信息的content_streaming消息"""
         # 检查是否应该处理该消息类型
         if not self.config.should_process_message_type("content_streaming"):
             return
-        
+
         message = {
             "message_type": "content_streaming",
             "content": content,
@@ -540,15 +666,15 @@ class AgentWorkflowProcessor:
             "length": len(content),
             "chunk_index": 0
         }
-        
+
         # 根据配置决定是否添加元数据
         if self.config.should_show_timing():
             message["timestamp"] = time.time()
             message["duration"] = round(time.time() - self.writer.step_start_time, 2)
-        
+
         if self.config.should_show_agent_hierarchy():
             message["agent_hierarchy"] = agent_hierarchy or [agent_name]  # 完整层级
-        
+
         self.writer.writer(message)
     
     def _process_content_updates_with_agent(self, updates_data: Dict[str, Any], agent_name: str):
@@ -951,6 +1077,85 @@ def create_agent_stream_collector(node_name: str, agent_name: str = "", custom_t
     """创建简化的Agent流式输出收集器"""
     writer = create_stream_writer(node_name, agent_name, custom_templates)
     return AgentStreamCollector(writer, custom_templates)
+
+# ============================================================================
+# 中断处理器 - 处理LangGraph中断
+# ============================================================================
+
+class InterruptHandler:
+    """LangGraph中断处理器"""
+
+    def __init__(self, writer: StreamWriter):
+        self.writer = writer
+        self.pending_interrupts = {}  # interrupt_id -> interrupt_info
+
+    def handle_interrupt_request(self, interrupt_id: str, action: str, args: dict, description: str, config: dict = None):
+        """处理中断请求"""
+        # 存储中断信息
+        self.pending_interrupts[interrupt_id] = {
+            'action': action,
+            'args': args,
+            'description': description,
+            'config': config or {},
+            'status': 'pending'
+        }
+
+        # 发送中断请求消息
+        self.writer.interrupt_request(action, args, description, interrupt_id)
+
+        # 发送等待消息
+        self.writer.interrupt_waiting(f"等待用户确认: {description}", interrupt_id)
+
+    def handle_user_response(self, interrupt_id: str, response: str, approved: bool):
+        """处理用户响应"""
+        if interrupt_id not in self.pending_interrupts:
+            self.writer.error(f"未找到中断ID: {interrupt_id}", "InterruptNotFound")
+            return False
+
+        interrupt_info = self.pending_interrupts[interrupt_id]
+        interrupt_info['status'] = 'approved' if approved else 'rejected'
+        interrupt_info['user_response'] = response
+
+        # 发送响应消息
+        self.writer.interrupt_response(response, approved, interrupt_id)
+
+        if approved:
+            # 执行被中断的操作
+            result = self._execute_approved_action(interrupt_info)
+            self.writer.interrupt_resolved(f"操作已执行: {result}", interrupt_id)
+        else:
+            self.writer.interrupt_resolved("操作已取消", interrupt_id)
+
+        # 清理已处理的中断
+        del self.pending_interrupts[interrupt_id]
+        return True
+
+    def _execute_approved_action(self, interrupt_info: dict) -> str:
+        """执行被批准的操作"""
+        action = interrupt_info.get('action', '')
+        args = interrupt_info.get('args', {})
+
+        # 这里可以根据action类型执行相应的操作
+        # 对于web_search，返回搜索参数信息
+        if action == 'web_search':
+            query = args.get('query', '')
+            return f"web_search(query='{query}')"
+
+        return f"{action}({args})"
+
+    def get_pending_interrupts(self) -> Dict[str, Any]:
+        """获取待处理的中断"""
+        return self.pending_interrupts.copy()
+
+    def clear_interrupt(self, interrupt_id: str):
+        """清理指定中断"""
+        if interrupt_id in self.pending_interrupts:
+            del self.pending_interrupts[interrupt_id]
+
+def create_interrupt_handler(node_name: str, agent_name: str = "", config: Optional[WriterConfig] = None) -> InterruptHandler:
+    """创建中断处理器"""
+    writer = create_stream_writer(node_name, agent_name, None, config)
+    return InterruptHandler(writer)
 
 # ============================================================================
 # Agent流式输出处理器 - 参考Multi-Agent-report设计
