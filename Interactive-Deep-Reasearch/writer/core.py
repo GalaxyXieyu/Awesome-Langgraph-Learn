@@ -393,7 +393,7 @@ class StreamWriter:
     
 class AgentWorkflowProcessor:
     """Agent工作流程处理器 - 使用扁平化数据格式"""
-    
+
     def __init__(self, writer: StreamWriter, custom_templates: Optional[Dict[str, str]] = None, config: Optional[WriterConfig] = None):
         self.writer = writer
         self.flat_processor = FlatDataProcessor()
@@ -404,6 +404,8 @@ class AgentWorkflowProcessor:
         self.final_output = {}
         # 添加去重缓存 - 基于内容hash去重reasoning消息
         self.processed_reasoning = set()
+        # 添加中断去重缓存 - 避免同一个中断被多次处理
+        self.processed_interrupts = set()
         self.config = config or get_writer_config()
 
         # 标记未使用的参数以维持向后兼容性
@@ -568,6 +570,13 @@ class AgentWorkflowProcessor:
             interrupt_value = getattr(interrupt_obj, 'value', {})
             interrupt_id = getattr(interrupt_obj, 'id', 'unknown')
 
+            # 如果已处理过相同的中断，跳过
+            if interrupt_id in self.processed_interrupts:
+                return {"chunk_count": self.chunk_count, "current_step": self.current_step, "interrupt_skipped": True}
+
+            # 添加到已处理集合
+            self.processed_interrupts.add(interrupt_id)
+
             if isinstance(interrupt_value, dict):
                 action_request = interrupt_value.get('action_request', {})
                 config = interrupt_value.get('config', {})
@@ -611,6 +620,12 @@ class AgentWorkflowProcessor:
             interrupt_data = updates_data['__interrupt__']
             if isinstance(interrupt_data, tuple) and len(interrupt_data) > 0:
                 interrupt_obj = interrupt_data[0]
+                interrupt_id = getattr(interrupt_obj, 'id', None)
+
+                # 如果已处理过，直接返回True表示已处理，避免后续处理
+                if interrupt_id and interrupt_id in self.processed_interrupts:
+                    return True
+
                 self._process_interrupt_object(interrupt_obj, subgraph_ids)
                 return True
         return False
@@ -837,22 +852,24 @@ class AgentWorkflowProcessor:
         """处理messages类型的chunk - 从AI消息中提取流式信息"""
         if not hasattr(message, '__class__'):
             return
-            
-        msg_type = type(message).__name__
-        
-        if msg_type in ["AIMessage", "AIMessageChunk"]:
-            # 检测工具调用 - 使用统一处理方法
-            if hasattr(message, 'tool_calls') and message.tool_calls:
-                for tool_call in message.tool_calls:
-                    tool_name = tool_call.get('name', 'unknown_tool')
-                    tool_args = tool_call.get('args', {})
-                    
-                    # 使用统一的工具调用处理方法
-                    self.writer.tool_call(tool_name, tool_args)
 
-                    # 使用简化的工具消息
-                    tool_message = self._generate_simple_tool_message(tool_name)
-                    self.writer.thinking(tool_message)
+        msg_type = type(message).__name__
+
+        if msg_type in ["AIMessage", "AIMessageChunk"]:
+            valid_tool_calls = []
+
+            if hasattr(message, 'tool_calls') and message.tool_calls:
+                valid_tool_calls.extend([tc for tc in message.tool_calls if tc.get('name')])
+
+            if valid_tool_calls:
+                for tool_call in valid_tool_calls:
+                    tool_name = tool_call.get('name')
+                    tool_args = tool_call.get('args', {})
+
+                    if tool_name and isinstance(tool_args, dict):
+                        self.writer.tool_call(tool_name, tool_args)
+                        tool_message = self._generate_simple_tool_message(tool_name)
+                        self.writer.thinking(tool_message)
             
             # 检测AI回复内容
             if hasattr(message, 'content') and message.content:
@@ -941,27 +958,31 @@ class AgentWorkflowProcessor:
     
     def _process_agent_message(self, message: Any, source_node: str):
         """处理Agent消息，检测工具调用 - 恢复完整逻辑处理子图中的工具调用"""
-        # source_node参数保留用于后续扩展，当前版本未使用
-        _ = source_node  # 标记为有意未使用
+        _ = source_node
         if not hasattr(message, '__class__'):
             return
-            
-        msg_type = type(message).__name__
-        
-        if msg_type in ["AIMessage", "AIMessageChunk"]:
-            # 检测工具调用 - 这是用户最关心的部分
-            if hasattr(message, 'tool_calls') and message.tool_calls:
-                # 检测到工具调用，处理每个工具
-                for tool_call in message.tool_calls:
-                    tool_name = tool_call.get('name', 'unknown_tool')
-                    tool_args = tool_call.get('args', {})
-                    
-                    # 使用统一的工具调用处理方法
-                    self.writer.tool_call(tool_name, tool_args)
 
-                    # 使用简化的工具消息
-                    tool_message = self._generate_simple_tool_message(tool_name)
-                    self.writer.thinking(tool_message)
+        msg_type = type(message).__name__
+
+        if msg_type in ["AIMessage", "AIMessageChunk"]:
+            # 初始化工具调用列表
+            valid_tool_calls = []
+
+            # 处理有效的 tool_calls
+            if hasattr(message, 'tool_calls') and message.tool_calls:
+                valid_tool_calls.extend([tc for tc in message.tool_calls if tc.get('name')])
+
+            # 处理工具调用
+            if valid_tool_calls:
+                for tool_call in valid_tool_calls:
+                    tool_name = tool_call.get('name')
+                    tool_args = tool_call.get('args', {})
+
+                    # 只有在工具名称和参数都存在时才处理
+                    if tool_name and isinstance(tool_args, dict):
+                        self.writer.tool_call(tool_name, tool_args)
+                        tool_message = self._generate_simple_tool_message(tool_name)
+                        self.writer.thinking(tool_message)
             
             # 检测AI回复内容
             if hasattr(message, 'content') and message.content:
@@ -994,27 +1015,30 @@ class AgentWorkflowProcessor:
     
     def _process_agent_message_with_agent(self, message: Any, source_node: str, agent_name: str):
         """处理Agent消息，检测工具调用 - 带agent信息版本"""
-        _ = source_node  # 标记为有意未使用
+        _ = source_node
         if not hasattr(message, '__class__'):
             return
-            
-        msg_type = type(message).__name__
-        
-        if msg_type in ["AIMessage", "AIMessageChunk"]:
-            # 检测工具调用 - 这是用户最关心的部分
-            if hasattr(message, 'tool_calls') and message.tool_calls:
-                # 检测到工具调用，处理每个工具
-                for tool_call in message.tool_calls:
-                    tool_name = tool_call.get('name', 'unknown_tool')
-                    tool_args = tool_call.get('args', {})
-                    
-                    # 使用统一的工具调用处理方法
-                    self._send_agent_message("tool_call", "", agent_name,
-                                           tool_name=tool_name, args=tool_args)
 
-                    # 使用简化的工具消息
-                    tool_message = self._generate_simple_tool_message(tool_name)
-                    self._send_agent_message("thinking", tool_message, agent_name)
+        msg_type = type(message).__name__
+
+        if msg_type in ["AIMessage", "AIMessageChunk"]:
+            valid_tool_calls = []
+
+            if hasattr(message, 'tool_calls') and message.tool_calls:
+                valid_tool_calls.extend([tc for tc in message.tool_calls if tc.get('name')])
+
+            if valid_tool_calls:
+                for tool_call in valid_tool_calls:
+                    tool_name = tool_call.get('name')
+                    tool_args = tool_call.get('args', {})
+
+                    if tool_name and isinstance(tool_args, dict):
+                        self._send_agent_message(
+                            "tool_call", "", agent_name,
+                            tool_name=tool_name, args=tool_args
+                        )
+                        tool_message = self._generate_simple_tool_message(tool_name)
+                        self._send_agent_message("thinking", tool_message, agent_name)
             
             # 检测AI回复内容
             if hasattr(message, 'content') and message.content:
