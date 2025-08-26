@@ -6,6 +6,9 @@ langchain>=0.2.0
 langchain-openai>=0.1.0
 langchain-community>=0.2.0
 pydantic>=2.0.0
+celery>=5.3.0
+redis>=5.0.0
+asyncpg>=0.29.0
 
 # 配置管理
 pyyaml>=6.0

@@ -194,6 +194,50 @@ python examples/basic_usage.py
 - [API文档](docs/) - 完整的API参考
 - [示例集合](examples/) - 各种使用场景示例
 
+## 🌐 FastAPI + Celery 服务
+
+本项目提供基于 Redis 的异步执行和流式输出：
+
+1. 启动 Celery worker（需要 Redis 和 PostgreSQL 服务）：
+
+```bash
+celery -A Interactive-Deep-Reasearch.main.celery_app worker --loglevel=info
+```
+
+2. 运行 FastAPI 服务：
+
+```bash
+uvicorn Interactive-Deep-Reasearch.main:app --reload --port 8000
+```
+
+3. 创建研究任务：
+
+```bash
+curl -X POST http://localhost:8000/research/tasks -H 'Content-Type: application/json' -d '{"topic": "人工智能发展趋势", "user_id": "demo"}'
+```
+
+4. 通过 SSE 订阅任务进度：
+
+```bash
+curl -N http://localhost:8000/research/tasks/<task_id>/stream
+```
+
+5. 取消正在运行的任务：
+
+```bash
+curl -X POST http://localhost:8000/research/tasks/<task_id>/cancel
+```
+
+任务执行过程中会通过 Redis 推送事件，检查点数据持久化到 PostgreSQL。事件流会在任务完成或取消后自动结束，并发送最终状态。
+
+### 持久化配置
+
+设置环境变量 `PG_URL` 指向 PostgreSQL 连接字符串，例如：
+
+```bash
+export PG_URL=postgresql+asyncpg://user:password@localhost:5432/agents
+```
+
 ## 🤝 贡献
 
 欢迎提交 Issue 和 Pull Request！
