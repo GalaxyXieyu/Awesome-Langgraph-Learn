@@ -38,6 +38,30 @@ class ResearchPostgresSaver(BaseCheckpointSaver):
                         user, _ = auth_part.split(":", 1)
                         return f"{protocol}://{user}:***@{host_part}"
         return self.connection_string
+
+    def _deserialize_data(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        反序列化存储的数据
+
+        Args:
+            data: 从数据库读取的数据
+
+        Returns:
+            反序列化后的数据
+        """
+        try:
+            if isinstance(data, dict) and data.get("type") == "jsonplus_serialized":
+                # 这是用 JsonPlusSerializer 序列化的数据
+                import base64
+                encoded_data = data["data"]
+                decoded_bytes = base64.b64decode(encoded_data.encode('utf-8'))
+                return self.serializer.loads(decoded_bytes)
+            else:
+                # 直接返回原始数据（向后兼容）
+                return data
+        except Exception as e:
+            print(f"⚠️  反序列化数据失败，返回原始数据: {e}")
+            return data
         
     def setup(self):
         """创建表结构"""
@@ -119,12 +143,23 @@ class ResearchPostgresSaver(BaseCheckpointSaver):
         thread_id = config["configurable"]["thread_id"]
         checkpoint_ns = config["configurable"].get("checkpoint_ns", "")
         
-        # 序列化数据 - 直接存储为 JSON，不使用 JsonPlusSerializer 的二进制格式
+        # 序列化数据 - 使用 JsonPlusSerializer 处理复杂对象，然后转换为 JSON 字符串
         try:
             import json
-            # 对于 JSONB 字段，我们直接存储 JSON 字符串
-            serialized_checkpoint = json.dumps(checkpoint, ensure_ascii=False)
-            serialized_metadata = json.dumps(metadata, ensure_ascii=False)
+            # 先用 JsonPlusSerializer 序列化，然后解码为字符串存储到 JSONB
+            checkpoint_bytes = self.serializer.dumps(checkpoint)
+            metadata_bytes = self.serializer.dumps(metadata)
+
+            # 将字节数据转换为 base64 字符串，以便存储在 JSONB 中
+            import base64
+            serialized_checkpoint = json.dumps({
+                "data": base64.b64encode(checkpoint_bytes).decode('utf-8'),
+                "type": "jsonplus_serialized"
+            })
+            serialized_metadata = json.dumps({
+                "data": base64.b64encode(metadata_bytes).decode('utf-8'),
+                "type": "jsonplus_serialized"
+            })
         except Exception as e:
             print(f"❌ 序列化数据失败: {e}")
             raise
@@ -227,9 +262,9 @@ class ResearchPostgresSaver(BaseCheckpointSaver):
                     if not row:
                         return None
 
-                    # 反序列化数据 - PostgreSQL JSONB 字段直接返回字典
-                    checkpoint = row["checkpoint"] if row["checkpoint"] else {}
-                    metadata = row["metadata"] if row["metadata"] else {}
+                    # 反序列化数据 - 从 base64 编码的 JsonPlusSerializer 数据恢复
+                    checkpoint = self._deserialize_data(row["checkpoint"]) if row["checkpoint"] else {}
+                    metadata = self._deserialize_data(row["metadata"]) if row["metadata"] else {}
 
                     return CheckpointTuple(
                         config={
@@ -272,9 +307,9 @@ class ResearchPostgresSaver(BaseCheckpointSaver):
 
                     for row in cur.fetchall():
                         try:
-                            # PostgreSQL JSONB 字段直接返回字典
-                            checkpoint = row["checkpoint"] if row["checkpoint"] else {}
-                            metadata = row["metadata"] if row["metadata"] else {}
+                            # 反序列化数据
+                            checkpoint = self._deserialize_data(row["checkpoint"]) if row["checkpoint"] else {}
+                            metadata = self._deserialize_data(row["metadata"]) if row["metadata"] else {}
 
                             yield CheckpointTuple(
                                 config={
@@ -403,3 +438,21 @@ class ResearchPostgresSaver(BaseCheckpointSaver):
         except Exception as e:
             print(f"❌ 清理 checkpoints 失败: {e}")
             return 0
+
+    # ========================================================================
+    # 异步方法实现 (LangGraph 需要)
+    # ========================================================================
+
+    async def aput(self, config: RunnableConfig, checkpoint: Dict[str, Any],
+                   metadata: Dict[str, Any], new_versions: Dict[str, Any]) -> RunnableConfig:
+        """异步存储 checkpoint"""
+        return self.put(config, checkpoint, metadata, new_versions)
+
+    async def aget_tuple(self, config: RunnableConfig) -> Optional[CheckpointTuple]:
+        """异步获取 checkpoint"""
+        return self.get_tuple(config)
+
+    async def alist(self, config: RunnableConfig) -> Iterator[CheckpointTuple]:
+        """异步列出 checkpoints"""
+        for item in self.list(config):
+            yield item
