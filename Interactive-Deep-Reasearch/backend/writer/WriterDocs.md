@@ -1,23 +1,42 @@
-# StreamWriter 输出格式文档
+# StreamWriter 输出格式文档 (简化版)
 
 ## 📋 概述
 
-这是 Interactive Deep Research 项目的标准化流式输出系统，基于 `backend/writer/core.py` 设计。系统提供统一的流式输出格式，便于前端实时渲染和解析。
+这是 Interactive Deep Research 项目的**简化版**标准化流式输出系统，基于 `backend/writer/core.py` 设计。系统已大幅简化为**4个核心消息类型**，提供统一的流式输出格式，便于前端实时渲染和解析。
 
-## 🏗️ 核心架构
+## 🏗️ 核心架构 (简化版)
 
 ### 主要组件
-- **StreamWriter**: 标准化流式输出Writer
-- **AgentWorkflowProcessor**: Agent工作流程处理器
+- **StreamWriter**: 标准化流式输出Writer (简化为4个核心方法)
+- **AgentWorkflowProcessor**: Agent工作流程处理器 (兼容旧格式)
 - **FlatDataProcessor**: 数据扁平化处理器
 - **InterruptHandler**: 中断处理器
 
-### 设计特点
+### 🎯 简化设计特点
+- ✅ **4个核心消息类型** - 大幅简化API
 - ✅ 扁平化数据结构，便于前端解析
 - ✅ 支持流式和批量模式
 - ✅ 智能去重机制
 - ✅ 中断处理支持
 - ✅ 配置化控制
+- ✅ 向后兼容旧格式
+
+## 🎯 简化架构总览
+
+### 核心简化对比
+
+| 旧API (已删除) | 新API (简化版) | 说明 |
+|---------------|---------------|------|
+| `step_start()` `step_progress()` `step_complete()` | `processing()` | 统一进度处理，支持自动百分比计算 |
+| `content_streaming()` `content_complete()` | `content()` | 统一内容输出，支持流式和完整内容 |
+| `reasoning()` `planning()` | `thinking()` | 统一思考过程，包含所有推理类型 |
+| `interrupt_request()` `interrupt_waiting()` | `interrupt()` | 统一中断处理，简化用户交互 |
+
+### 保留的特殊方法
+- `tool_call()` `tool_result()` - 工具相关
+- `final_result()` - 最终结果
+- `error()` - 错误处理
+- `interrupt_response()` `interrupt_resolved()` - 中断响应处理
 
 ## 📦 基础消息结构
 
@@ -35,121 +54,189 @@ interface BaseMessage {
 }
 ```
 
-## 🔖 消息类型定义
+## 🔖 简化消息类型定义
 
-### 消息类型枚举
+### 🎯 核心4个消息类型 (简化版)
 
 ```typescript
-type MessageType = 
-  // 步骤状态类型
-  | "step_start"              // 步骤开始
-  | "step_progress"           // 步骤进度更新
-  | "step_complete"           // 步骤完成
-  | "node_complete"           // 节点汇总完成 (非流式节点)
-  
+type CoreMessageType =
+  // 1. 进度处理 - 节点执行状态（支持百分比）
+  | "processing"              // 进度处理 (替代 step_start/progress/complete)
+
+  // 2. 内容输出 - 实际输出内容
+  | "content"                 // 内容输出 (替代 content_streaming/complete)
+
+  // 3. 思考过程 - AI推理过程
+  | "thinking"                // 思考过程 (替代 reasoning/planning)
+
+  // 4. 中断处理 - 用户交互
+  | "interrupt"               // 中断处理 (替代 interrupt_request/waiting)
+```
+
+### 🔧 保留的特殊类型
+
+```typescript
+type SpecialMessageType =
   // 工具使用类型
   | "tool_call"               // 工具调用
   | "tool_result"             // 工具执行结果
-  
-  // 思考过程类型
-  | "thinking"                // 思考过程
-  | "reasoning"               // 推理分析
-  
-  // 内容输出类型
-  | "content_streaming"       // 流式内容输出
-  | "content_complete"        // 内容输出完成
-  
-  // 中断处理类型
-  | "interrupt_request"       // 中断请求 (需要用户确认)
+
+  // 中断响应类型 (保留用于内部处理)
   | "interrupt_response"      // 中断响应 (用户回复)
-  | "interrupt_waiting"       // 等待用户响应
   | "interrupt_resolved"      // 中断已解决
-  
+
   // 结果状态类型
   | "final_result"            // 最终结果
   | "error";                  // 错误信息
 ```
 
-## 📝 详细消息格式
+## 📝 简化消息格式详解
 
-### 1. 步骤状态消息
+### 🎯 1. 进度处理消息 (processing)
 
-#### 步骤开始
+**统一的进度处理** - 替代所有步骤相关消息
+
 ```typescript
-interface StepStartMessage extends BaseMessage {
-  message_type: "step_start";
-  content: string;  // 步骤描述，如 "开始生成大纲"
+interface ProcessingMessage extends BaseMessage {
+  message_type: "processing";
+  content: string;           // 进度描述
+  progress?: number;         // 进度百分比 (0-100，自动计算)
+  graph_nodes?: string[];    // 图节点列表 (用于进度计算)
+  [key: string]: any;        // 其他自定义字段
 }
 ```
 
 **示例:**
 ```json
 {
-  "message_type": "step_start",
+  "message_type": "processing",
   "content": "开始生成研究大纲",
   "node": "outline_generation",
-  "timestamp": 1703123456.789,
-  "duration": 0
-}
-```
-
-#### 步骤进度
-```typescript
-interface StepProgressMessage extends BaseMessage {
-  message_type: "step_progress";
-  content: string;           // 进度描述
-  progress: number;          // 进度百分比 (0-100)
-  research_title?: string;   // 研究标题 (可选)
-}
-```
-
-**示例:**
-```json
-{
-  "message_type": "step_progress",
-  "content": "发现研究资料: AI在医疗领域的应用",
-  "node": "research",
-  "agent": "research",
   "progress": 25,
-  "research_title": "AI在医疗领域的应用",
   "timestamp": 1703123456.789,
   "duration": 2.34
 }
 ```
 
-#### 步骤完成
+**使用方法:**
+```python
+# 基本用法
+processor.writer.processing("开始处理")
+
+# 带进度计算
+processor.writer.processing("处理中", graph_nodes=["node1", "node2", "node3"])
+
+# 带自定义字段
+processor.writer.processing("完成", sections_count=5, total_words=1000)
+```
+
+### 🎯 2. 内容输出消息 (content)
+
+**统一的内容输出** - 替代所有内容相关消息
+
 ```typescript
-interface StepCompleteMessage extends BaseMessage {
-  message_type: "step_complete";
-  content: string;  // 完成总结
-  duration: number; // 执行时长
+interface ContentMessage extends BaseMessage {
+  message_type: "content";
+  content: string;           // 输出内容
+  chunk_index?: number;      // 流式片段索引 (可选)
+  length?: number;           // 内容长度
+  [key: string]: any;        // 其他自定义字段
 }
 ```
 
 **示例:**
 ```json
 {
-  "message_type": "step_complete",
-  "content": "大纲生成完成，包含5个主要章节",
-  "node": "outline_generation",
-  "duration": 15.67,
+  "message_type": "content",
+  "content": "第一章：人工智能概述\n\n人工智能是...",
+  "node": "writing",
+  "agent": "writing",
+  "length": 1500,
+  "word_count": 500,
   "timestamp": 1703123456.789
 }
 ```
 
-#### 节点汇总完成 (非流式节点)
+**使用方法:**
+```python
+# 基本内容输出
+processor.writer.content("生成的内容")
+
+# 带自定义字段
+processor.writer.content("章节内容", word_count=500, section_title="概述")
+```
+
+### 🎯 3. 思考过程消息 (thinking)
+
+**统一的思考过程** - 替代推理、规划等消息
+
 ```typescript
-interface NodeCompleteMessage extends BaseMessage {
-  message_type: "node_complete";
-  content: string;     // 汇总内容
-  duration: number;    // 执行时长
-  aggregated: true;    // 标识这是汇总结果
+interface ThinkingMessage extends BaseMessage {
+  message_type: "thinking";
+  content: string;           // 思考内容
+  [key: string]: any;        // 其他自定义字段
 }
 ```
 
-### 2. 工具使用消息
+**示例:**
+```json
+{
+  "message_type": "thinking",
+  "content": "正在分析用户需求，准备生成大纲结构...",
+  "node": "outline_generation",
+  "timestamp": 1703123456.789
+}
+```
 
-#### 工具调用
+**使用方法:**
+```python
+# 基本思考过程
+processor.writer.thinking("正在分析...")
+
+# 带自定义字段
+processor.writer.thinking("推理完成", reasoning_type="logical")
+```
+
+### 🎯 4. 中断处理消息 (interrupt)
+
+**统一的中断处理** - 替代所有中断相关消息
+
+```typescript
+interface InterruptMessage extends BaseMessage {
+  message_type: "interrupt";
+  content: string;           // 中断描述
+  action?: string;           // 中断动作
+  args?: any;               // 中断参数
+  interrupt_id?: string;     // 中断ID
+  [key: string]: any;        // 其他自定义字段
+}
+```
+
+**示例:**
+```json
+{
+  "message_type": "interrupt",
+  "content": "等待用户确认大纲",
+  "node": "outline_confirmation",
+  "action": "confirm_outline",
+  "args": {"outline": "..."},
+  "interrupt_id": "confirm_123456",
+  "timestamp": 1703123456.789
+}
+```
+
+**使用方法:**
+```python
+# 基本中断
+processor.writer.interrupt("等待用户确认")
+
+# 带中断参数
+processor.writer.interrupt("确认操作", action="confirm", args={"data": "..."})
+```
+
+### 🔧 5. 保留的特殊消息类型
+
+#### 工具调用 (tool_call)
 ```typescript
 interface ToolCallMessage extends BaseMessage {
   message_type: "tool_call";
@@ -175,7 +262,7 @@ interface ToolCallMessage extends BaseMessage {
 }
 ```
 
-#### 工具结果
+#### 工具结果 (tool_result)
 ```typescript
 interface ToolResultMessage extends BaseMessage {
   message_type: "tool_result";
@@ -199,165 +286,8 @@ interface ToolResultMessage extends BaseMessage {
 }
 ```
 
-### 3. 内容输出消息
+### 🔧 6. 最终结果消息 (final_result)
 
-#### 流式内容
-```typescript
-interface ContentStreamingMessage extends BaseMessage {
-  message_type: "content_streaming";
-  content: string;      // 内容片段
-  length: number;       // 片段长度
-  chunk_index: number;  // 片段索引
-  agent?: string;       // Agent名称 (子图消息)
-}
-```
-
-**示例:**
-```json
-{
-  "message_type": "content_streaming",
-  "content": "# 第一章 人工智能概述\n\n人工智能(AI)是计算机科学的一个分支...",
-  "node": "content_creation",
-  "agent": "writing",
-  "length": 156,
-  "chunk_index": 0,
-  "timestamp": 1703123456.789
-}
-```
-
-#### 内容完成
-```typescript
-interface ContentCompleteMessage extends BaseMessage {
-  message_type: "content_complete";
-  content: string;          // 完成描述
-  word_count?: number;      // 字数统计
-  section_title?: string;   // 章节标题
-  tools_used?: string[];    // 使用的工具列表
-  total_chunks?: number;    // 总片段数
-}
-```
-
-**示例:**
-```json
-{
-  "message_type": "content_complete",
-  "content": "完成章节: 人工智能概述",
-  "node": "content_creation",
-  "agent": "writing",
-  "word_count": 1245,
-  "section_title": "人工智能概述",
-  "timestamp": 1703123456.789,
-  "duration": 45.23
-}
-```
-
-### 4. 思考过程消息
-
-#### 思考过程
-```typescript
-interface ThinkingMessage extends BaseMessage {
-  message_type: "thinking";
-  content: string;  // 思考内容
-}
-```
-
-**示例:**
-```json
-{
-  "message_type": "thinking",
-  "content": "需要搜索更多关于AI医疗诊断的资料",
-  "node": "research",
-  "agent": "research",
-  "timestamp": 1703123456.789
-}
-```
-
-#### 推理分析
-```typescript
-interface ReasoningMessage extends BaseMessage {
-  message_type: "reasoning";
-  content: string;  // 推理内容
-}
-```
-
-**示例:**
-```json
-{
-  "message_type": "reasoning",
-  "content": "基于收集到的资料，AI在医疗领域主要应用于诊断、治疗和药物研发三个方面",
-  "node": "research",
-  "agent": "research",
-  "timestamp": 1703123456.789,
-  "duration": 1.23
-}
-```
-
-### 5. 中断处理消息
-
-#### 中断请求
-```typescript
-interface InterruptRequestMessage extends BaseMessage {
-  message_type: "interrupt_request";
-  content: string;                    // 中断描述
-  action: string;                     // 请求的操作
-  args: Record<string, any>;          // 操作参数
-  interrupt_id: string;               // 中断ID
-  requires_approval: true;            // 需要用户确认
-  config?: Record<string, any>;       // 配置信息
-}
-```
-
-**示例:**
-```json
-{
-  "message_type": "interrupt_request",
-  "content": "需要进行网络搜索以获取最新信息，是否继续？",
-  "node": "research",
-  "agent": "research",
-  "action": "web_search",
-  "args": {
-    "query": "2024年AI医疗最新发展",
-    "num_results": 5
-  },
-  "interrupt_id": "search_20241201_001",
-  "requires_approval": true,
-  "timestamp": 1703123456.789
-}
-```
-
-#### 中断响应
-```typescript
-interface InterruptResponseMessage extends BaseMessage {
-  message_type: "interrupt_response";
-  content: string;        // 用户响应内容
-  approved: boolean;      // 是否批准
-  interrupt_id: string;   // 中断ID
-}
-```
-
-#### 中断等待
-```typescript
-interface InterruptWaitingMessage extends BaseMessage {
-  message_type: "interrupt_waiting";
-  content: string;        // 等待描述
-  interrupt_id: string;   // 中断ID
-  status: "waiting";      // 状态
-}
-```
-
-#### 中断解决
-```typescript
-interface InterruptResolvedMessage extends BaseMessage {
-  message_type: "interrupt_resolved";
-  content: string;        // 解决结果
-  interrupt_id: string;   // 中断ID
-  status: "resolved";     // 状态
-}
-```
-
-### 6. 结果状态消息
-
-#### 最终结果
 ```typescript
 interface FinalResultMessage extends BaseMessage {
   message_type: "final_result";
@@ -385,7 +315,8 @@ interface FinalResultMessage extends BaseMessage {
 }
 ```
 
-#### 错误消息
+### 🔧 7. 错误消息 (error)
+
 ```typescript
 interface ErrorMessage extends BaseMessage {
   message_type: "error";
@@ -406,88 +337,90 @@ interface ErrorMessage extends BaseMessage {
 }
 ```
 
-## 🎯 前端解析建议
+## 🎯 前端解析建议 (简化版)
 
-### 1. 消息处理器示例
+### 1. 简化消息处理器示例
 
 ```typescript
-class StreamMessageProcessor {
+class SimplifiedStreamMessageProcessor {
   private contentBuffer = new Map<string, string>();
-  
+
   processMessage(message: BaseMessage) {
     switch (message.message_type) {
-      case 'step_start':
-        this.showStepStart(message as StepStartMessage);
+      // 核心4个消息类型
+      case 'processing':
+        this.showProcessing(message as ProcessingMessage);
         break;
-        
-      case 'step_progress':
-        this.updateProgress(message as StepProgressMessage);
+
+      case 'content':
+        this.handleContent(message as ContentMessage);
         break;
-        
-      case 'content_streaming':
-        this.handleContentStream(message as ContentStreamingMessage);
+
+      case 'thinking':
+        this.showThinking(message as ThinkingMessage);
         break;
-        
+
+      case 'interrupt':
+        this.handleInterrupt(message as InterruptMessage);
+        break;
+
+      // 保留的特殊类型
       case 'tool_call':
         this.showToolCall(message as ToolCallMessage);
         break;
-        
+
       case 'tool_result':
         this.showToolResult(message as ToolResultMessage);
         break;
-        
-      case 'interrupt_request':
-        this.handleInterrupt(message as InterruptRequestMessage);
-        break;
-        
+
       case 'final_result':
         this.showFinalResult(message as FinalResultMessage);
         break;
-        
+
       case 'error':
         this.showError(message as ErrorMessage);
         break;
-        
+
       default:
         console.log('未处理的消息类型:', message.message_type);
     }
   }
-  
-  private handleContentStream(message: ContentStreamingMessage) {
+
+  private handleContent(message: ContentMessage) {
     const key = `${message.node}_${message.agent || 'main'}`;
     const current = this.contentBuffer.get(key) || '';
     this.contentBuffer.set(key, current + message.content);
-    
+
     // 实时更新UI
     this.updateContentDisplay(key, this.contentBuffer.get(key)!);
   }
-  
-  private handleInterrupt(message: InterruptRequestMessage) {
+
+  private handleInterrupt(message: InterruptMessage) {
     // 显示确认对话框
     const confirmed = confirm(message.content);
-    
+
     // 发送用户响应 (需要通过WebSocket或API发送)
     this.sendInterruptResponse(message.interrupt_id, confirmed);
   }
 }
 ```
 
-### 2. 状态管理建议
+### 2. 简化状态管理建议
 
 ```typescript
-interface AppState {
+interface SimplifiedAppState {
   currentStep: string;
   progress: number;
   activeAgents: Set<string>;
   contentSections: Map<string, string>;
   toolCalls: ToolCallMessage[];
-  pendingInterrupts: Map<string, InterruptRequestMessage>;
+  pendingInterrupts: Map<string, InterruptMessage>;
   errors: ErrorMessage[];
   isComplete: boolean;
 }
 
-class StateManager {
-  private state: AppState = {
+class SimplifiedStateManager {
+  private state: SimplifiedAppState = {
     currentStep: '',
     progress: 0,
     activeAgents: new Set(),
@@ -497,27 +430,38 @@ class StateManager {
     errors: [],
     isComplete: false
   };
-  
+
   updateFromMessage(message: BaseMessage) {
     switch (message.message_type) {
-      case 'step_start':
-        this.state.currentStep = message.content;
+      // 简化的消息类型处理
+      case 'processing':
+        const processingMsg = message as ProcessingMessage;
+        this.state.currentStep = processingMsg.content;
+        if (processingMsg.progress !== undefined) {
+          this.state.progress = processingMsg.progress;
+        }
         break;
-        
-      case 'step_progress':
-        const progressMsg = message as StepProgressMessage;
-        this.state.progress = progressMsg.progress;
-        break;
-        
-      case 'content_streaming':
-        const contentMsg = message as ContentStreamingMessage;
+
+      case 'content':
+        const contentMsg = message as ContentMessage;
         if (contentMsg.agent) {
           this.state.activeAgents.add(contentMsg.agent);
         }
         break;
-        
+
+      case 'interrupt':
+        const interruptMsg = message as InterruptMessage;
+        if (interruptMsg.interrupt_id) {
+          this.state.pendingInterrupts.set(interruptMsg.interrupt_id, interruptMsg);
+        }
+        break;
+
       case 'final_result':
         this.state.isComplete = true;
+        break;
+
+      case 'error':
+        this.state.errors.push(message as ErrorMessage);
         break;
     }
   }
@@ -567,6 +511,55 @@ function InterruptDialog({ interrupt, onResponse }: {
     </div>
   );
 }
+```
+
+## 🚀 简化API使用指南
+
+### 基本使用模式
+
+```python
+from writer import create_workflow_processor
+
+# 创建处理器
+processor = create_workflow_processor("my_node", "my_agent")
+
+# 使用4个核心方法
+processor.writer.processing("开始处理")        # 进度处理
+processor.writer.content("生成的内容")          # 内容输出
+processor.writer.thinking("正在思考...")       # 思考过程
+processor.writer.interrupt("等待确认")         # 中断处理
+```
+
+### 进度计算示例
+
+```python
+# 自动进度计算
+graph_nodes = ["outline", "research", "writing", "integration"]
+processor.writer.processing("当前步骤", graph_nodes=graph_nodes)
+
+# 手动进度 (如果不传graph_nodes，默认50%)
+processor.writer.processing("处理中")  # 自动返回50%进度
+```
+
+### 兼容性说明
+
+```python
+# ✅ 新的简化API (推荐)
+processor.writer.processing("消息")
+processor.writer.content("内容")
+processor.writer.thinking("思考")
+processor.writer.interrupt("中断")
+
+# ❌ 旧API (已删除，不再支持)
+# processor.writer.step_start("开始")
+# processor.writer.step_progress("进度", 50)
+# processor.writer.step_complete("完成")
+# processor.writer.content_streaming("流式内容")
+# processor.writer.content_complete("内容完成")
+# processor.writer.reasoning("推理")
+# processor.writer.planning("规划")
+# processor.writer.interrupt_request("请求")
+# processor.writer.interrupt_waiting("等待")
 ```
 
 ## ⚙️ 配置控制

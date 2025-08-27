@@ -96,7 +96,7 @@ class FlatDataProcessor:
                 'duration': round(step_duration, 2)
             })
             
-        elif message_type == 'content_streaming':
+        elif message_type == 'content':
             chunk_index = metadata.get('chunk_index', 0)
             
             flat_data.update({
@@ -144,37 +144,32 @@ class FlatDataProcessor:
         return content.strip()
 
 class MessageType(Enum):
-    """Agent工作流程消息类型枚举"""
-    # 步骤状态 - 当前在做什么
-    STEP_START = "step_start"
-    STEP_PROGRESS = "step_progress"
-    STEP_COMPLETE = "step_complete"
+    """简化的消息类型枚举 - 核心类型"""
+    # 1. 进度相关 - 节点执行状态（支持百分比）
+    PROCESSING = "processing"
 
-    # 工具使用 - Agent使用工具的过程
-    TOOL_CALL = "tool_call"
-    TOOL_RESULT = "tool_result"
+    # 2. 内容相关 - 实际输出内容
+    CONTENT = "content"
 
-    # 思考过程 - Agent的推理
+    # 3. 思考相关 - AI推理过程（包含planning）
     THINKING = "thinking"
-    REASONING = "reasoning"
 
-    # 内容输出 - 实际产出
-    CONTENT_STREAMING = "content_streaming"
-    CONTENT_COMPLETE = "content_complete"
-
-    # 中断处理 - 用户交互
-    INTERRUPT_REQUEST = "interrupt_request"
+    # 4. 中断相关 - 用户交互
+    INTERRUPT = "interrupt"
     INTERRUPT_RESPONSE = "interrupt_response"
-    INTERRUPT_WAITING = "interrupt_waiting"
     INTERRUPT_RESOLVED = "interrupt_resolved"
 
-    # 结果状态
+    # 保留的特殊类型
+    TOOL_CALL = "tool_call"
+    TOOL_RESULT = "tool_result"
     FINAL_RESULT = "final_result"
     ERROR = "error"
 
+
+
 class StreamWriter:
-    """标准化流式输出Writer - 扁平化数据版本"""
-    
+    """标准化流式输出Writer - 简化消息类型版本"""
+
     def __init__(self, node_name: str = "", agent_name: str = "", custom_templates: Optional[Dict[str, str]] = None, config: Optional[WriterConfig] = None):
         self.node_name = node_name
         self.agent_name = agent_name
@@ -195,35 +190,70 @@ class StreamWriter:
             return get_stream_writer()
         except Exception:
             return lambda _: None
+
+    def _calculate_progress_percentage(self, graph_nodes: List[str] = None) -> int:
+        """
+        根据当前节点计算进度百分比
+
+        Args:
+            graph_nodes: 图的节点列表，如果不提供则返回默认进度
+
+        Returns:
+            进度百分比 (0-100)
+        """
+        try:
+            if graph_nodes and self.node_name in graph_nodes:
+                node_index = graph_nodes.index(self.node_name)
+                total_nodes = len(graph_nodes)
+
+                # 基础进度：当前节点在总节点中的位置
+                base_progress = (node_index / total_nodes) * 100
+
+                # 节点内进度（假设节点执行到一半）
+                node_progress = (100 / total_nodes) * 0.5
+
+                return int(base_progress + node_progress)
+
+            # 子图节点或未知节点，返回默认进度
+            return 50
+
+        except Exception:
+            return 50
     
-    def _send_message(self, msg_type: MessageType, content: str, **kwargs):
-        """发送扁平化格式消息 - 支持配置控制"""
+    def _send_message(self, msg_type: MessageType, content: str, subtype: str = None, **kwargs):
+        """发送简化格式消息 - 支持子类型和进度计算"""
         # 检查消息类型是否应该被处理
         if not self.config.should_process_message_type(msg_type.value):
             return
-        
-        # 构建扁平化消息
+
+        # 构建简化消息
         message = {
             "message_type": msg_type.value,
             "content": content,
             "node": self.node_name,
-            "timestamp": time.time(),
-            "duration": round(time.time() - self.step_start_time, 2)
+            "timestamp": time.time()
         }
-        
+
+        # 添加子类型
+        if subtype:
+            message["subtype"] = subtype
+
+        # 为processing类型自动计算进度百分比
+        if msg_type == MessageType.PROCESSING and subtype:
+            message["progress"] = self._calculate_progress_percentage(subtype)
+
         # 根据配置决定是否添加元数据
         if self.config.should_show_timing():
-            message["timestamp"] = time.time()
             message["duration"] = round(time.time() - self.step_start_time, 2)
-        
+
         # 添加特定字段
         for key, value in kwargs.items():
             if key not in message:  # 避免覆盖核心字段
                 message[key] = value
-        
+
         # 根据流式配置决定如何发送
         if self.config.is_stream_enabled():
-            self.writer(("custom", message))  # 使用正确的tuple格式
+            self.writer(("custom", message))
         else:
             self.message_buffer.append(message)
             if len(self.message_buffer) >= self.config.get_batch_size():
@@ -235,34 +265,33 @@ class StreamWriter:
             self.writer(("custom", message))  # 修复：使用正确的tuple格式
         self.message_buffer.clear()
     
-    # 基础步骤方法
-    def step_start(self, description: str):
-        """步骤开始 - 支持节点级别流式控制"""
+    # ============================================================================
+    # 新的简化方法 - 4个核心消息类型
+    # ============================================================================
+
+    # 核心4个方法 - 对应4个消息类型
+    def processing(self, message: str, graph_nodes: List[str] = None, **kwargs):
+        """进度处理 - 支持百分比计算"""
         self.step_start_time = time.time()
-        # 检查当前节点是否启用流式输出
         if self.config.is_node_streaming_enabled(self.node_name):
-            self._send_message(MessageType.STEP_START, description)
-    
-    def step_progress(self, status: str, progress: int, **kwargs):
-        """步骤进度 - 支持节点级别流式控制"""
-        # 检查当前节点是否启用流式输出
+            progress = self._calculate_progress_percentage(graph_nodes)
+            self._send_message(MessageType.PROCESSING, message, progress=progress, **kwargs)
+
+    def content(self, content: str, **kwargs):
+        """内容输出"""
         if self.config.is_node_streaming_enabled(self.node_name):
-            self._send_message(MessageType.STEP_PROGRESS, status, progress=progress, **kwargs)
-    
-    def step_complete(self, summary: str, **kwargs):
-        """步骤完成 - 支持节点级别流式控制"""
-        calculated_duration = time.time() - self.step_start_time
-        # 如果用户没有提供duration，使用计算的duration
-        if "duration" not in kwargs:
-            kwargs["duration"] = calculated_duration
-        
-        # 检查当前节点是否启用流式输出
+            self._send_message(MessageType.CONTENT, content, **kwargs)
+
+    def thinking(self, thought: str, **kwargs):
+        """思考过程（包含planning）"""
         if self.config.is_node_streaming_enabled(self.node_name):
-            # 流式模式：发送step_complete消息
-            self._send_message(MessageType.STEP_COMPLETE, summary, **kwargs)
-        else:
-            # 非流式模式：发送汇总结果消息
-            self._send_aggregated_result(summary, **kwargs)
+            self._send_message(MessageType.THINKING, thought, **kwargs)
+
+    def interrupt(self, description: str, **kwargs):
+        """中断处理"""
+        self._send_message(MessageType.INTERRUPT, description, **kwargs)
+
+
     
     def _send_aggregated_result(self, summary: str, **kwargs):
         """发送节点汇总结果 - 用于非流式节点"""
@@ -282,32 +311,7 @@ class StreamWriter:
         
         self.writer(message)
     
-    # 思考过程方法
-    def thinking(self, thought: str):
-        """Agent思考过程"""
-        self._send_message(MessageType.THINKING, thought)
-    
-    def reasoning(self, reasoning: str, **kwargs):
-        """Agent推理分析"""
-        self._send_message(MessageType.REASONING, reasoning, **kwargs)
-    
-    # 内容输出方法 - 扁平化版本
-    def content_streaming(self, content_chunk: str, chunk_index: int = 0):
-        """流式内容输出"""
-        self._send_message(
-            MessageType.CONTENT_STREAMING,
-            content_chunk,
-            length=len(content_chunk),
-            chunk_index=chunk_index
-        )
-    
-    def content_complete(self, content_summary: str, **kwargs):
-        """内容输出完成"""
-        self._send_message(
-            MessageType.CONTENT_COMPLETE,
-            content_summary,
-            **kwargs
-        )
+
     
     # 工具相关方法 - 扁平化版本
     def tool_call(self, tool_name: str, tool_args: Dict[str, Any], custom_content: Optional[str] = None):
@@ -350,26 +354,7 @@ class StreamWriter:
         """错误信息"""
         self._send_message(MessageType.ERROR, error_msg, error_type=error_type)
 
-    # 中断处理方法
-    def interrupt_request(self, action: str, args: dict, description: str, interrupt_id: Optional[str] = None):
-        """发送中断请求 - 需要用户确认的操作"""
-        self._send_message(
-            MessageType.INTERRUPT_REQUEST,
-            description,
-            action=action,
-            args=args,
-            interrupt_id=interrupt_id,
-            requires_approval=True
-        )
 
-    def interrupt_waiting(self, description: str, interrupt_id: Optional[str] = None):
-        """等待用户响应中断"""
-        self._send_message(
-            MessageType.INTERRUPT_WAITING,
-            description,
-            interrupt_id=interrupt_id,
-            status="waiting"
-        )
 
     def interrupt_response(self, response: str, approved: bool, interrupt_id: Optional[str] = None):
         """用户对中断的响应"""
@@ -542,7 +527,7 @@ class AgentWorkflowProcessor:
 
         # 直接输出扁平化数据，不再重复处理
         # 这是最简洁的方式 - 扁平数据直接传给前端
-        if message_type in ['tool_call', 'tool_result', 'content_streaming', 'thinking', 'reasoning']:
+        if message_type in ['tool_call', 'tool_result', 'content', 'thinking', 'reasoning']:
             # 数据已经是扁平格式，可以直接使用
             pass
 
@@ -676,8 +661,8 @@ class AgentWorkflowProcessor:
                     if hasattr(message, 'content') and message.content:
                         content = str(message.content)
                         if content and content.strip():
-                            # 发送带agent信息的content_streaming消息
-                            self._send_agent_content_streaming(content, agent_name, agent_hierarchy)
+                            # 发送带agent信息的content消息
+                            self._send_agent_content(content, agent_name, agent_hierarchy)
                             # 对于AIMessageChunk，不再继续调用_process_message_chunk避免重复
                             return {"chunk_count": self.chunk_count, "current_step": self.current_step}
 
@@ -692,14 +677,14 @@ class AgentWorkflowProcessor:
 
         return {"chunk_count": self.chunk_count, "current_step": self.current_step}
 
-    def _send_agent_content_streaming(self, content: str, agent_name: str, agent_hierarchy: Optional[List[str]] = None):
-        """发送带agent信息的content_streaming消息"""
+    def _send_agent_content(self, content: str, agent_name: str, agent_hierarchy: Optional[List[str]] = None):
+        """发送带agent信息的content消息"""
         # 检查是否应该处理该消息类型
-        if not self.config.should_process_message_type("content_streaming"):
+        if not self.config.should_process_message_type("content"):
             return
 
         message = {
-            "message_type": "content_streaming",
+            "message_type": "content",
             "content": content,
             "node": self.writer.node_name,
             "agent": agent_name,  # 最具体的agent
@@ -832,7 +817,7 @@ class AgentWorkflowProcessor:
         # 只传递用户关心的工作流程消息
         if message_type in ["step_start", "step_progress", "step_complete", 
                            "tool_call", "tool_result", "thinking", "reasoning",
-                           "content_streaming", "content_complete", "final_result"]:
+                           "content", "content_complete", "final_result"]:
             
             content = custom_data.get("content", "")
             
@@ -842,16 +827,15 @@ class AgentWorkflowProcessor:
                 metadata = custom_data.get("metadata", {})
                 
                 if message_type == "step_start":
-                    self.writer.step_start(content)
+                    self.writer.processing(content)
                 elif message_type == "step_progress":
-                    progress = metadata.get("progress", 0)
-                    self.writer.step_progress(content, progress, **metadata)
+                    self.writer.processing(content, **metadata)
                 elif message_type == "step_complete":
-                    self.writer.step_complete(content, **metadata)
+                    self.writer.processing(content, **metadata)
                 elif message_type == "thinking":
                     self.writer.thinking(content)
                 elif message_type == "reasoning":
-                    self.writer.reasoning(content, **metadata)
+                    self.writer.thinking(content, **metadata)
                 elif message_type == "tool_call":
                     tool_name = metadata.get("tool_name", "")
                     tool_args = metadata.get("tool_args", {})
@@ -859,10 +843,10 @@ class AgentWorkflowProcessor:
                 elif message_type == "tool_result":
                     tool_name = metadata.get("tool_name", "")
                     self.writer.tool_result(tool_name, content)
-                elif message_type == "content_streaming":
-                    self.writer.content_streaming(content, metadata.get("chunk_index", 0))
+                elif message_type == "content":
+                    self.writer.content(content, chunk_index=metadata.get("chunk_index", 0), **metadata)
                 elif message_type == "content_complete":
-                    self.writer.content_complete(content, **metadata)
+                    self.writer.content(content, **metadata)
                 elif message_type == "final_result":
                     execution_summary = metadata.get("execution_summary", {})
                     self.writer.final_result(content, execution_summary)
@@ -904,14 +888,14 @@ class AgentWorkflowProcessor:
                 if msg_type == "AIMessageChunk":
                     # 流式内容片段
                     if content and content.strip():
-                        self.writer.content_streaming(content)
+                        self.writer.content(content)
                 else:
                     # 完整的AI消息
                     if len(content) > 300:
                         preview = content[:500] + "..." if len(content) > 500 else content
-                        self.writer.content_streaming(preview)
+                        self.writer.content(preview)
                     elif len(content) > 50:
-                        self.writer.reasoning(content)
+                        self.writer.thinking(content)
                     
         elif msg_type == "ToolMessage":
             # 检测工具结果 - 使用统一处理方法
@@ -964,7 +948,7 @@ class AgentWorkflowProcessor:
                             word_count = section.get("word_count", 0)
                             if title not in [s.get("title") for s in self.sections_completed]:
                                 self.sections_completed.append(section)
-                                self.writer.content_complete(
+                                self.writer.content(
                                     f"完成章节: {title}",
                                     word_count=word_count,
                                     section_title=title
@@ -979,9 +963,8 @@ class AgentWorkflowProcessor:
                             title = research["title"]
                             if title not in [r.get("title") for r in self.research_findings]:
                                 self.research_findings.append(research)
-                                self.writer.step_progress(
+                                self.writer.processing(
                                     f"发现研究资料: {title}",
-                                    progress=0,  # 修复progress=None的问题
                                     research_title=title
                                 )
             
@@ -1026,13 +1009,13 @@ class AgentWorkflowProcessor:
                 if msg_type == "AIMessageChunk":
                     # 流式内容片段 - 直接显示
                     if content and content.strip():
-                        self.writer.content_streaming(content)
+                        self.writer.content(content)
                 else:
                     # 完整的AI消息
                     if len(content) > 300:
-                        self.writer.content_streaming(content[:500] + "..." if len(content) > 500 else content)
+                        self.writer.content(content[:500] + "..." if len(content) > 500 else content)
                     elif len(content) > 50:
-                        self.writer.reasoning(content)
+                        self.writer.thinking(content)
                     
         elif msg_type == "ToolMessage":
             # 检测工具结果 - 展示工具返回的内容
@@ -1082,13 +1065,13 @@ class AgentWorkflowProcessor:
                 if msg_type == "AIMessageChunk":
                     # 流式内容片段 - 直接显示
                     if content and content.strip():
-                        self._send_agent_message("content_streaming", content, agent_name, 
+                        self._send_agent_message("content", content, agent_name, 
                                                length=len(content), chunk_index=0)
                 else:
                     # 完整的AI消息
                     if len(content) > 300:
                         preview_content = content[:500] + "..." if len(content) > 500 else content
-                        self._send_agent_message("content_streaming", preview_content, agent_name,
+                        self._send_agent_message("content", preview_content, agent_name,
                                                length=len(content), chunk_index=0)
                     elif len(content) > 50:
                         self._send_agent_message("reasoning", content, agent_name)
@@ -1159,10 +1142,7 @@ class InterruptHandler:
         }
 
         # 发送中断请求消息
-        self.writer.interrupt_request(action, args, description, interrupt_id)
-
-        # 发送等待消息
-        self.writer.interrupt_waiting(f"等待用户确认: {description}", interrupt_id)
+        self.writer.interrupt(description, action=action, args=args, interrupt_id=interrupt_id)
 
     def handle_user_response(self, interrupt_id: str, response: str, approved: bool):
         """处理用户响应"""
@@ -1250,14 +1230,14 @@ class AgentStreamCollector:
                             self.tools_used.append(tool_name)
                     
                     # 如果是内容流，累积响应
-                    elif flat_data.get('message_type') == 'content_streaming':
+                    elif flat_data.get('message_type') == 'content':
                         content = flat_data.get('content', '')
                         if content:
                             self.full_response += content
                 
             # 处理完成
             if self.full_response:
-                self.writer.content_complete(
+                self.writer.processing(
                     f"{agent_name}任务完成",
                     word_count=len(self.full_response.split()),
                     tools_used=self.tools_used,

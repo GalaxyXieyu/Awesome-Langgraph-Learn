@@ -119,15 +119,14 @@ async def report_generation(state: DeepResearchState) -> DeepResearchState:
     """
     # 创建工作流程处理器 - 不使用模板，保持简洁
     processor = create_workflow_processor("intelligent_research", "深度研究报告生成")
-    processor.writer.step_start("开始深度研究报告生成")
-    
+    processor.writer.processing("开始深度研究报告生成")
+
     # 获取子图实例
     subgraph = get_intelligent_research_subgraph()
     subgraph_input = create_update_subgraph_state(state)
-    
-    processor.writer.step_progress(
-        "准备研究计划", 
-        10, 
+
+    processor.writer.processing(
+        "准备研究计划",
         sections_count=len(subgraph_input.get("sections", []))
     )
     
@@ -245,7 +244,7 @@ async def report_generation(state: DeepResearchState) -> DeepResearchState:
             }
         }
         
-        processor.writer.step_complete(
+        processor.writer.processing(
             "部分内容生成完成",
             sections_count=len(updated_sections),
             is_partial=True
@@ -288,7 +287,7 @@ async def intelligent_section_processing_node(state: DeepResearchState, config=N
     """
     # 使用扁平化Writer - 不使用模板，保持简洁
     writer = create_stream_writer("intelligent_section_processing", "智能章节处理")
-    writer.step_start("开始智能研究处理（使用update子图）")
+    writer.processing("开始智能研究处理（使用update子图）")
 
     try:
         outline = state.get("outline", {})
@@ -298,14 +297,13 @@ async def intelligent_section_processing_node(state: DeepResearchState, config=N
             writer.error("没有可用的章节信息", "NoSectionsError")
             return state
 
-        writer.step_progress(
+        writer.processing(
             f"准备使用智能Supervisor处理 {len(sections)} 个章节",
-            10,
             total_sections=len(sections)
         )
 
         # 调用update子图进行整体处理
-        writer.step_progress("启动智能研究子图", 20)
+        writer.processing("启动智能研究子图")
 
         # 直接调用子图（按照官方文档的方式）
         updated_state = await call_intelligent_research_subgraph(state)
@@ -315,7 +313,7 @@ async def intelligent_section_processing_node(state: DeepResearchState, config=N
             completed_sections = updated_state.get("sections", [])
             total_words = updated_state.get("performance_metrics", {}).get("total_words", 0)
 
-            writer.step_complete(
+            writer.processing(
                 "智能研究完成",
                 completed_sections=len(completed_sections),
                 total_sections=len(sections),
@@ -325,7 +323,7 @@ async def intelligent_section_processing_node(state: DeepResearchState, config=N
             logger.info(f"智能研究完成: {len(completed_sections)} 个章节, 总字数: {total_words}")
             return updated_state
         else:
-            writer.step_progress("子图处理未完成，返回原状态", 50)
+            writer.processing("子图处理未完成，返回原状态")
             logger.warning("子图处理未完成")
             return state
 
@@ -344,8 +342,8 @@ async def outline_generation(state: DeepResearchState, config=None) -> DeepResea
     """大纲生成节点 - 支持流式输出汇总"""
     # 使用扁平化处理器 - 不使用模板，保持简洁
     processor = create_workflow_processor("outline_generation", "大纲生成器")
-    processor.writer.step_start("开始生成深度研究大纲")
-    
+    processor.writer.processing("开始生成深度研究大纲")
+
     try:
         start_time = time.time()
         llm = create_llm()
@@ -385,15 +383,14 @@ async def outline_generation(state: DeepResearchState, config=None) -> DeepResea
             "format_instructions": parser.get_format_instructions()
         }
         
-        processor.writer.step_progress("正在生成专业大纲...", 30)
-        
+        processor.writer.processing("正在生成专业大纲...")
+
         # 创建LLM链并流式执行
         llm_chain = outline_prompt | llm | parser
-        
+
         outline_data = None
         chunk_count = 0
         current_outline_display = ""
-        raw_chunks_content = ""  # 🔥 只累计原始LLM输出的content
         
         async for chunk in llm_chain.astream(input_data, config=config):
             outline_data = chunk
@@ -414,18 +411,16 @@ async def outline_generation(state: DeepResearchState, config=None) -> DeepResea
                     if len(chunk.sections) > 3:
                         current_outline_display += f"  ... 还有{len(chunk.sections)-3}个章节"
                 
-                processor.writer.step_progress(
+                processor.writer.content(
                     str(chunk),
-                    min(70, 30 + (chunk_count // 5) * 10),
                     current_outline=current_outline_display,
                     chunk_count=chunk_count
                 )
-                
+
                 # 如果大纲基本完整，提前显示
                 if hasattr(chunk, 'title') and hasattr(chunk, 'sections') and len(chunk.sections) >= 3:
-                    processor.writer.step_progress(
+                    processor.writer.processing(
                         "大纲结构已生成，正在完善细节...",
-                        85,
                         partial_outline=chunk,
                         streaming_content=current_outline_display
                     )
@@ -454,7 +449,7 @@ async def outline_generation(state: DeepResearchState, config=None) -> DeepResea
             status="completed"
         )
         
-        processor.writer.step_complete(
+        processor.writer.processing(
             "深度研究大纲生成完成",
             sections_count=len(outline_dict.get("sections", [])),
             execution_time=execution_time,
@@ -508,19 +503,19 @@ def create_interaction_node_legacy(interaction_type: InteractionType):
         """通用交互确认节点 - 统一中断处理格式"""
         # 使用扁平化处理器
         processor = create_workflow_processor(f"interaction_{interaction_type.value}", f"{interaction_type.value}_交互")
-        processor.writer.step_start(f"开始{interaction_type.value}确认")
+        processor.writer.processing(f"开始{interaction_type.value}确认")
 
         interaction_config = get_interaction_config(interaction_type)
         mode = state["mode"]
 
         # Copilot模式自动通过
         if mode == ReportMode.COPILOT:
-            processor.writer.step_progress("Copilot模式自动通过", 100)
+            processor.writer.processing("Copilot模式自动通过")
 
             state["approval_status"][interaction_type.value] = True
             state["user_feedback"][interaction_type.value] = {"approved": True, "auto": True}
 
-            processor.writer.step_complete(f"Copilot模式自动通过", auto_approved=True)
+            processor.writer.processing(f"Copilot模式自动通过", auto_approved=True)
 
             state["messages"] = state["messages"] + [
                 AIMessage(content=f"🤖 Copilot模式：{interaction_config['copilot_message']}")
@@ -529,13 +524,10 @@ def create_interaction_node_legacy(interaction_type: InteractionType):
             return state
 
         # Interactive模式：使用统一的中断机制
-        processor.writer.step_progress("准备用户确认...", 30)
+        processor.writer.processing("准备用户确认...")
 
         # 构建中断请求，格式与工具包装器一致
         message_content = format_interaction_message(state, interaction_type, interaction_config)
-
-        from langgraph.prebuilt.interrupt import HumanInterrupt
-        from langgraph import types
 
         # 创建标准化的中断请求
         request: HumanInterrupt = {
@@ -556,12 +548,12 @@ def create_interaction_node_legacy(interaction_type: InteractionType):
             "description": f"请确认{interaction_config['title']}：\n\n{message_content}\n\n可选操作：\n- 输入 'yes' 确认通过\n- 输入 'no' 拒绝\n- 输入 'response' 提供自定义反馈",
         }
 
-        processor.writer.step_progress("等待用户确认...", 50)
+        processor.writer.processing("等待用户确认...")
 
         # 调用统一的中断函数
         response = types.interrupt(request)
 
-        processor.writer.step_progress("处理用户响应...", 80)
+        processor.writer.processing("处理用户响应...")
 
         # 标准化响应处理
         if response["type"] == "accept":
@@ -599,7 +591,7 @@ def create_interaction_node_legacy(interaction_type: InteractionType):
         # 添加确认消息
         state["messages"] = state["messages"] + [AIMessage(content=result_message)]
 
-        processor.writer.step_complete(
+        processor.writer.processing(
             result_message,
             approved=approved,
             user_feedback=user_feedback,
@@ -734,7 +726,7 @@ _outline_confirmation_base_node = create_confirmation_node(
     get_data_func=get_outline_data
 )
 
-async def outline_confirmation_node(state: DeepResearchState, config=None) -> DeepResearchState:
+async def outline_confirmation(state: DeepResearchState, config=None) -> DeepResearchState:
     """带有自定义处理的大纲确认节点"""
     # 调用基础的确认节点
     result_state = await _outline_confirmation_base_node(state, config)
@@ -761,7 +753,7 @@ def route_after_outline_confirmation(state: DeepResearchState) -> str:
         return "outline_generation"
 
     # 确认通过，进入内容创建
-    return "content_creation"
+    return "report_generation"
 
 # ============================================================================
 # 图构建函数
@@ -773,10 +765,8 @@ def create_deep_research_graph():
 
     # 添加简化的核心节点 - 集成智能章节研究子图
     workflow.add_node("outline_generation", outline_generation)
-    workflow.add_node("outline_confirmation", outline_confirmation_node)
-    # 直接使用子图调用函数作为节点（按照官方文档方式）
+    workflow.add_node("outline_confirmation", outline_confirmation)
     workflow.add_node("report_generation", report_generation)
-    
     # 设置简化的流程：大纲生成 → 大纲确认 → 内容创建
     workflow.add_edge(START, "outline_generation")
     workflow.add_edge("outline_generation", "outline_confirmation")
@@ -787,10 +777,10 @@ def create_deep_research_graph():
         route_after_outline_confirmation,
         {
             "outline_generation": "outline_generation",
-            "content_creation": "content_creation"
+            "report_generation": "report_generation"
         }
     )
     
-    workflow.add_edge("content_creation", END)
+    workflow.add_edge("report_generation", END)
     
     return workflow

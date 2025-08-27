@@ -42,21 +42,21 @@ def create_interrupt_node(
         """统一的中断处理节点"""
         # 创建处理器
         processor = create_workflow_processor(node_name, f"{node_name}_中断处理")
-        processor.writer.step_start(f"开始{node_name}处理")
+        processor.writer.processing(f"开始{node_name}处理")
         
         start_time = time.time()
         mode = state.get("mode", "interactive")
         
         # Copilot模式处理
         if mode == "copilot" and auto_approve_in_copilot:
-            processor.writer.step_progress("Copilot模式自动通过", 100)
-            
+            processor.writer.processing("Copilot模式自动通过")
+
             # 如果有自定义响应处理函数，调用它
             if process_response_func:
                 result = process_response_func(state, {"type": "auto_approve", "approved": True})
                 state.update(result)
-            
-            processor.writer.step_complete("Copilot模式自动通过", auto_approved=True)
+
+            processor.writer.processing("Copilot模式自动通过", auto_approved=True)
             
             # 添加自动通过消息
             if "messages" in state:
@@ -67,7 +67,7 @@ def create_interrupt_node(
             return state
         
         # Interactive模式：使用统一的中断机制
-        processor.writer.step_progress("准备用户确认...", 30)
+        processor.writer.processing("准备用户确认...")
         
         # 获取中断数据
         try:
@@ -98,10 +98,10 @@ def create_interrupt_node(
                           "\n- 输入 'response' 提供自定义反馈",
         }
         
-        processor.writer.step_progress("等待用户确认...", 50)
+        processor.writer.processing("等待用户确认...")
 
         # 在中断前发送明确的中断消息
-        processor.writer.step_complete(
+        processor.writer.interrupt(
             f"等待用户确认",
             message_type="interrupt_request",
             interrupt_content=formatted_description,
@@ -121,7 +121,7 @@ def create_interrupt_node(
         response = types.interrupt(request)
 
         # 注意：下面的代码在中断时不会执行，只有在恢复执行时才会执行
-        processor.writer.step_progress("处理用户响应...", 80)
+        processor.writer.processing("处理用户响应...")
         
         # 标准化响应处理
         if response["type"] == "accept":
@@ -169,7 +169,7 @@ def create_interrupt_node(
         # 记录执行时间
         execution_time = time.time() - start_time
         
-        processor.writer.step_complete(
+        processor.writer.processing(
             result_message,
             approved=approved,
             response_data=result_data,
