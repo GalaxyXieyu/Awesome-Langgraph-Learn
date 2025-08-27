@@ -38,6 +38,9 @@ from subgraphs.deepresearch.graph import (
 # 导入标准化流式输出系统
 from writer.core import create_stream_writer, create_workflow_processor
 
+# 导入通用中断节点
+from common import create_confirmation_node
+
 # 配置日志
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -108,7 +111,7 @@ def create_update_subgraph_state(state: DeepResearchState) -> Dict[str, Any]:
 
     return subgraph_state
 
-async def call_intelligent_research_subgraph(state: DeepResearchState) -> DeepResearchState:
+async def report_generation(state: DeepResearchState) -> DeepResearchState:
     """
     调用智能研究子图 - 统一流式输出
 
@@ -337,7 +340,7 @@ async def intelligent_section_processing_node(state: DeepResearchState, config=N
 # 大纲生成节点
 # ============================================================================
 
-async def outline_generation_node(state: DeepResearchState, config=None) -> DeepResearchState:
+async def outline_generation(state: DeepResearchState, config=None) -> DeepResearchState:
     """大纲生成节点 - 支持流式输出汇总"""
     # 使用扁平化处理器 - 不使用模板，保持简洁
     processor = create_workflow_processor("outline_generation", "大纲生成器")
@@ -395,14 +398,7 @@ async def outline_generation_node(state: DeepResearchState, config=None) -> Deep
         async for chunk in llm_chain.astream(input_data, config=config):
             outline_data = chunk
             chunk_count += 1
-        
-            if hasattr(chunk, 'content'):
-                raw_chunks_content = chunk.content
-            elif isinstance(chunk, str):
-                raw_chunks_content = chunk
-            elif hasattr(chunk, '__str__'):
-                raw_chunks_content = str(chunk)
-            
+
             # 实时显示大纲内容（每5个chunk更新一次以减少频率）
             if chunk_count % 5 == 0:
                 # 构建当前大纲的显示文本
@@ -420,7 +416,7 @@ async def outline_generation_node(state: DeepResearchState, config=None) -> Deep
                 
                 processor.writer.step_progress(
                     str(chunk),
-                    min(90, 30 + (chunk_count // 5) * 10),
+                    min(70, 30 + (chunk_count // 5) * 10),
                     current_outline=current_outline_display,
                     chunk_count=chunk_count
                 )
@@ -449,35 +445,12 @@ async def outline_generation_node(state: DeepResearchState, config=None) -> Deep
         state["current_step"] = "outline_generated"
         state["execution_path"] = state["execution_path"] + ["outline_generation"]
         
-        # 创建大纲展示消息
-        sections_text = "\n".join([
-            f"  {i+1}. {section['title']}\n     {section['description']}\n     关键词: {', '.join(section['research_queries'][:3])}"
-            for i, section in enumerate(outline_dict.get("sections", []))
-        ])
-        
-        outline_message = f"""
-        📋 深度研究大纲生成完成：
-        
-        🎯 报告标题：{outline_dict.get('title', '未知')}
-        
-        📝 执行摘要：
-        {outline_dict.get('executive_summary', '无摘要')}
-        
-        📚 研究章节：
-        {sections_text}
-        
-        🔍 研究方法：{outline_dict.get('methodology', '未指定')}
-        📊 预估字数：{outline_dict.get('estimated_length', 0):,}字
-        ⏱️ 生成时间：{execution_time:.2f}秒
-        """
-        
-        state["messages"] = state["messages"] + [AIMessage(content=outline_message)]
         add_node_output(
             state, 
             "outline_generation", 
-            raw_chunks_content,  # 只存储原始累计的content
+            outline_data,  # 只存储原始累计的content
             execution_time=execution_time,
-            word_count=len(raw_chunks_content),
+            word_count=len(outline_data),
             status="completed"
         )
         
@@ -486,7 +459,7 @@ async def outline_generation_node(state: DeepResearchState, config=None) -> Deep
             sections_count=len(outline_dict.get("sections", [])),
             execution_time=execution_time,
             outline_data=outline_dict,
-            display_text=outline_message
+            display_text=outline_data
         )
         
         from writer.config import get_writer_config
@@ -497,11 +470,11 @@ async def outline_generation_node(state: DeepResearchState, config=None) -> Deep
             if writer:
                 aggregated_message = {
                     "message_type": "node_output_complete",
-                    "content": raw_chunks_content,  # 🔥 只发送最原始的累计content
+                    "content": outline_data,  # 🔥 只发送最原始的累计content
                     "node": "outline_generation",
                     "timestamp": time.time(),
                     "duration": execution_time,
-                    "word_count": len(raw_chunks_content)
+                    "word_count": len(outline_data)
                 }
                 writer(aggregated_message)
         return state
@@ -525,71 +498,116 @@ async def outline_generation_node(state: DeepResearchState, config=None) -> Deep
         return state
 
 # ============================================================================
-# 交互确认节点
+# 交互确认节点 - 使用通用中断节点
 # ============================================================================
 
-def create_interaction_node(interaction_type: InteractionType):
-    """创建交互确认节点的工厂函数"""
-    
-    def interaction_node(state: DeepResearchState) -> DeepResearchState:
-        """通用交互确认节点"""
-        # 交互节点 - 不使用模板，保持简洁
+def create_interaction_node_legacy(interaction_type: InteractionType):
+    """创建交互确认节点的工厂函数 - 使用统一的中断机制"""
+
+    async def interaction_node(state: DeepResearchState, config=None) -> DeepResearchState:
+        """通用交互确认节点 - 统一中断处理格式"""
+        # 使用扁平化处理器
         processor = create_workflow_processor(f"interaction_{interaction_type.value}", f"{interaction_type.value}_交互")
-        
+        processor.writer.step_start(f"开始{interaction_type.value}确认")
+
         interaction_config = get_interaction_config(interaction_type)
         mode = state["mode"]
-        
-        processor.writer.step_start(f"等待用户确认: {interaction_config['title']}")
-        
+
         # Copilot模式自动通过
         if mode == ReportMode.COPILOT:
+            processor.writer.step_progress("Copilot模式自动通过", 100)
+
             state["approval_status"][interaction_type.value] = True
             state["user_feedback"][interaction_type.value] = {"approved": True, "auto": True}
-            
+
             processor.writer.step_complete(f"Copilot模式自动通过", auto_approved=True)
-            
+
             state["messages"] = state["messages"] + [
                 AIMessage(content=f"🤖 Copilot模式：{interaction_config['copilot_message']}")
             ]
-            
+
             return state
-        
-        # 交互模式需要用户确认
+
+        # Interactive模式：使用统一的中断机制
+        processor.writer.step_progress("准备用户确认...", 30)
+
+        # 构建中断请求，格式与工具包装器一致
         message_content = format_interaction_message(state, interaction_type, interaction_config)
 
-        
-        # 使用interrupt等待用户输入
-        user_response = interrupt({
-            "message_type": "interrupt",
-            "type": interaction_type.value,
-            "title": interaction_config["title"],
-            "message": message_content,
-            "options": interaction_config["options"],
-            "default": interaction_config.get("default", "continue")
-        })
-        
-        # 处理用户响应
-        approved = user_response.get("approved", True) if isinstance(user_response, dict) else True
+        from langgraph.prebuilt.interrupt import HumanInterrupt
+        from langgraph import types
+
+        # 创建标准化的中断请求
+        request: HumanInterrupt = {
+            "action_request": {
+                "action": f"confirm_{interaction_type.value}",
+                "args": {
+                    "interaction_type": interaction_type.value,
+                    "title": interaction_config["title"],
+                    "message": message_content,
+                    "options": interaction_config["options"]
+                }
+            },
+            "config": {
+                "allow_accept": True,
+                "allow_edit": False,  # 确认节点通常不允许编辑
+                "allow_respond": True
+            },
+            "description": f"请确认{interaction_config['title']}：\n\n{message_content}\n\n可选操作：\n- 输入 'yes' 确认通过\n- 输入 'no' 拒绝\n- 输入 'response' 提供自定义反馈",
+        }
+
+        processor.writer.step_progress("等待用户确认...", 50)
+
+        # 调用统一的中断函数
+        response = types.interrupt(request)
+
+        processor.writer.step_progress("处理用户响应...", 80)
+
+        # 标准化响应处理
+        if response["type"] == "accept":
+            # 用户确认通过
+            approved = True
+            user_feedback = {"approved": True, "type": "accept"}
+            result_message = f"✅ {interaction_config['title']}：确认通过"
+
+        elif response["type"] == "reject":
+            # 用户拒绝
+            approved = False
+            user_feedback = {"approved": False, "type": "reject"}
+            result_message = f"❌ {interaction_config['title']}：被拒绝"
+
+        elif response["type"] == "response":
+            # 用户提供自定义反馈
+            user_feedback_content = response.get("args", "")
+            approved = True  # 默认认为提供反馈就是通过
+            user_feedback = {"approved": True, "type": "response", "content": user_feedback_content}
+            result_message = f"💬 {interaction_config['title']}：用户反馈 - {user_feedback_content}"
+
+        else:
+            # 未知响应类型，默认拒绝
+            approved = False
+            user_feedback = {"approved": False, "type": "unknown", "raw_response": response}
+            result_message = f"❓ {interaction_config['title']}：未知响应，默认拒绝"
+
+        # 更新状态
         state["approval_status"][interaction_type.value] = approved
-        state["user_feedback"][interaction_type.value] = user_response
-        
+        state["user_feedback"][interaction_type.value] = user_feedback
+
         # 记录交互历史
-        add_user_interaction(state, interaction_type.value, user_response)
-        
-        processor.writer.step_complete(
-            "用户确认完成",
-            user_response=user_response,
-            approved=approved
-        )
-        
+        add_user_interaction(state, interaction_type.value, user_feedback)
+
         # 添加确认消息
-        status_emoji = "✅" if approved else "❌"
-        confirmation_message = f"{status_emoji} {interaction_config['title']}：{'确认通过' if approved else '被拒绝'}"
-        
-        state["messages"] = state["messages"] + [AIMessage(content=confirmation_message)]
-        
+        state["messages"] = state["messages"] + [AIMessage(content=result_message)]
+
+        processor.writer.step_complete(
+            result_message,
+            approved=approved,
+            user_feedback=user_feedback,
+            interaction_type=interaction_type.value
+        )
+
         return state
-    
+
     return interaction_node
 
 def get_interaction_config(interaction_type: InteractionType) -> Dict[str, Any]:
@@ -665,18 +683,85 @@ def format_interaction_message(state: DeepResearchState, interaction_type: Inter
     else:
         return f"请确认{config['title']}相关设置"
 
-# 创建交互节点实例
-outline_confirmation_node = create_interaction_node(InteractionType.OUTLINE_CONFIRMATION)
+# ============================================================================
+# 使用通用中断节点创建具体的交互节点
+# ============================================================================
+
+def get_outline_data(state: DeepResearchState) -> Dict[str, Any]:
+    """获取大纲确认所需的数据"""
+    outline = state.get("outline", {})
+    sections_text = "\n".join([
+        f"  {i+1}. {section.get('title', '未知章节')}\n     {section.get('description', '无描述')}"
+        for i, section in enumerate(outline.get("sections", []))
+    ])
+
+    return {
+        "title": outline.get('title', '未知标题'),
+        "executive_summary": outline.get('executive_summary', '无摘要'),
+        "sections_text": sections_text,
+        "methodology": outline.get('methodology', '未指定'),
+        "estimated_length": outline.get('estimated_length', 0),
+        "target_audience": outline.get('target_audience', '未知')
+    }
+
+def process_outline_confirmation(state: DeepResearchState, response_data: Dict[str, Any]) -> DeepResearchState:
+    """处理大纲确认响应"""
+    # 更新确认状态
+    state["approval_status"]["outline_confirmation"] = response_data.get("approved", False)
+    state["user_feedback"]["outline_confirmation"] = response_data
+
+    # 记录交互历史
+    add_user_interaction(state, "outline_confirmation", response_data)
+
+    return state
+
+# 创建大纲确认节点
+_outline_confirmation_base_node = create_confirmation_node(
+    node_name="outline_confirmation",
+    title="大纲确认",
+    message_template="""请确认以下深度研究报告大纲：
+
+    标题：{title}
+
+    摘要：{executive_summary}
+
+    章节结构：
+    {sections_text}
+
+    研究方法：{methodology}
+    预估字数：{estimated_length:,}字
+    目标读者：{target_audience}""",
+    get_data_func=get_outline_data
+)
+
+async def outline_confirmation_node(state: DeepResearchState, config=None) -> DeepResearchState:
+    """带有自定义处理的大纲确认节点"""
+    # 调用基础的确认节点
+    result_state = await _outline_confirmation_base_node(state, config)
+
+    # 应用自定义处理
+    if "confirmations" in result_state and "outline_confirmation" in result_state["confirmations"]:
+        confirmation_data = result_state["confirmations"]["outline_confirmation"]
+        result_state = process_outline_confirmation(result_state, confirmation_data)
+
+    return result_state
 
 # ============================================================================
 # 路由函数
 # ============================================================================
 
 def route_after_outline_confirmation(state: DeepResearchState) -> str:
-    """大纲确认后的路由 - 简化版本"""
-    if not state["approval_status"].get("outline_confirmation", True):
-        return "outline_generation"  # 重新生成大纲
-    return "content_creation"  # 直接进入内容创建（集成了子图）
+    """大纲确认后的路由 - 适配通用中断节点"""
+    # 检查通用中断节点的确认状态
+    confirmations = state.get("confirmations", {})
+    outline_confirmation = confirmations.get("outline_confirmation", {})
+
+    # 如果用户拒绝或没有确认，重新生成大纲
+    if not outline_confirmation.get("approved", True):
+        return "outline_generation"
+
+    # 确认通过，进入内容创建
+    return "content_creation"
 
 # ============================================================================
 # 图构建函数
@@ -687,10 +772,10 @@ def create_deep_research_graph():
     workflow = StateGraph(DeepResearchState)
 
     # 添加简化的核心节点 - 集成智能章节研究子图
-    workflow.add_node("outline_generation", outline_generation_node)
+    workflow.add_node("outline_generation", outline_generation)
     workflow.add_node("outline_confirmation", outline_confirmation_node)
     # 直接使用子图调用函数作为节点（按照官方文档方式）
-    workflow.add_node("content_creation", call_intelligent_research_subgraph)
+    workflow.add_node("report_generation", report_generation)
     
     # 设置简化的流程：大纲生成 → 大纲确认 → 内容创建
     workflow.add_edge(START, "outline_generation")

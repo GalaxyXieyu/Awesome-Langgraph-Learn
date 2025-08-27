@@ -5,12 +5,24 @@
 import os
 import time
 import uuid
+import json
 from typing import List, Dict, Any
 from langchain_core.tools import tool
 from langchain_community.tools.tavily_search import TavilySearchResults
+from langchain_openai import ChatOpenAI
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import JsonOutputParser
 import logging
 
 logger = logging.getLogger(__name__)
+
+# 导入状态类型
+try:
+    from state import ReportOutline
+except ImportError:
+    # 如果导入失败，定义一个简单的类型
+    class ReportOutline:
+        pass
 
 
 @tool
@@ -141,10 +153,113 @@ def research_context(query: str) -> Dict[str, Any]:
         return {"error": f"查询失败: {str(e)}"}
 
 
+def create_llm() -> ChatOpenAI:
+    """创建LLM实例"""
+    return ChatOpenAI(
+        model="qwen2.5-72b-instruct-awq",
+        temperature=0.7,
+        base_url="https://llm.3qiao.vip:23436/v1",
+        api_key="sk-0rnrrSH0OsiaWCiv6b37C1E4E60c4b9394325001Ec19A197",
+    )
+
+
+@tool
+def generate_outline(
+    topic: str,
+    report_type: str = "深度研究报告",
+    target_audience: str = "专业人士",
+    depth_level: str = "深度",
+    target_length: int = 5000
+) -> Dict[str, Any]:
+    """
+    生成深度研究报告大纲工具
+
+    Args:
+        topic: 研究主题
+        report_type: 报告类型
+        target_audience: 目标读者
+        depth_level: 研究深度级别
+        target_length: 目标字数
+
+    Returns:
+        Dict: 包含大纲数据的字典
+    """
+    try:
+        llm = create_llm()
+        parser = JsonOutputParser(pydantic_object=ReportOutline)
+
+        # 构建高级大纲生成提示
+        outline_prompt = ChatPromptTemplate.from_messages([
+            ("system", """你是专业的报告大纲设计专家。请生成详细的深度研究报告大纲。
+
+            要求：
+            1. 大纲符合{report_type}报告的标准结构
+            2. 针对{target_audience}读者群体设计
+            3. 研究深度为{depth_level}级别
+            4. 目标字数约{target_length}字
+            5. 每个章节包含研究查询关键词
+            6. 章节优先级合理分配
+
+            {format_instructions}"""),
+            ("human", """
+            请为以下主题生成专业的深度研究报告大纲：
+
+            研究主题：{topic}
+            报告类型：{report_type}
+            目标读者：{target_audience}
+            深度级别：{depth_level}
+
+            请确保大纲结构完整、逻辑清晰、便于深度研究。
+            """)
+        ])
+
+        input_data = {
+            "topic": topic,
+            "report_type": report_type,
+            "target_audience": target_audience,
+            "depth_level": depth_level,
+            "target_length": target_length,
+            "format_instructions": parser.get_format_instructions()
+        }
+
+        # 创建LLM链并执行
+        llm_chain = outline_prompt | llm | parser
+        outline_data = llm_chain.invoke(input_data)
+
+        # 转换为字典格式
+        if hasattr(outline_data, 'dict'):
+            outline_dict = outline_data.dict()
+        else:
+            outline_dict = dict(outline_data) if outline_data else {}
+
+        # 添加元数据
+        result = {
+            "id": str(uuid.uuid4()),
+            "topic": topic,
+            "outline": outline_dict,
+            "timestamp": time.time(),
+            "success": True
+        }
+
+        logger.info(f"大纲生成成功: {topic}")
+        return result
+
+    except Exception as e:
+        logger.error(f"大纲生成失败: {str(e)}")
+        return {
+            "id": str(uuid.uuid4()),
+            "topic": topic,
+            "error": f"大纲生成失败: {str(e)}",
+            "timestamp": time.time(),
+            "success": False
+        }
+
+
 # 导出工具列表
 RESEARCH_TOOLS = [
     web_search,
     industry_data,
     trend_analysis,
-    research_context
+    research_context,
+    generate_outline
 ]

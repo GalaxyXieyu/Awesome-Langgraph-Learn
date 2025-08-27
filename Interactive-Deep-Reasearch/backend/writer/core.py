@@ -223,7 +223,7 @@ class StreamWriter:
         
         # 根据流式配置决定如何发送
         if self.config.is_stream_enabled():
-            self.writer(message)
+            self.writer(("custom", message))  # 使用正确的tuple格式
         else:
             self.message_buffer.append(message)
             if len(self.message_buffer) >= self.config.get_batch_size():
@@ -232,7 +232,7 @@ class StreamWriter:
     def flush_buffer(self):
         """刷新消息缓冲区"""
         for message in self.message_buffer:
-            self.writer(message)
+            self.writer(("custom", message))  # 修复：使用正确的tuple格式
         self.message_buffer.clear()
     
     # 基础步骤方法
@@ -311,7 +311,6 @@ class StreamWriter:
     
     # 工具相关方法 - 扁平化版本
     def tool_call(self, tool_name: str, tool_args: Dict[str, Any], custom_content: Optional[str] = None):
-        """工具调用 - 简化版本"""
         # 使用自定义内容或简化格式
         if custom_content:
             content = custom_content
@@ -327,7 +326,6 @@ class StreamWriter:
     
     def tool_result(self, tool_name: str, result: str):
         """工具执行结果 - 扁平化版本"""
-        # 清理结果，移除工具名前缀
         clean_result = self.flat_processor._clean_tool_result(result)
         
         self._send_message(
@@ -561,6 +559,26 @@ class AgentWorkflowProcessor:
                         interrupt_obj = interrupt_data[0]
                         return self._process_interrupt_object(interrupt_obj, subgraph_ids)
 
+        # 检查是否是主图的中断格式: ('updates', {'__interrupt__': (Interrupt(...),)})
+        elif isinstance(chunk, tuple) and len(chunk) == 2:
+            chunk_type, chunk_data = chunk
+
+            if chunk_type == 'updates' and isinstance(chunk_data, dict):
+                if '__interrupt__' in chunk_data:
+                    interrupt_data = chunk_data['__interrupt__']
+                    if isinstance(interrupt_data, tuple) and len(interrupt_data) > 0:
+                        interrupt_obj = interrupt_data[0]
+                        # 主图中断，使用空的subgraph_ids
+                        return self._process_interrupt_object(interrupt_obj, ())
+
+        # 检查是否是直接的中断字典格式: {'__interrupt__': (Interrupt(...),)}
+        elif isinstance(chunk, dict) and '__interrupt__' in chunk:
+            interrupt_data = chunk['__interrupt__']
+            if isinstance(interrupt_data, tuple) and len(interrupt_data) > 0:
+                interrupt_obj = interrupt_data[0]
+                # 主图中断，使用空的subgraph_ids
+                return self._process_interrupt_object(interrupt_obj, ())
+
         return None
 
     def _process_interrupt_object(self, interrupt_obj: Any, subgraph_ids: tuple) -> Dict[str, Any]:
@@ -589,11 +607,18 @@ class AgentWorkflowProcessor:
                     # 提取agent信息
                     agent_name = self._extract_agent_name(subgraph_ids)
 
+                    # 如果是主图中断，使用特殊的节点名
+                    if not subgraph_ids:
+                        # 主图中断，从当前节点名获取
+                        node_name = getattr(self, 'current_node', 'main_graph')
+                    else:
+                        node_name = agent_name
+
                     # 发送中断请求消息
                     self._send_agent_message(
                         "interrupt_request",
                         description,
-                        agent_name,
+                        node_name,
                         action=action,
                         args=args,
                         interrupt_id=interrupt_id,
@@ -905,6 +930,15 @@ class AgentWorkflowProcessor:
     
     def _process_content_updates(self, updates_data: Dict[str, Any]):
         """处理内容更新 - 恢复完整逻辑处理子图数据"""
+        # 首先检查是否包含中断信息
+        if '__interrupt__' in updates_data:
+            interrupt_data = updates_data['__interrupt__']
+            if isinstance(interrupt_data, tuple) and len(interrupt_data) > 0:
+                interrupt_obj = interrupt_data[0]
+                # 主图中断，使用空的subgraph_ids
+                self._process_interrupt_object(interrupt_obj, ())
+                return
+
         for node_name, node_data in updates_data.items():
             if not isinstance(node_data, dict):
                 continue

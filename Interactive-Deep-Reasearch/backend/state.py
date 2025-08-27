@@ -155,6 +155,7 @@ class DeepResearchState(TypedDict):
     user_feedback: Dict[str, Any]                # 用户反馈记录
     approval_status: Dict[str, bool]             # 审批状态记录
     interaction_history: List[Dict[str, Any]]    # 交互历史记录
+    confirmations: Dict[str, Dict[str, Any]]     # 通用中断节点确认记录
     
     # ========== 系统状态 ==========
     error_log: List[str]                         # 错误日志
@@ -238,6 +239,7 @@ def create_initial_state(
         "user_feedback": {},
         "approval_status": {},
         "interaction_history": [],
+        "confirmations": {},
         
         # 系统状态
         "error_log": [],

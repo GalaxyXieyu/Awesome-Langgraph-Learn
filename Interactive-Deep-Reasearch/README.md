@@ -1,247 +1,253 @@
-# Interactive Deep Research
+# 🧠 智能报告生成器 (Interactive Deep Research)
 
-> 🔬 智能交互式深度研究系统 - 基于LangGraph的多Agent协作平台
+一个基于 LangGraph 的智能深度研究报告生成系统，支持实时流式输出和交互式确认。
 
 ## ✨ 特性
 
-- 🏗️ **模块化架构** - 清晰的代码组织和职责分离
-- 🤖 **多Agent协作** - 智能监督者、研究者、写作者协同工作
-- ⚡ **流式输出** - 实时响应，支持配置驱动的输出控制
-- 🎛️ **配置驱动** - 简单YAML配置控制所有行为
-- 🔧 **可扩展** - 易于添加新的子图、工具和功能
-- 🔒 **安全配置** - 环境变量管理API密钥，避免硬编码
+### 🎯 核心功能
+- **智能报告生成**: 基于 AI 的深度研究报告自动生成
+- **实时流式展示**: 实时显示 AI 工作过程和生成进度
+- **交互式确认**: 支持工具调用的用户确认和参数编辑
+- **层级化大纲**: 清晰的报告章节结构和进度展示
+- **多种工作模式**: 交互模式、副驾驶模式、引导模式
 
-## 🚀 快速开始
+### 🎨 设计特色
+- **苹果风格 UI**: 现代化的 macOS 风格界面设计
+- **毛玻璃效果**: 优雅的视觉层次和透明度
+- **流畅动画**: 基于 Framer Motion 的微交互
+- **响应式设计**: 适配不同屏幕尺寸
 
-### 1. 环境配置
-
-复制环境变量模板：
-```bash
-cp .env.example .env
-```
-
-编辑 `.env` 文件，填入你的API密钥：
-```bash
-# OpenAI配置
-OPENAI_API_KEY=your_openai_api_key_here
-OPENAI_BASE_URL=https://api.openai.com/v1
-OPENAI_MODEL=gpt-4o-mini
-OPENAI_TEMPERATURE=0.7
-
-# Tavily搜索API配置  
-TAVILY_API_KEY=your_tavily_api_key_here
-```
-
-### 2. 使用示例
-
-```python
-from graph import create_deep_research_graph
-from state import create_simple_state
-from writer.core import create_workflow_processor
-
-# 创建主图
-graph = create_deep_research_graph()
-
-# 创建初始状态
-state = create_simple_state("研究人工智能的发展趋势")
-
-# 创建输出处理器
-processor = create_workflow_processor("main")
-
-# 运行图
-for chunk in graph.stream(state):
-    result = processor.process_chunk(chunk)
-    print(result)
-```
+### 🔧 技术栈
+- **后端**: Python + FastAPI + LangGraph + Celery + Redis
+- **前端**: React + TypeScript + Tailwind CSS + Framer Motion
+- **AI模型**: 支持多种 LLM 集成
+- **实时通信**: Server-Sent Events (SSE)
 
 ## 🏗️ 项目结构
 
 ```
 Interactive-Deep-Research/
-├── core/                    # 🎯 核心模块
-│   ├── graph.py            # 主图定义
-│   └── state.py            # 状态管理
-├── subgraphs/              # 🔄 子图模块
-│   └── intelligent_research/
-├── tools/                  # 🛠️ 工具模块
-│   ├── research/          # 研究工具
-│   ├── writing/           # 写作工具
-│   └── common/            # 通用工具
-├── writer/                 # ✍️ Writer系统
-│   ├── core.py           # 核心逻辑
-│   ├── config.py         # 配置管理
-│   └── config.yaml       # 配置文件
-├── tests/                  # 🧪 测试
-├── examples/               # 📝 示例
-└── docs/                   # 📚 文档
+├── backend/                 # 后端服务
+│   ├── main.py             # FastAPI 主服务
+│   ├── graph.py            # LangGraph 工作流定义
+│   ├── state.py            # 状态管理和数据模型
+│   ├── tools/              # 工具集合
+│   ├── subgraphs/          # 子图定义
+│   └── writer/             # 流式输出核心
+├── frontend/               # 前端界面
+│   ├── src/
+│   │   ├── components/     # React 组件
+│   │   ├── hooks/          # 自定义 Hooks
+│   │   ├── types/          # TypeScript 类型定义
+│   │   ├── utils/          # 工具函数
+│   │   └── App.tsx         # 主应用组件
+│   ├── tailwind.config.js  # Tailwind 配置
+│   └── package.json        # 前端依赖
+└── README.md               # 项目文档
 ```
 
 ## 🚀 快速开始
 
-### 安装依赖
+### 1. 后端启动
 
 ```bash
+# 进入后端目录
+cd backend
+
+# 安装依赖
 pip install -r requirements.txt
+
+# 启动 Redis (必需)
+redis-server
+
+# 启动 Celery Worker
+celery -A main.celery_app worker --loglevel=info
+
+# 启动 FastAPI 服务
+python main.py
+# 或使用 uvicorn
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### 基本使用
+### 2. 前端启动
+
+```bash
+# 进入前端目录
+cd frontend
+
+# 安装依赖
+npm install
+
+# 启动开发服务器
+npm start
+```
+
+### 3. 访问应用
+
+- 前端界面: http://localhost:3000
+- 后端 API: http://localhost:8000
+- API 文档: http://localhost:8000/docs
+
+## 🎮 使用指南
+
+### 创建研究任务
+
+1. **选择工作模式**:
+   - 🤝 **交互模式**: 每个工具调用都需要用户确认
+   - ⚡ **副驾驶模式**: 自动执行所有操作
+   - 🧭 **引导模式**: AI 提供建议但需要确认
+
+2. **输入研究主题**: 例如 "人工智能发展趋势"
+
+3. **配置参数** (可选):
+   - 报告类型、目标读者、章节数量、字数等
+
+4. **开始生成**: 点击"生成报告"按钮
+
+### 交互式确认
+
+当 AI 需要调用工具时，系统会显示确认界面：
+
+- ✅ **允许 (yes)**: 批准工具调用
+- ❌ **拒绝 (no)**: 拒绝工具调用
+- ✏️ **编辑 (edit)**: 修改工具参数后调用
+- ⏭️ **跳过 (response)**: 不调用工具，直接提供反馈
+
+### 实时监控
+
+- 📊 **进度展示**: 实时显示生成进度
+- 💭 **思考过程**: AI 的推理和思考过程
+- 🔧 **工具调用**: 工具使用情况和结果
+- 📖 **大纲更新**: 报告结构的实时构建
+
+## 🔗 API 接口
+
+### 核心接口
+
+```typescript
+// 创建任务
+POST /research/tasks
+{
+  "topic": "研究主题",
+  "mode": "interactive",
+  "max_sections": 3,
+  "target_length": 2000
+}
+
+// 获取任务状态
+GET /research/tasks/{task_id}
+
+// 流式数据 (SSE)
+GET /research/tasks/{task_id}/stream
+
+// 取消任务
+POST /research/tasks/{task_id}/cancel
+```
+
+### 流式消息格式
+
+```typescript
+interface StreamMessage {
+  message_type: 'step_start' | 'step_progress' | 'tool_call' | 'interrupt_request' | ...;
+  content: string;
+  node: string;
+  timestamp: number;
+  // 其他字段根据消息类型变化
+}
+```
+
+## 🛠️ 开发指南
+
+### 自定义工具
+
+在 `backend/tools/` 目录下添加新工具：
 
 ```python
-from core import create_deep_research_graph, create_simple_state
-from writer import create_workflow_processor
+from langchain_core.tools import tool
 
-# 创建主图
-graph = create_deep_research_graph()
-
-# 创建初始状态
-state = create_simple_state("研究人工智能发展趋势")
-
-# 创建输出处理器
-processor = create_workflow_processor("main")
-
-# 运行研究
-for chunk in graph.stream(state):
-    result = processor.process_chunk(chunk)
-    print(result)
+@tool
+def my_custom_tool(query: str) -> str:
+    """自定义工具描述"""
+    # 工具实现
+    return result
 ```
 
-### 配置Writer输出
+### 添加新的消息类型
 
-编辑 `writer/config.yaml`:
+1. 在 `frontend/src/types/index.ts` 中添加类型定义
+2. 在 `StreamMessage.tsx` 中添加渲染逻辑
+3. 在 `useReportGenerator.ts` 中添加处理逻辑
 
-```yaml
-# 只显示核心Agent
-agents:
-  include: ["research", "writing"]
-  exclude: ["intelligent_supervisor"]
+### 自定义样式
 
-# 隐藏思考过程
-messages:
-  exclude: ["reasoning", "thinking"]
+使用 Tailwind CSS 自定义主题：
 
-# 简化输出
-verbosity:
-  level: "normal"
-  show_metadata: false
+```javascript
+// tailwind.config.js
+module.exports = {
+  theme: {
+    extend: {
+      colors: {
+        'apple': {
+          // 自定义颜色
+        }
+      }
+    }
+  }
+}
 ```
 
-## 🛠️ 模块详解
+## 🔧 环境配置
 
-### 核心模块 (core/)
-- `graph.py` - 主工作流图定义
-- `state.py` - 状态管理和数据结构
+### 环境变量
 
-### 子图模块 (subgraphs/)
-- `intelligent_research/` - 智能研究子图，包含多Agent协作逻辑
+**后端** (`.env`):
+```bash
+REDIS_URL=redis://localhost:6379/0
+PG_URL=postgresql://user:pass@localhost/db  # 可选
+OPENAI_API_KEY=your_api_key
+```
 
-### 工具模块 (tools/)
-- `research/` - 搜索、分析、数据获取工具
-- `writing/` - 内容生成、编辑工具
-- `common/` - 通用实用工具
+**前端** (`.env`):
+```bash
+REACT_APP_API_URL=http://localhost:8000
+```
 
-### Writer系统 (writer/)
-- `core.py` - 流式输出核心逻辑
-- `config.py` - YAML配置管理
-- `config.yaml` - 默认配置文件
-
-## 📚 最佳实践
-
-### 构建新的Graph
-
-1. **模块化设计** - 将功能拆分成独立的节点
-2. **状态驱动** - 通过状态变化控制流程
-3. **配置优先** - 所有可变行为都通过配置控制
-4. **测试覆盖** - 为每个节点编写单元测试
-
-### 添加新工具
-
-1. 在 `tools/` 下创建相应分类文件夹
-2. 实现工具函数并添加到 `__init__.py`
-3. 在子图中引用工具
-4. 编写工具测试
-
-### 扩展Writer系统
-
-1. 修改 `writer/config.yaml` 添加新的配置选项
-2. 在 `writer/config.py` 中添加配置处理逻辑
-3. 在 `writer/core.py` 中实现新功能
-
-## 🔧 开发
-
-### 运行测试
+### Docker 部署
 
 ```bash
-# 运行所有测试
-pytest tests/
-
-# 运行特定测试
-pytest tests/test_core.py
+# 使用 docker-compose
+docker-compose up -d
 ```
 
-### 开发模式
+## 📝 更新日志
 
-```bash
-# 安装开发依赖
-pip install -e .
+### v1.0.0 (2024-01-XX)
+- ✨ 初始版本发布
+- 🎨 苹果风格 UI 设计
+- ⚡ 实时流式数据展示
+- 🤝 交互式工具确认
+- 📊 报告大纲层级展示
 
-# 运行示例
-python examples/basic_usage.py
-```
+## 🤝 贡献指南
 
-## 📖 文档
-
-- [Writer配置指南](writer/guide.md) - 详细的Writer配置说明
-- [API文档](docs/) - 完整的API参考
-- [示例集合](examples/) - 各种使用场景示例
-
-## 🌐 FastAPI + Celery 服务
-
-本项目提供基于 Redis 的异步执行和流式输出：
-
-1. 启动 Celery worker（需要 Redis 和 PostgreSQL 服务）：
-
-```bash
-celery -A Interactive-Deep-Reasearch.main.celery_app worker --loglevel=info
-```
-
-2. 运行 FastAPI 服务：
-
-```bash
-uvicorn Interactive-Deep-Reasearch.main:app --reload --port 8000
-```
-
-3. 创建研究任务：
-
-```bash
-curl -X POST http://localhost:8000/research/tasks -H 'Content-Type: application/json' -d '{"topic": "人工智能发展趋势", "user_id": "demo"}'
-```
-
-4. 通过 SSE 订阅任务进度：
-
-```bash
-curl -N http://localhost:8000/research/tasks/<task_id>/stream
-```
-
-5. 取消正在运行的任务：
-
-```bash
-curl -X POST http://localhost:8000/research/tasks/<task_id>/cancel
-```
-
-任务执行过程中会通过 Redis 推送事件，检查点数据持久化到 PostgreSQL。事件流会在任务完成或取消后自动结束，并发送最终状态。
-
-### 持久化配置
-
-设置环境变量 `PG_URL` 指向 PostgreSQL 连接字符串，例如：
-
-```bash
-export PG_URL=postgresql+asyncpg://user:password@localhost:5432/agents
-```
-
-## 🤝 贡献
-
-欢迎提交 Issue 和 Pull Request！
+1. Fork 项目
+2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 开启 Pull Request
 
 ## 📄 许可证
 
-MIT License
+本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
+
+## 🙏 致谢
+
+- [LangGraph](https://github.com/langchain-ai/langgraph) - 强大的 AI 工作流框架
+- [React](https://reactjs.org/) - 用户界面库
+- [Tailwind CSS](https://tailwindcss.com/) - CSS 框架
+- [Framer Motion](https://www.framer.com/motion/) - 动画库
+
+---
+
+🌟 **如果这个项目对你有帮助，请给它一个 Star！**
