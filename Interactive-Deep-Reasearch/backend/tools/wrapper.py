@@ -13,7 +13,7 @@ from langgraph import types
 
 async def wrap_interactive_tools(
     tool: Union[Callable, BaseTool], 
-    state: Optional[Dict[str, Any]] = None,
+    mode: str,
     *,
     interrupt_config: HumanInterruptConfig = None
 ) -> BaseTool:
@@ -41,8 +41,6 @@ async def wrap_interactive_tools(
             "allow_edit": True,
             "allow_respond": True,
         }
-    # 检测模式
-    mode = state.get("mode", "copilot") 
     # Copilot模式：直接执行，无需确认
     if mode == "copilot":
         @create_tool(
@@ -110,7 +108,7 @@ async def wrap_interactive_tools(
 
 async def wrap_tools(
     tools: List[Union[Callable, BaseTool]], 
-    state: Optional[Dict[str, Any]] = None
+    mode: str,
 ) -> List[BaseTool]:
     """
     批量包装工具 - 简化版本，直接返回包装后的工具列表
@@ -118,7 +116,7 @@ async def wrap_tools(
     interactive_tools = []
     for tool in tools:
         try:
-            interactive_tool = await wrap_interactive_tools(tool, state)
+            interactive_tool = await wrap_interactive_tools(tool, mode)
             interactive_tools.append(interactive_tool)
         except Exception as e:
             continue

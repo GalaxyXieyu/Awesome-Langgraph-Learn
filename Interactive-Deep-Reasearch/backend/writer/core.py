@@ -253,7 +253,7 @@ class StreamWriter:
 
         # 根据流式配置决定如何发送
         if self.config.is_stream_enabled():
-            self.writer(("custom", message))
+            self.writer(message)
         else:
             self.message_buffer.append(message)
             if len(self.message_buffer) >= self.config.get_batch_size():
@@ -262,7 +262,7 @@ class StreamWriter:
     def flush_buffer(self):
         """刷新消息缓冲区"""
         for message in self.message_buffer:
-            self.writer(("custom", message))  # 修复：使用正确的tuple格式
+            self.writer(message)  # 修复：使用正确的tuple格式
         self.message_buffer.clear()
     
     # ============================================================================

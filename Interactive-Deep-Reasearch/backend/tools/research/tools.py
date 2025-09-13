@@ -6,6 +6,7 @@ import os
 import time
 import uuid
 import json
+import asyncio
 from typing import List, Dict, Any
 from langchain_core.tools import tool
 from langchain_community.tools.tavily_search import TavilySearchResults
@@ -39,10 +40,10 @@ def web_search(query: str, max_results: int = 5) -> List[Dict[str, Any]]:
                     include_raw_content=False,
                     include_images=False
                 )
-                
+
                 # 尝试正确的调用方式
                 results = search_tool.invoke({"query": query})
-                
+
                 formatted_results = []
                 for result in results:
                     formatted_result = {
@@ -55,13 +56,13 @@ def web_search(query: str, max_results: int = 5) -> List[Dict[str, Any]]:
                         "timestamp": time.time()
                     }
                     formatted_results.append(formatted_result)
-                    
+
                 return formatted_results
-                
+
             except Exception as tavily_error:
                 logger.warning(f"Tavily搜索失败: {tavily_error}, 使用模拟搜索")
                 # 回退到模拟搜索
-        
+
         # 模拟搜索（当API不可用时）
         results = [
             {
@@ -93,7 +94,7 @@ def web_search(query: str, max_results: int = 5) -> List[Dict[str, Any]]:
             }
         ]
         return results[:max_results]
-            
+
     except Exception as e:
         logger.error(f"搜索失败: {str(e)}")
         return [{
@@ -105,6 +106,56 @@ def web_search(query: str, max_results: int = 5) -> List[Dict[str, Any]]:
 
 
 @tool
+async def web_search_async(query: str, max_results: int = 5) -> List[Dict[str, Any]]:
+    """联网搜索工具（异步）"""
+    try:
+        if os.getenv("TAVILY_API_KEY"):
+            # Tavily 暂无原生 async 客户端，这里用线程池包装同步调用
+            loop = asyncio.get_event_loop()
+
+            def _sync_call():
+                search_tool = TavilySearchResults(
+                    tavily_api_key=os.getenv("TAVILY_API_KEY"),
+                    max_results=max_results,
+                    search_depth="advanced",
+                    include_answer=True,
+                    include_raw_content=False,
+                    include_images=False,
+                )
+                return search_tool.invoke({"query": query})
+
+            try:
+                results = await loop.run_in_executor(None, _sync_call)
+            except Exception as tavily_error:
+                logger.warning(f"[async] Tavily搜索失败: {tavily_error}, 回退到模拟搜索")
+                return web_search(query, max_results)
+
+            formatted_results = []
+            for result in results:
+                formatted_results.append({
+                    "id": str(uuid.uuid4()),
+                    "query": query,
+                    "title": result.get("title", ""),
+                    "content": result.get("content", "")[:500],
+                    "url": result.get("url", ""),
+                    "relevance_score": result.get("score", 0.8),
+                    "timestamp": time.time(),
+                })
+            return formatted_results
+        # 无 API Key 时，使用同步的模拟搜索
+        return web_search(query, max_results)
+    except Exception as e:
+        logger.error(f"[async] 搜索失败: {e}")
+        return [{
+            "id": str(uuid.uuid4()),
+            "error": f"搜索失败: {str(e)}",
+            "query": query,
+            "timestamp": time.time(),
+        }]
+
+
+
+@tool
 def industry_data(industry: str) -> Dict[str, Any]:
     """行业数据工具"""
     try:
@@ -113,16 +164,23 @@ def industry_data(industry: str) -> Dict[str, Any]:
             "区块链": "2023年全球区块链市场规模达到200亿美元，预计2025年将达到670亿美元",
             "云计算": "2023年全球云计算市场规模达到5450亿美元，预计2025年将达到8320亿美元"
         }
-        
+
         return {
             "id": str(uuid.uuid4()),
             "industry": industry,
             "data": data_map.get(industry, f"{industry}行业数据：市场规模持续增长，技术创新加速"),
             "timestamp": time.time()
         }
-        
+
     except Exception as e:
         return {"error": f"数据获取失败: {str(e)}"}
+
+
+@tool
+async def industry_data_async(industry: str) -> Dict[str, Any]:
+    """行业数据工具（异步）"""
+    return industry_data(industry)
+
 
 
 @tool
@@ -151,6 +209,18 @@ def research_context(query: str) -> Dict[str, Any]:
         }
     except Exception as e:
         return {"error": f"查询失败: {str(e)}"}
+
+
+@tool
+async def trend_analysis_async(topic: str) -> Dict[str, Any]:
+    """趋势分析工具（异步）"""
+    return trend_analysis(topic)
+
+
+@tool
+async def research_context_async(query: str) -> Dict[str, Any]:
+    """获取研究上下文工具（异步）"""
+    return research_context(query)
 
 
 def create_llm() -> ChatOpenAI:
@@ -263,3 +333,12 @@ RESEARCH_TOOLS = [
     research_context,
     generate_outline
 ]
+
+# 异步工具列表（用于需要并发的 Graph 或测试）
+RESEARCH_TOOLS_ASYNC = [
+    web_search_async,
+    industry_data_async,
+    trend_analysis_async,
+    research_context_async,
+]
+

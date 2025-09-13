@@ -19,8 +19,8 @@ from langgraph.prebuilt import create_react_agent
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import InMemorySaver
 
-from .context_builder import build_supervisor_context, determine_next_action_by_state
-from .prompts import get_supervisor_prompt, get_researcher_prompt, get_writer_prompt
+from context_builder import build_supervisor_context, determine_next_action_by_state
+from prompts import get_supervisor_prompt, get_researcher_prompt, get_writer_prompt
 
 # 导入新的工具系统
 import sys
@@ -82,7 +82,7 @@ async def create_research_agents(state: IntelligentResearchState):
 
     # 🎯 使用新工具系统：自动检测mode，自动包装
     # 异步获取并包装研究工具，state的传递是关键
-    research_tools = await get_research_tools(state)
+    research_tools = await get_research_tools(state["mode"])
 
     # 研究员Agent
     researcher_agent = create_react_agent(
@@ -110,8 +110,6 @@ async def create_research_agents(state: IntelligentResearchState):
 async def supervisor_node(state: IntelligentResearchState, config=None) -> IntelligentResearchState:
     """智能Supervisor节点 - 使用LLM进行智能决策和质量评估"""
 
-
-    _ = config  # LangGraph会传入config，但此节点暂时未使用
     llm = create_llm()
 
     # 使用模块化的上下文构建
@@ -124,7 +122,7 @@ async def supervisor_node(state: IntelligentResearchState, config=None) -> Intel
     # 流式调用LLM进行智能决策
     full_response = ""
     chunk_count = 0
-    async for chunk in llm.astream(formatted_messages, config=config):
+    async for chunk in llm.astream(formatted_messages):
         if hasattr(chunk, 'content') and chunk.content:
             content = str(chunk.content)
             full_response += content
