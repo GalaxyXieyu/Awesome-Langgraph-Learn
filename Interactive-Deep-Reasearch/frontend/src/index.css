@@ -218,6 +218,9 @@
 .step-start,
 .step-complete,
 .step-progress,
+.search-results,
+.chart-generation,
+.chart-display,
 .error-message,
 .final-result {
   transition: all 0.2s ease;
@@ -225,7 +228,10 @@
 
 .thinking-container:hover,
 .reasoning-container:hover,
-.streaming-content:hover {
+.streaming-content:hover,
+.search-results:hover,
+.chart-generation:hover,
+.chart-display:hover {
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
@@ -254,4 +260,155 @@
   100% {
     left: 100%;
   }
+}
+
+/* 搜索结果特效 */
+.search-results {
+  position: relative;
+}
+
+.search-results::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #3b82f6, #06b6d4, #3b82f6);
+  background-size: 200% 100%;
+  animation: search-pulse 2s linear infinite;
+  border-radius: 4px 4px 0 0;
+}
+
+@keyframes search-pulse {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* 图表生成旋转效果 */
+@keyframes chart-spin {
+  0% { transform: rotate(0deg) scale(1); }
+  50% { transform: rotate(180deg) scale(1.05); }
+  100% { transform: rotate(360deg) scale(1); }
+}
+
+.chart-generation .chart-icon {
+  animation: chart-spin 2s ease-in-out infinite;
+}
+
+/* 图表显示弹跳效果 */
+@keyframes chart-bounce {
+  0%, 100% { 
+    transform: translateY(0) scale(1);
+  }
+  25% { 
+    transform: translateY(-2px) scale(1.02);
+  }
+  50% { 
+    transform: translateY(0) scale(1.04);
+  }
+  75% { 
+    transform: translateY(-1px) scale(1.02);
+  }
+}
+
+.chart-display {
+  animation: chart-bounce 0.6s ease-out;
+}
+
+/* 数据条目淡入效果 */
+@keyframes data-entry-fade {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.chart-display .data-entry {
+  animation: data-entry-fade 0.3s ease-out;
+}
+
+/* 搜索结果卡片悬停效果 */
+.search-result-card {
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.search-result-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.15);
+}
+
+.search-result-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #3b82f6, transparent);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.search-result-card:hover::before {
+  opacity: 1;
+}
+
+/* 相关性分数动画 */
+@keyframes relevance-pulse {
+  0%, 100% { 
+    background-color: rgb(239, 246, 255);
+    color: rgb(37, 99, 235);
+  }
+  50% { 
+    background-color: rgb(37, 99, 235);
+    color: white;
+  }
+}
+
+.relevance-score {
+  animation: relevance-pulse 2s ease-in-out infinite;
+}
+
+/* 图表配置标签动画 */
+@keyframes config-tag-fade {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.config-tag {
+  animation: config-tag-fade 0.4s ease-out;
+}
+
+/* 链接悬停效果 */
+.search-link {
+  position: relative;
+  transition: color 0.2s ease;
+}
+
+.search-link::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  width: 0;
+  height: 1px;
+  background-color: rgb(37, 99, 235);
+  transition: width 0.3s ease;
+}
+
+.search-link:hover::after {
+  width: 100%;
 }

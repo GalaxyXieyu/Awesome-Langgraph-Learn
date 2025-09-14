@@ -69,7 +69,7 @@ def get_checkpointer():
 # Celery task that executes the research graph asynchronously
 # ---------------------------------------------------------------------------
 @celery_app.task(name="run_research_task")
-def run_research_task(user_id: str, topic: str, task_id: str) -> Dict[str, Any]:
+def run_research_task(task_data: Dict[str, Any], task_id: str) -> Dict[str, Any]:
     """Execute the deep research graph and store progress in Redis streams."""
 
     async def _runner() -> Dict[str, Any]:
@@ -77,7 +77,13 @@ def run_research_task(user_id: str, topic: str, task_id: str) -> Dict[str, Any]:
         checkpointer = get_checkpointer()
         graph = workflow.compile(checkpointer=checkpointer)
 
-        state = create_simple_state(topic, user_id=user_id)
+        # 从 task_data 提取必要信息
+        user_id = task_data.get("user_id", "user")
+        topic = task_data.get("topic", "")
+        mode = task_data.get("mode", "copilot")
+        
+        # 创建状态时传递 mode 参数
+        state = create_simple_state(topic, user_id=user_id, mode=mode)
         state["session_id"] = task_id
         config = RunnableConfig(configurable={"thread_id": task_id})
 
@@ -116,17 +122,28 @@ app.add_middleware(
 class CreateTask(BaseModel):
     topic: str
     user_id: str = "user"
+    mode: str = "copilot"
+    report_type: str = "comprehensive"
+    target_audience: str = "general"
+    depth_level: str = "moderate"
+    max_sections: int = 5
+    target_length: int = 1000
+    language: str = "zh"
+    style: str = "professional"
 
 @app.post("/research/tasks")
 async def create_task(req: CreateTask):
     task_id = uuid.uuid4().hex[:8]  # 移除task_前缀
-    result = run_research_task.apply_async(args=[req.user_id, req.topic, task_id])
+    # 传递完整的请求数据到 Celery 任务
+    result = run_research_task.apply_async(args=[req.dict(), task_id])
     redis_client.hset(
         f"task:{task_id}",
         mapping={
             "status": "pending",
             "topic": req.topic,
             "user_id": req.user_id,
+            "mode": req.mode,
+            "report_type": req.report_type,
             "celery_id": result.id,
         },
     )

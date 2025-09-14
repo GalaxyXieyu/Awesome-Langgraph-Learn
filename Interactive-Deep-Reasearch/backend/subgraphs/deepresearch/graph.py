@@ -33,7 +33,7 @@ project_root = os.path.abspath(os.path.join(current_dir, '..', '..'))
 # Add the project root to the system path
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
-from tools import get_research_tools
+from tools import get_research_tools, get_mcp_tools, get_all_tools
 
 # ============================================================================
 # 状态定义 - LangGraph核心
@@ -81,13 +81,15 @@ async def create_research_agents(state: IntelligentResearchState):
     llm = create_llm()
 
     # 🎯 使用新工具系统：自动检测mode，自动包装
-    # 异步获取并包装研究工具，state的传递是关键
-    research_tools = await get_research_tools(state)
+    # 异步获取并包装研究工具和MCP工具，包含真实联网搜索和图表生成
+    research_tools = await get_research_tools(state["mode"])
+    mcp_tools = await get_mcp_tools(state["mode"])
+    all_tools = research_tools + mcp_tools
 
     # 研究员Agent
     researcher_agent = create_react_agent(
         llm,
-        tools=research_tools,  # 使用包装后的工具
+        tools=all_tools,  # 使用包装后的工具（包含研究工具和MCP工具）
         prompt=get_researcher_prompt()
     )
 
@@ -110,8 +112,6 @@ async def create_research_agents(state: IntelligentResearchState):
 async def supervisor_node(state: IntelligentResearchState, config=None) -> IntelligentResearchState:
     """智能Supervisor节点 - 使用LLM进行智能决策和质量评估"""
 
-
-    _ = config  # LangGraph会传入config，但此节点暂时未使用
     llm = create_llm()
 
     # 使用模块化的上下文构建
@@ -124,7 +124,7 @@ async def supervisor_node(state: IntelligentResearchState, config=None) -> Intel
     # 流式调用LLM进行智能决策
     full_response = ""
     chunk_count = 0
-    async for chunk in llm.astream(formatted_messages, config=config):
+    async for chunk in llm.astream(formatted_messages):
         if hasattr(chunk, 'content') and chunk.content:
             content = str(chunk.content)
             full_response += content

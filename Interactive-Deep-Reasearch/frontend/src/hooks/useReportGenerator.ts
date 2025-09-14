@@ -37,31 +37,63 @@ export const useReportGenerator = () => {
   // 添加消息
   const addMessage = useCallback((message: StreamMessage) => {
     setState(prev => {
-      // 处理 content_streaming 消息的累积拼接
-      if (message.message_type === 'content_streaming') {
+      // 处理 content_streaming 和 content 消息的累积拼接
+      if (message.message_type === 'content_streaming' || message.message_type === 'content') {
         const messages = [...prev.messages];
 
-        // 查找最后一个相同 node 的 content_streaming 消息
+        // 查找最后一个流式内容消息（不限制node匹配，因为JSON片段可能来自不同节点）
         let lastStreamingIndex = -1;
         for (let i = messages.length - 1; i >= 0; i--) {
-          if (messages[i].message_type === 'content_streaming' &&
-              messages[i].node === message.node) {
+          const msg = messages[i];
+          if ((msg.message_type === 'content_streaming' || msg.message_type === 'content') &&
+              !msg.is_final && // 只与未完成的消息合并
+              msg.node === message.node) { // 同一节点的消息才合并
             lastStreamingIndex = i;
             break;
           }
         }
 
         if (lastStreamingIndex !== -1) {
-          // 如果找到了，就累积内容
+          // 如果找到了未完成的流式消息，就累积内容
+          const existingMessage = messages[lastStreamingIndex];
+          const combinedContent = existingMessage.content + message.content;
+          
+          // 检测是否是完整的JSON或其他完整内容
+          let isCompleteContent = false;
+          let finalMessageType: 'content_streaming' | 'content' = 'content_streaming';
+          
+          // JSON 检测
+          if (combinedContent.trim().startsWith('{') || combinedContent.trim().startsWith('[')) {
+            try {
+              JSON.parse(combinedContent.trim());
+              isCompleteContent = true;
+              finalMessageType = 'content'; // 完整JSON使用content类型
+            } catch (e) {
+              // 仍在构建中的JSON，继续累积
+            }
+          }
+          
+          // 检测其他完整内容标志
+          if (message.is_final || isCompleteContent) {
+            finalMessageType = 'content';
+            isCompleteContent = true;
+          }
+
           messages[lastStreamingIndex] = {
-            ...messages[lastStreamingIndex],
-            content: messages[lastStreamingIndex].content + message.content,
+            ...existingMessage,
+            content: combinedContent,
+            message_type: finalMessageType,
             timestamp: message.timestamp, // 更新时间戳
-            length: (messages[lastStreamingIndex].length || 0) + (message.length || 0)
+            length: combinedContent.length,
+            is_final: isCompleteContent
           };
         } else {
-          // 如果没找到，创建新的流式消息
-          messages.push(message);
+          // 如果没找到可合并的消息，创建新的流式消息
+          messages.push({
+            ...message,
+            message_type: message.is_final ? 'content' : 'content_streaming',
+            is_final: message.is_final || false
+          });
         }
 
         return {
@@ -169,40 +201,6 @@ export const useReportGenerator = () => {
     });
   }, []);
 
-  // 创建任务
-  const createTask = useCallback(async (topic: string, config: CreateTaskRequest) => {
-    try {
-      setState(prev => ({ 
-        ...prev, 
-        isGenerating: true, 
-        messages: [],
-        outline: null,
-        pendingInterrupts: new Map(),
-      }));
-
-      const response = await ApiClient.createTask(config);
-      const taskStatus: TaskStatus = {
-        task_id: response.task_id,
-        status: 'pending',
-        topic,
-        user_id: config.user_id || 'user',
-      };
-
-      setState(prev => ({ 
-        ...prev, 
-        currentTask: taskStatus,
-        settings: { ...prev.settings, mode: config.mode || 'interactive' }
-      }));
-
-      // 开始监听流式数据
-      startStreaming(response.task_id);
-
-    } catch (error) {
-      console.error('创建任务失败:', error);
-      setState(prev => ({ ...prev, isGenerating: false }));
-    }
-  }, []);
-
   // 开始流式监听
   const startStreaming = useCallback((taskId: string) => {
     // 关闭现有连接
@@ -253,6 +251,40 @@ export const useReportGenerator = () => {
       eventSource.close();
     };
   }, [addMessage]);
+
+  // 创建任务
+  const createTask = useCallback(async (topic: string, config: CreateTaskRequest) => {
+    try {
+      setState(prev => ({ 
+        ...prev, 
+        isGenerating: true, 
+        messages: [],
+        outline: null,
+        pendingInterrupts: new Map(),
+      }));
+
+      const response = await ApiClient.createTask(config);
+      const taskStatus: TaskStatus = {
+        task_id: response.task_id,
+        status: 'pending',
+        topic,
+        user_id: config.user_id || 'user',
+      };
+
+      setState(prev => ({ 
+        ...prev, 
+        currentTask: taskStatus,
+        settings: { ...prev.settings, mode: config.mode || 'interactive' }
+      }));
+
+      // 开始监听流式数据
+      startStreaming(response.task_id);
+
+    } catch (error) {
+      console.error('创建任务失败:', error);
+      setState(prev => ({ ...prev, isGenerating: false }));
+    }
+  }, [startStreaming]);
 
   // 处理中断响应
   const handleInterruptResponse = useCallback(async (

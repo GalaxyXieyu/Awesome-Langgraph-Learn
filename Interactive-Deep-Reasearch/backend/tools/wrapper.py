@@ -13,7 +13,7 @@ from langgraph import types
 
 async def wrap_interactive_tools(
     tool: Union[Callable, BaseTool], 
-    state: Optional[Dict[str, Any]] = None,
+    mode: str,
     *,
     interrupt_config: HumanInterruptConfig = None
 ) -> BaseTool:
@@ -41,8 +41,6 @@ async def wrap_interactive_tools(
             "allow_edit": True,
             "allow_respond": True,
         }
-    # 检测模式
-    mode = state.get("mode", "copilot") 
     # Copilot模式：直接执行，无需确认
     if mode == "copilot":
         @create_tool(
@@ -50,9 +48,21 @@ async def wrap_interactive_tools(
             description=tool.description,
             args_schema=tool.args_schema
         )
-        async def copilot_tool(config: RunnableConfig, **tool_input):
+        async def copilot_tool(config: RunnableConfig = None, **tool_input):
             try:
-                result = await tool.ainvoke(input=tool_input)
+                # 兼容不同的工具调用方式
+                if hasattr(tool, 'ainvoke'):
+                    result = await tool.ainvoke(tool_input, config=config)
+                elif hasattr(tool, 'arun'):
+                    result = await tool.arun(**tool_input)
+                elif hasattr(tool, 'invoke'):
+                    # 同步工具需要在异步环境中执行
+                    import asyncio
+                    loop = asyncio.get_event_loop()
+                    result = await loop.run_in_executor(None, tool.invoke, tool_input)
+                else:
+                    # 直接调用工具函数
+                    result = await tool(**tool_input)
                 return result
             except Exception as e:
                 return f"工具执行失败: {str(e)}"        
@@ -65,7 +75,7 @@ async def wrap_interactive_tools(
             description=tool.description,
             args_schema=tool.args_schema
         )
-        async def interactive_tool(config: RunnableConfig, **tool_input):
+        async def interactive_tool(config: RunnableConfig = None, **tool_input):
             # 创建人工中断请求，完全参考参考文件
             request: HumanInterrupt = {
                 "action_request": {
@@ -79,26 +89,33 @@ async def wrap_interactive_tools(
             # 调用 interrupt 函数，获取人工审查的响应
             response = types.interrupt(request)
 
-            # 完全参考参考文件的响应处理逻辑
-            if response["type"] == "accept":
+            # 定义统一的工具调用函数
+            async def call_tool(input_args):
                 try:
-                    tool_response = await tool.ainvoke(input=tool_input)
-                    return tool_response
+                    if hasattr(tool, 'ainvoke'):
+                        return await tool.ainvoke(input_args, config=config)
+                    elif hasattr(tool, 'arun'):
+                        return await tool.arun(**input_args)
+                    elif hasattr(tool, 'invoke'):
+                        # 同步工具需要在异步环境中执行
+                        import asyncio
+                        loop = asyncio.get_event_loop()
+                        return await loop.run_in_executor(None, tool.invoke, input_args)
+                    else:
+                        # 直接调用工具函数
+                        return await tool(**input_args)
                 except Exception as e:
                     return f"工具执行失败: {str(e)}"
 
+            # 完全参考参考文件的响应处理逻辑
+            if response["type"] == "accept":
+                return await call_tool(tool_input)
             elif response["type"] == "edit":
                 # 如果是编辑，更新工具输入参数为响应中提供的参数
                 tool_input = response["args"]["args"]
-                try:
-                    tool_response = await tool.ainvoke(input=tool_input)
-                    return tool_response
-                except Exception as e:
-                    return f"工具执行失败: {str(e)}"
-
+                return await call_tool(tool_input)
             elif response["type"] == "reject":
                 return '该工具被拒绝使用，请尝试其他方法或拒绝回答问题。'
-
             elif response["type"] == "response":
                 # 如果是响应，直接将用户反馈作为工具的响应
                 user_feedback = response["args"]
@@ -110,7 +127,7 @@ async def wrap_interactive_tools(
 
 async def wrap_tools(
     tools: List[Union[Callable, BaseTool]], 
-    state: Optional[Dict[str, Any]] = None
+    mode: str,
 ) -> List[BaseTool]:
     """
     批量包装工具 - 简化版本，直接返回包装后的工具列表
@@ -118,7 +135,7 @@ async def wrap_tools(
     interactive_tools = []
     for tool in tools:
         try:
-            interactive_tool = await wrap_interactive_tools(tool, state)
+            interactive_tool = await wrap_interactive_tools(tool, mode)
             interactive_tools.append(interactive_tool)
         except Exception as e:
             continue

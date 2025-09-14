@@ -9,7 +9,11 @@ export interface StreamMessage {
     | 'thinking'
     | 'reasoning'
     | 'content_streaming'
+    | 'content'
     | 'content_complete'
+    | 'search_result'
+    | 'chart_generation'
+    | 'chart_display'
     | 'interrupt_request'
     | 'interrupt_response'
     | 'interrupt_waiting'
@@ -40,11 +44,64 @@ export interface StreamMessage {
     allow_respond?: boolean;
   };
   
+  // 搜索结果字段
+  search_results?: SearchResult[];
+  query?: string;
+  
+  // 图表数据字段
+  chart_data?: ChartData;
+  chart_config?: ChartConfig;
+  chart_type?: string;
+  
   // 其他字段
   chunk_index?: number;
   aggregated?: boolean;
   is_final?: boolean;
   error_type?: string;
+  [key: string]: any;
+}
+
+// 搜索结果类型
+export interface SearchResult {
+  id: string;
+  title: string;
+  content: string;
+  url?: string;
+  relevance_score?: number;
+  timestamp: number;
+  source: string;
+  source_type: 'web_search' | 'academic' | 'news' | 'database';
+  query?: string;
+  error?: string;
+}
+
+// 图表数据类型
+export interface ChartData {
+  labels?: string[];
+  values?: number[];
+  datasets?: {
+    label: string;
+    data: number[];
+    backgroundColor?: string | string[];
+    borderColor?: string | string[];
+    [key: string]: any;
+  }[];
+  [key: string]: any;
+}
+
+// 图表配置类型
+export interface ChartConfig {
+  type: 'bar' | 'line' | 'pie' | 'scatter' | 'doughnut' | 'area';
+  title?: string;
+  x_label?: string;
+  y_label?: string;
+  responsive?: boolean;
+  animation?: {
+    duration: number;
+    easing: string;
+  };
+  colors?: string[];
+  theme?: 'default' | 'dark' | 'light';
   [key: string]: any;
 }
 
