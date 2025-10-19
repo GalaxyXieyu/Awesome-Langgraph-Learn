@@ -13,11 +13,8 @@ from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import MemorySaver
 
 # 导入官方 Redis 支持
-try:
-    from langgraph.checkpoint.redis import RedisSaver
-    REDIS_AVAILABLE = True
-except ImportError:
-    REDIS_AVAILABLE = False
+from langgraph.checkpoint.redis import RedisSaver
+REDIS_AVAILABLE = True
 
 
 class ChatState(TypedDict):

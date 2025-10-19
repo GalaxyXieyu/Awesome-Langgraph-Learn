@@ -49,10 +49,10 @@ logger = logging.getLogger(__name__)
 def create_llm() -> ChatOpenAI:
     """创建LLM实例"""
     return ChatOpenAI(
-        model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+        model=os.getenv("OPENAI_MODEL", "qwen2.5-72b-instruct-awq"),
         temperature=float(os.getenv("OPENAI_TEMPERATURE", "0.7")),
-        base_url=os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1"),
-        api_key=os.getenv("OPENAI_API_KEY"),
+        base_url=os.getenv("OPENAI_BASE_URL", "https://llm.3qiao.vip:23436/v1"),
+        api_key=os.getenv("OPENAI_API_KEY","sk-0rnrrSH0OsiaWCiv6b37C1E4E60c4b9394325001Ec19A197"),
     )
 
 # 编译子图（全局变量，避免重复编译）- 使用update子图
@@ -138,6 +138,9 @@ async def call_intelligent_research_subgraph(state: DeepResearchState) -> DeepRe
         # 流式调用子图，使用增强的processor统一处理嵌套流式输出
         async for chunk in subgraph.astream(subgraph_input, stream_mode=["updates", "messages"], subgraphs=True):
             # 使用增强的processor统一处理所有类型的chunk
+            print("subgraph_input")
+            print(chunk)
+            print("="*20)
             processor.process_chunk(chunk)
             
             # 同时收集实际数据用于状态更新，处理嵌套结构
