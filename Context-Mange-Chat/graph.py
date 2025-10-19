@@ -107,14 +107,26 @@ def get_llm(temp: float = 0.2) -> ChatOpenAI:
         temperature=temp,
     )
 
-def prep_node(*, hard_limit: int, keep_last: int, summarize: bool, compress_target: str = "all"):
+def prep_node(
+    *,
+    hard_limit: int,
+    summarize: bool,
+    compress_target: str = "all",
+    mode: str = "token",  # "token" | "rounds"
+    rounds_limit: int = 6,
+):
     """创建“普通节点压缩”的节点函数（返回 async 可调用）。
 
-    - 当历史近似 tokens 超过 ``hard_limit`` 时：插入一条摘要并仅保留最近 ``keep_last`` 条原文。
+    压缩触发：当“窗口基线”的近似 tokens 超过 ``hard_limit`` 才执行压缩。
+
+    压缩模式（单选）：
+    - ``mode="token"``：基于 token 预算的尾窗回填（推荐）。
+    - ``mode="rounds"``：保留最近 ``rounds_limit`` 个“用户轮”（human 消息计数）的尾窗。
+      若轮数尚未达到 ``rounds_limit`` 但 token 已超限，则回退到 token 预算压缩，保障上限。
+
+    其他：
     - ``summarize=False`` 时改用静态提示，避免 LLM 调用。
-    - ``compress_target`` 控制压缩目标："all"（默认）/ "human" / "ai"。
-      仅当选择 "human" 或 "ai" 时，早期历史会先按角色过滤后再做摘要；
-      其他未选中的角色仅保留到最近 ``keep_last`` 的窗口中。
+    - ``compress_target`` 控制摘要聚焦目标："all"（默认）/ "human" / "ai"。
     """
 
     async def _prep(state: ChatState) -> ChatState:  # type: ignore[override]
@@ -128,74 +140,122 @@ def prep_node(*, hard_limit: int, keep_last: int, summarize: bool, compress_targ
         summary_text = ""
         compressed = False
 
-        if before["approx_tokens"] > hard_limit:
-            compressed = True
-            early = max(0, len(history) - keep_last)
-            norm_msgs = _normalize_messages(history)
-            early_msgs = norm_msgs[:-keep_last] if keep_last > 0 else norm_msgs
-            # 仅对选定角色进行摘要
-            def _match_role(m: BaseMessage) -> bool:
-                if compress_target == "human":
-                    return isinstance(m, HumanMessage)
-                if compress_target == "ai":
-                    return isinstance(m, AIMessage)
-                return True
+        def _is_tool(x) -> bool:
+            if isinstance(x, dict):
+                t = (x.get("type") or x.get("role") or "").lower()
+                return t == "tool"
+            name = getattr(x, "type", "") or getattr(x, "role", "")
+            return str(name).lower() == "tool"
 
-            selected_early = [m for m in early_msgs if _match_role(m)]
-            focus_early = selected_early[-40:] if len(selected_early) > 40 else selected_early
+        def _match_role(m: BaseMessage) -> bool:
+            if compress_target == "human":
+                return isinstance(m, HumanMessage)
+            if compress_target == "ai":
+                return isinstance(m, AIMessage)
+            return True
 
-            # 识别早期的 tool 类型消息（不参与摘要，不被裁剪，直接保留原文）
-            def _is_tool(x) -> bool:
-                if isinstance(x, dict):
-                    t = (x.get("type") or x.get("role") or "").lower()
-                    return t == "tool"
-                # 对于 BaseMessage 的 tool 类型，这里保守处理：LangChain 中 ToolMessage 也可视为“工具输出”
-                name = getattr(x, "type", "") or getattr(x, "role", "")
-                return str(name).lower() == "tool"
-
-            early_orig = history[:-keep_last] if keep_last > 0 else history
-            tool_early = [m for m in early_orig if _is_tool(m)]
-            # 为避免窗口爆炸，仅保留最近若干条早期工具消息
-            TOOL_PRESERVE_MAX = 8
-            tool_early = tool_early[-TOOL_PRESERVE_MAX:]
-
+        async def _summarize(early_for_summary: List[BaseMessage], early_count: int) -> tuple[str, SystemMessage]:
+            nonlocal summarize
             if summarize:
                 llm = get_llm(0.2)
                 try:
                     prompt: List[BaseMessage] = [
                         SystemMessage(content="你是一个对话摘要助手，用最短语言保留事实、实体、数字、结论。"),
-                        *focus_early,
+                        *early_for_summary,
                         HumanMessage(content="请将以上早期对话压缩为<=120字摘要，避免重复，保留关键信息。若有冲突，以最近消息为准。"),
                     ]
                     resp = await llm.ainvoke(prompt)
-                    summary_text = getattr(resp, "content", "") or ""
+                    stext = getattr(resp, "content", "") or ""
                     label = {
                         "human": "(仅用户)",
                         "ai": "(仅助手)",
                         "all": "",
                     }.get(compress_target, "")
-                    summary_msg = SystemMessage(content=f"摘要{label}: {summary_text}")
+                    return stext, SystemMessage(content=f"摘要{label}: {stext}")
                 except Exception:
-                    summary_text = f"早期内容已压缩，仅保留最近 {keep_last} 条（共{early}条被省略）。"
-                    summary_msg = SystemMessage(content=f"摘要: {summary_text}")
-            else:
-                summary_text = f"早期内容已压缩，仅保留最近 {keep_last} 条（共{early}条被省略）。"
-                summary_msg = SystemMessage(content=f"摘要: {summary_text}")
+                    pass
+            stext = f"早期内容已压缩（约{early_count}条被概括）。"
+            return stext, SystemMessage(content=f"摘要: {stext}")
 
-            # 压缩后的窗口：摘要 + 早期保留的工具消息 + 最近 keep_last 条原文
-            # 注意：tool_early 取自原始 history（可能是 dict/BaseMessage 混合），可被下游正常处理
-            window = [summary_msg, *tool_early, *history[-keep_last:]]
+        def _pack_tail_by_token_budget(history_msgs: List[Any], base_msgs: List[Any], turn_msgs: List[Any]) -> List[Any]:
+            # 预留10%的预算给摘要/工具，先用 90% 预算回填尾部
+            BUDGET = max(1, int(hard_limit * 0.9))
+            tail_rev: List[Any] = []
+            for m in reversed(history_msgs):
+                tentative = [*base_msgs, *reversed(tail_rev), *turn_msgs, m]
+                if _approx_tokens(tentative) > BUDGET:
+                    break
+                tail_rev.append(m)
+            return list(reversed(tail_rev))
+
+        if before["approx_tokens"] > hard_limit:
+            compressed = True
+
+            # 根据模式选择尾窗
+            if mode == "rounds":
+                # 计算最后 rounds_limit 个 human 的起始下标
+                human_idx = [i for i, m in enumerate(history) if (
+                    (m.get("type") if isinstance(m, dict) else getattr(m, "type", "")) in ("human", "user")
+                )]
+                start_idx = human_idx[-rounds_limit] if len(human_idx) >= rounds_limit else 0
+                tail = history[start_idx:]
+                early_orig = history[:start_idx]
+
+                # 早期摘要（按 compress_target 过滤）
+                norm_msgs = _normalize_messages(early_orig)
+                selected_early = [m for m in norm_msgs if _match_role(m)]
+                focus_early = selected_early[-40:] if len(selected_early) > 40 else selected_early
+                summary_text, summary_msg = await _summarize(focus_early, len(early_orig))
+
+                window = [summary_msg, *tail]
+
+                # 如果仍然超过 token 上限，退回 token 预算压缩
+                if _approx_tokens([*window, *turn_msgs]) > hard_limit:
+                    base = [summary_msg]
+                    tail = _pack_tail_by_token_budget(history, base, turn_msgs)
+                    window = [summary_msg, *tail]
+            else:  # mode == "token"
+                # 先生成“占位”摘要对象，tail 选出后再用真实摘要替换（并校正预算）
+                placeholder_summary = SystemMessage(content="摘要: ……")
+                base = [placeholder_summary]
+                # 先按预算回填尾部
+                tail = _pack_tail_by_token_budget(history, base, turn_msgs)
+                # 早期区域：除去尾部的剩余消息
+                early_cut = len(history) - len(tail)
+                early_orig = history[:early_cut]
+                # 早期摘要
+                norm_msgs = _normalize_messages(early_orig)
+                selected_early = [m for m in norm_msgs if _match_role(m)]
+                focus_early = selected_early[-40:] if len(selected_early) > 40 else selected_early
+                summary_text, summary_msg = await _summarize(focus_early, len(early_orig))
+                window = [summary_msg, *tail]
+
+                # 若加入真实摘要后超限，则从 tail 前端剔除直至达标
+                while window and _approx_tokens([*window, *turn_msgs]) > hard_limit:
+                    # 移除最早的非摘要/非工具条目（即 tail 的头部）
+                    # 保留摘要与工具早期信息的优先级更高
+                    if len(window) > 0 and not _is_tool(window[0]) and not isinstance(window[0], SystemMessage):
+                        window.pop(0)
+                    elif len(window) > 1:
+                        window.pop(1)
+                    else:
+                        break
         else:
             window = history
 
+        # 关键修复：将“当轮新消息（turn_msgs）”附加到窗口尾部，确保下游 Agent
+        # 在同一轮即可看到当前用户输入，避免出现“滞后一轮”现象。
+        window_with_turn = [*window, *turn_msgs] if turn_msgs else window
+
         result: Dict[str, Any] = {
-            # 面向下游 LLM/Agent 的上下文：用压缩后的窗口作为 messages
-            "messages": window,
-            # 将本轮的压缩窗口“提交”为下一轮的基准窗口
-            "history_window": window,
+            # 面向下游 LLM/Agent 的上下文：使用“窗口 + 当轮增量”
+            "messages": window_with_turn,
+            # 将“窗口 + 当轮增量”作为下一轮的基准窗口，确保连续性
+            "history_window": window_with_turn,
             "stats": {
                 "before": before,
-                "window": {"count": len(window), "approx_tokens": _approx_tokens(window)},
+                # 统计以“实际提供给下游的窗口”为准
+                "window": {"count": len(window_with_turn), "approx_tokens": _approx_tokens(window_with_turn)},
                 "compressed": compressed,
                 "summary": summary_text,
                 "compress_target": compress_target,

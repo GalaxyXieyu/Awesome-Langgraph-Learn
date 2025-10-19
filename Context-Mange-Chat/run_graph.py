@@ -28,7 +28,9 @@ from .graph import (
 def parse_args():
     p = argparse.ArgumentParser(description="Official-only ReAct chatbot with saver/store/cache + compression")
     p.add_argument("--limit", type=int, default=800, help="Hard token limit for node compression")
-    p.add_argument("--keep", type=int, default=12, help="Keep last N messages when compressed")
+    # Compression behavior
+    p.add_argument("--mode", type=str, choices=["token", "rounds"], default="token", help="Compression mode: token budget or rounds-based")
+    p.add_argument("--rounds", type=int, default=6, help="Rounds to keep when mode=rounds (count human/user turns)")
     p.add_argument("--no-sum", action="store_true", help="Disable LLM summary in node compressor")
     p.add_argument(
         "--target",
@@ -55,18 +57,34 @@ async def main():
     # 压缩目标来自 CLI: --target (all/human/ai)
     prep = prep_node(
         hard_limit=args.limit,
-        keep_last=args.keep,
         summarize=not args.no_sum,
         compress_target=args.target,
+        mode=args.mode,
+        rounds_limit=args.rounds,
     )
-    # 使用 graph.react_agent 内置工具（web_search / inject_memory / search_memory）
-    agent = react_agent()
+    # 使用 graph.react_agent 内置工具（web_search / inject_memory / search_memory）。
+    # 为便于在无网络/无API Key环境下自测，提供可选的离线回显Agent。
+    offline = (os.getenv("OFFLINE_AGENT", "false").lower() in {"1","true","yes"})
+    agent = None if offline else react_agent()
 
     # 将 ReAct agent 包装成一个普通节点，避免子图兼容性差异带来的错误
     async def agent_node(state: dict) -> dict:  # type: ignore[override]
         # 优先使用 agent_hook_node 产生的 agent_view（模拟“agent 侧 hook”）
         prev_msgs = state.get("agent_view") or state.get("history_window") or state.get("messages", []) or []
-        # 调用 Agent 时增加容错，避免上游 4xx/网络错误导致整轮崩溃
+
+        # 离线回显模式：从最近一条 human 消息生成即时回复，便于验证“同轮可见”
+        if offline:
+            last_human = None
+            for m in reversed(prev_msgs):
+                role = m.get("type") if isinstance(m, dict) else getattr(m, "type", None)
+                if role in ("human", "user"):
+                    last_human = m.get("content") if isinstance(m, dict) else getattr(m, "content", "")
+                    break
+            reply = f"已收到：{(last_human or '').strip()}"
+            delta = {"type": "ai", "content": reply}
+            return {"messages": [delta], "history": [delta]}
+
+        # 在线模式：真实调用 ReAct Agent（带容错）
         try:
             result = await agent.ainvoke({"messages": prev_msgs})
         except Exception as e:
@@ -118,12 +136,12 @@ async def main():
     app = graph.compile(checkpointer=saver, store=store, cache=saver)
 
     print(
-        f"Limit={args.limit}, Keep={args.keep}, Target={args.target}, Summarize={'on' if not args.no_sum else 'off'}"
+        f"Limit={args.limit}, Mode={args.mode}, Rounds={args.rounds}, Target={args.target}, Summarize={'on' if not args.no_sum else 'off'}"
     )
     print("Type your message. 'exit' to quit.\n")
     print(
-        "提示: 将 --limit 调小(如 100) 更容易触发压缩; --keep 控制保留条数; "
-        "用 --target 选择按 human/ai 定向压缩; 用 --user-id 跨线程复用记忆\n"
+        "提示: 将 --limit 调小(如 100) 更容易触发压缩; --mode 选择 token/rounds; "
+        "--rounds 控制 rounds 模式下保留的人类轮数; 用 --target 选择按 human/ai 定向摘要; 用 --user-id 跨线程复用记忆\n"
     )
 
     # 仅用于展示与统计的“本地抄本”，避免与图的累加历史重复
@@ -133,7 +151,7 @@ async def main():
     first_turn = True
     # 跨轮控制标记：用于节点请求在下一轮注入长期记忆等
     control: dict = {}
-    # 用于每轮展示“压缩后的当前窗口”
+    # 用于每轮展示“压缩后的当前窗口”（严格只打印窗口，不再回落到完整抄本）
     last_window: list = []
 
     # 基于 user_id（若未提供则回落到 thread_id）构造长期记忆命名空间，实现跨线程/会话复用
@@ -215,6 +233,9 @@ async def main():
                 turn_state["messages"] = [mem_msg, *turn_state["messages"]]
             # 单次消费后清除请求标记
             control.pop("inject_memory_request", None)
+
+        # 默认窗口：先用当轮输入作为窗口初值，随后由 prep 节点更新为“压缩窗口”
+        last_window = turn_state.get("messages", [])
         # 分隔线：回合开始
         print("\n──────── 回合开始 ────────")
         print(f"[user] {q}")
@@ -283,26 +304,8 @@ async def main():
         if new_deltas:
             transcript.extend(new_deltas)
 
-        # 回合结果摘要
-        print("\n──────── 本轮结果 ────────")
-        if last_lookup_meta:
-            print(
-                f"[cache] lookup 计数={last_lookup_meta.get('counter')} (命中缓存则保持不变)"
-            )
-        if last_agent_text:
-            print(f"[agent] {last_agent_text}")
-        else:
-            print("[agent] (无回复)")
-        if last_suggest_text:
-            print(f"[suggest]\n{last_suggest_text}")
-
-        # 从用户输入抽取“可长期记忆”的信息并写入 InMemoryStore
-        mem_updates = await _extract_and_store_from_user(q)
-        if mem_updates:
-            print(f"[memory] 已更新: {', '.join(mem_updates)}")
-
-        # 回合结束：打印完整上下文与当前 token 估算
-        msgs = last_window or transcript
+        # 先打印“当前上下文”（仅展示 prep 产生的压缩窗口，或本轮输入）
+        msgs = last_window
         tok = _approx_tokens(msgs) if msgs else 0
 
         def _role(m):
@@ -319,7 +322,26 @@ async def main():
                 content = getattr(m, "content", "")
             content_str = str(content).replace("\n", " ")
             print(f"{i:02d}. [{_role(m)}] {content_str[:300]}")
-        print("──────── 结束 ────────\n")
+        print("──────── 结束 ────────")
+
+        # 回合结果摘要（在上下文之后展示更符合阅读节奏）
+        print("\n──────── 本轮结果 ────────")
+        if last_lookup_meta:
+            print(
+                f"[cache] lookup 计数={last_lookup_meta.get('counter')} (命中缓存则保持不变)"
+            )
+        if last_agent_text:
+            print(f"[agent] {last_agent_text}")
+        else:
+            print("[agent] (无回复)")
+        if last_suggest_text:
+            print(f"[suggest]\n{last_suggest_text}")
+
+        # 从用户输入抽取“可长期记忆”的信息并写入 InMemoryStore
+        mem_updates = await _extract_and_store_from_user(q)
+        if mem_updates:
+            print(f"[memory] 已更新: {', '.join(mem_updates)}")
+        print()
 
     # 退出后：从图状态取出完整 history 并打印
     try:
