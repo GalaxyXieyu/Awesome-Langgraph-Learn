@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 
 # Redis 配置
-REDIS_URL = "redis://default:mfzstl2v@dbconn.sealoshzh.site:41277"
+REDIS_URL = ""
 redis_client = redis.Redis.from_url(REDIS_URL, decode_responses=True)
 
 # 异步Redis客户端 (用于事件流)
@@ -480,7 +480,6 @@ async def _handle_task_failure(task_id: str, error: Exception):
         logger.error(f"发送失败事件失败: {xe}")
 
     raise error
-
 
 @celery_app.task(bind=True)
 def resume_writing_task(self, user_id: str, session_id: str, task_id: str, user_response: str):

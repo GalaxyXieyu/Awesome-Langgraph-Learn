@@ -6,7 +6,6 @@ Multi-Agent Handoff图实现
 
 from typing import Literal
 from langchain_openai import ChatOpenAI
-from langchain_anthropic import ChatAnthropic
 from langgraph.graph import StateGraph, START, END
 from langgraph.prebuilt import create_react_agent
 from langgraph.checkpoint.memory import MemorySaver
@@ -25,11 +24,6 @@ def get_llm(model_type: str = "openai"):
     if model_type == "openai":
         return ChatOpenAI(
             model="gpt-4o-mini",  # 或其他OpenAI模型
-            temperature=0.1
-        )
-    elif model_type == "anthropic":
-        return ChatAnthropic(
-            model="claude-3-haiku-20240307",
             temperature=0.1
         )
     else:

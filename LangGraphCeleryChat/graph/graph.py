@@ -95,7 +95,7 @@ def create_llm() -> ChatOpenAI:
         model="qwen2.5-72b-instruct-awq",
         temperature=0.7,
         base_url="https://llm.3qiao.vip:23436/v1",
-        api_key="sk-0rnrrSH0OsiaWCiv6b37C1E4E60c4b9394325001Ec19A197",
+        api_key="",
     )
 
 
