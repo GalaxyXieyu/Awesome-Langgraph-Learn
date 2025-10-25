@@ -1,0 +1,24 @@
+# LangChain 核心库
+langchain>=0.3.7
+langchain-core>=0.3.17  # 调整版本以兼容 langchain-openai
+langchain-openai>=0.2.8
+langgraph>=0.2.45
+
+# LangSmith
+langsmith>=0.1.144
+
+# Azure OpenAI
+openai>=1.54.4
+
+# 工具和解析
+pyyaml>=6.0.2
+python-dotenv>=1.0.1
+
+# 搜索工具
+requests>=2.31.0
+perplexityai>=1.0.0  # Perplexity 官方 SDK
+tavily-python>=0.5.0  # 可选备用
+
+# 类型检查
+typing-extensions>=4.12.2
+

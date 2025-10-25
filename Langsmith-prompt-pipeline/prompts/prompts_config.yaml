@@ -1,0 +1,25 @@
+# Prompts 配置文件 - 极简版
+# 核心理念：远程是唯一真相源，本地是工作副本
+
+# 同步配置
+sync:
+  auto_pull: true              # 默认自动拉取（建议保持 true）
+
+# Prompt 配置
+prompts:
+  # 参数解析 Prompt
+  parameter_parser:
+    file: "parameter_parser.yaml"
+    hub_name: "parameter_parser"     # Hub 上的名称（可选，默认用 key）
+    test_dataset: "test_cases"       # 测试数据集名称
+    min_quality_score: 0.8           # 最低质量要求
+    description: "从用户输入中提取结构化参数"
+    
+  # 报告生成 Prompt
+  report_generator:
+    file: "report_generator.yaml"
+    hub_name: "report_generator"
+    test_dataset: "test_cases"
+    min_quality_score: 0.85
+    description: "生成结构化的分析报告"
+
