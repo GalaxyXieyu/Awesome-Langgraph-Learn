@@ -219,10 +219,6 @@ metadata:
     success_rate: 0.95
     target_audience: 政府机关、国有企业、大型民企决策层
 
-# 版本说明
-# v1.1 (2025-10-25): 优化为政企风格，符合政府企业报告写作规范
-# 本地只保留最新版本，历史版本通过 LangSmith Hub 管理
-# Hub 地址: https://smith.langchain.com/hub/report_generator
 notes: |
   政企版报告生成器 v1.1
   - 使用 ChatPromptTemplate 标准格式，符合 2025 年 LangChain/LangSmith 最佳实践
