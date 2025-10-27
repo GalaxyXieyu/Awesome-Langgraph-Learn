@@ -5,11 +5,13 @@ LangGraph 节点实现
 from typing import Dict, Any
 import json
 from langchain_core.output_parsers import StrOutputParser
+from langsmith import traceable
 
 from graph.state import ReportState, ReportStateUpdate
 from config.azure_config import AzureConfig
 from tools.search_tool import SearchTool
 from prompts.prompt_manager import PromptManager
+from tools.capture import capture_dataset, capture_inputs
 
 
 class ReportNodes:
@@ -30,6 +32,8 @@ class ReportNodes:
         )
         self.prompt_manager = PromptManager()
     
+    @traceable
+    @capture_dataset(prompt_name="parameter_parser", dataset_name="parameter_parser")
     def parse_parameters_node(self, state: ReportState) -> ReportStateUpdate:
         """
         参数解析节点
@@ -44,16 +48,19 @@ class ReportNodes:
         prompt_config = self.prompt_manager.get('parameter_parser')
         
         # 准备输入参数
-        inputs = {
+        user_inputs = {
             "user_query": user_query
         }
+        
+        # 捕获 inputs（用于 Dataset）
+        capture_inputs(user_inputs, metadata={"prompt_version": prompt_config.get('version')})
         
         print(f"  使用 Prompt: {prompt_config.get('name')} {prompt_config.get('version')}")
         
         try:
-            # 创建 ChatPromptTemplate 并调用 LLM
-            prompt = self.prompt_manager.create_chat_prompt(prompt_config)
-            response = self.fast_llm.invoke(prompt.format_messages(**inputs))
+            # 创建并格式化 Prompt（自动应用默认值）
+            messages = self.prompt_manager.create_prompt(prompt_config, user_inputs)
+            response = self.fast_llm.invoke(messages)
             
             # 清理响应（移除可能的 markdown 代码块标记）
             content = response.content.strip()
@@ -130,6 +137,8 @@ class ReportNodes:
                 "metadata": state.get("metadata", {})
             }
     
+    @traceable
+    @capture_dataset(prompt_name="report_generator", dataset_name="report_generator")
     def generate_report_node(self, state: ReportState) -> ReportStateUpdate:
         """
         报告生成节点
@@ -141,7 +150,7 @@ class ReportNodes:
         prompt_config = self.prompt_manager.get('report_generator')
         
         # 准备输入参数
-        inputs = {
+        user_inputs = {
             "topic": state.get("topic", ""),
             "year_range": state.get("year_range", ""),
             "style": state.get("style", "formal"),
@@ -150,15 +159,21 @@ class ReportNodes:
             "search_results": state.get("search_results_formatted", "")
         }
         
+        # 捕获 inputs（用于 Dataset）
+        capture_inputs(user_inputs, metadata={
+            "user_query": state.get("user_query", ""),
+            "prompt_version": prompt_config.get("version")
+        })
 
         try:
-            # 创建 ChatPromptTemplate 并生成
-            prompt = self.prompt_manager.create_chat_prompt(prompt_config)
-
-            # 构建链
-            chain = prompt | self.llm | StrOutputParser()
+            # 方式1: 直接使用 create_prompt 格式化（推荐，简洁）
+            # messages = self.prompt_manager.create_prompt(prompt_config, user_inputs)
+            # report = self.llm.invoke(messages).content
             
-            # 生成报告
+            # 方式2: 使用链式调用（保留灵活性）
+            prompt = self.prompt_manager.create_prompt(prompt_config)
+            inputs = self.prompt_manager._get_prompt_with_defaults(prompt_config, user_inputs)
+            chain = prompt | self.llm | StrOutputParser()
             report = chain.invoke(inputs)
             
             return {

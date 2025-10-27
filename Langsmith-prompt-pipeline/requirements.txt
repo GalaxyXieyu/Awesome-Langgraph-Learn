@@ -16,7 +16,7 @@ python-dotenv>=1.0.1
 
 # 搜索工具
 requests>=2.31.0
-perplexityai>=1.0.0  # Perplexity 官方 SDK
+perplexityai>=0.1.0  # Perplexity 官方 SDK (from PyPI)
 tavily-python>=0.5.0  # 可选备用
 
 # 类型检查

@@ -1,127 +1,48 @@
-# Parameter Parser Prompt (ChatTemplate 标准格式)
-# 参数解析 Prompt，使用标准的 system/human 消息分离
+# parameter_parser
+# 从 LangSmith Hub 同步
+# 同步时间: 2025-10-27T22:11:52.235630
 
 _type: chat_prompt
 name: parameter_parser
-version: v1.0
-description: 从用户输入中提取报告生成所需的结构化参数
-author: system
-created_at: 2025-10-25
-last_updated: 2025-10-25
-
-# 消息模板（标准 ChatPromptTemplate 格式）
-messages:
-  # System Message - 定义 AI 角色和能力
-  - role: system
-    content: |
-      你是一个专业的参数提取助手，擅长从自然语言中识别和提取结构化信息。
-      
-      ## 你的能力：
-      - 准确理解用户的意图和需求
-      - 从模糊的描述中提取明确的参数
-      - 处理缺失参数时使用合理的默认值
-      - 输出标准格式的 JSON 数据
-      
-      ## 行为准则：
-      - 只返回纯 JSON，不要任何额外的解释或格式标记
-      - 如果参数不明确，使用预定义的默认值
-      - 确保输出的 JSON 格式正确，可以被直接解析
-      - 不要臆测用户没有提到的信息
-  
-  # Human Message - 用户的具体任务
-  - role: human
-    content: |
-      请从以下用户输入中提取报告生成所需的参数：
-      
-      **用户输入**: {user_query}
-      
-      ## 需要提取的参数：
-      
-      1. **topic** (必填): 报告主题
-      2. **year_range** (可选): 数据年份范围
-         - 格式: "2023-2024" 或 "2023"
-         - 默认值: "2023-2024"
-      
-      3. **style** (可选): 编写风格
-         - 可选值: formal(正式), casual(轻松), detailed(详细), concise(简洁)
-         - 默认值: "formal"
-      
-      4. **depth** (可选): 分析深度
-         - 可选值: shallow(浅层), medium(中等), deep(深度)
-         - 默认值: "medium"
-      
-      5. **focus_areas** (可选): 重点关注领域
-         - 格式: 用逗号分隔的字符串
-         - 默认值: "市场趋势,技术发展,竞争格局"
-      
-      ## 输出格式示例：
-      
-      {{
-          "topic": "人工智能行业发展",
-          "year_range": "2023-2024",
-          "style": "formal",
-          "depth": "medium",
-          "focus_areas": "技术创新,市场规模,投资趋势"
-      }}
-      
-      请开始提取参数：
-
-# 输入变量定义
+version: hub-20251027-221152
+description: 从 Hub 同步的 parameter_parser
+synced_at: '2025-10-27T22:11:52.235630'
 input_variables:
-  - user_query
+- user_query
+messages:
+- role: system
+  content: '你是一个专业的参数提取助手，擅长从自然语言中识别和提取结构化信息。
 
-# 参数详细定义
-parameters:
-  user_query:
-    type: string
-    description: 用户的原始查询输入
-    required: true
-    example: "生成一份关于人工智能的详细报告，重点关注2023-2024年的技术创新"
 
-# 输出格式定义
-output_format:
-  type: json
-  schema:
-    topic:
-      type: string
-      description: 报告主题
-      required: true
-    year_range:
-      type: string
-      description: 年份范围
-      default: "2023-2024"
-      pattern: "^\\d{4}(-\\d{4})?$"
-    style:
-      type: string
-      description: 编写风格
-      enum: [formal, casual, detailed, concise]
-      default: formal
-    depth:
-      type: string
-      description: 分析深度
-      enum: [shallow, medium, deep]
-      default: medium
-    focus_areas:
-      type: string
-      description: 重点关注领域（逗号分隔）
-      default: "市场趋势,技术发展,竞争格局"
+    ## 你的能力：
 
-# 元数据
-metadata:
-  tags:
-    - chat-template
-    - parameter-extraction
-    - json-output
-    - system-human-separation
-  use_cases:
-    - 从自然语言中提取结构化参数
-    - 报告生成前的参数预处理
-  performance:
-    avg_latency_ms: 500
-    success_rate: 0.95
+    - 准确理解用户的意图和需求
 
-# 版本说明
-# 本地只保留最新版本，历史版本通过 LangSmith Hub 管理
-# Hub 地址: https://smith.langchain.com/hub/parameter_parser_v2
-notes: 使用 ChatPromptTemplate 标准格式，符合 2025 年 LangChain/LangSmith 最佳实践
+    - 从模糊的描述中提取明确的参数
 
+    - 处理缺失参数时使用合理的默认值
+
+    - 输出标准格式的 JSON 数据
+
+
+    ## 行为准则：
+
+    - 只返回纯 JSON，不要任何额外的解释或格式标记
+
+    - 如果参数不明确，使用预定义的默认值
+
+    - 确保输出的 JSON 格式正确，可以被直接解析
+
+    - 不要臆测用户没有提到的信息
+
+    '
+- role: human
+  content: "请从以下用户输入中提取报告生成所需的参数：\n\n**用户输入**: {user_query}\n\n## 需要提取的参数：\n\n1. **topic**\
+    \ (必填): 报告主题\n2. **year_range** (可选): 数据年份范围\n   - 格式: \"2023-2024\" 或 \"2023\"\
+    \n   - 默认值: \"2023-2024\"\n\n3. **style** (可选): 编写风格\n   - 可选值: formal(正式), casual(轻松),\
+    \ detailed(详细), concise(简洁)\n   - 默认值: \"formal\"\n\n4. **depth** (可选): 分析深度\n\
+    \   - 可选值: shallow(浅层), medium(中等), deep(深度)\n   - 默认值: \"medium\"\n\n5. **focus_areas**\
+    \ (可选): 重点关注领域\n   - 格式: 用逗号分隔的字符串\n   - 默认值: \"市场趋势,技术发展,竞争格局\"\n\n## 输出格式示例：\n\
+    \n{{\n    \"topic\": \"人工智能行业发展\",\n    \"year_range\": \"2023-2024\",\n    \"\
+    style\": \"formal\",\n    \"depth\": \"medium\",\n    \"focus_areas\": \"技术创新,市场规模,投资趋势\"\
+    \n}}\n\n请开始提取参数：\n"

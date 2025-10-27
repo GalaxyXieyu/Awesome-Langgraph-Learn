@@ -1,6 +1,6 @@
-# LangSmith Prompt 管理与迭代优化实战指南
+# LangSmith Prompt 工程化平台
 
-> 🎯 一个完整的提示词管理系统，展示如何使用 LangSmith 进行提示词的优雅管理和迭代优化
+> 🚀 企业级提示词开发、测试、优化的完整解决方案
 
 [![LangChain](https://img.shields.io/badge/LangChain-Latest-blue)](https://python.langchain.com/)
 [![LangSmith](https://img.shields.io/badge/LangSmith-Integrated-green)](https://smith.langchain.com/)
@@ -8,668 +8,1030 @@
 
 ---
 
-## 项目简介
+## 📖 目录
 
-本项目是一个**基于 LangGraph 和 LangSmith 的智能报告生成系统**，更重要的是，它展示了如何**优雅地管理和迭代优化提示词**。
-
-### 核心价值
-
-1. **提示词管理最佳实践** - ChatPromptTemplate 标准化、YAML 格式存储、版本管理
-2. **LangSmith 完整集成** - 追踪、评估、数据集管理、Hub 推送
-3. **自动化工作流** - 自动拉取、自动测试、一键推送
-4. **多参数设计** - 灵活可配置的提示词系统
+- [快速开始](#-快速开始)
+- [核心 SOP：提示词开发工作流](#-核心-sop提示词开发工作流)
+- [系统架构](#-系统架构)
+- [核心功能](#-核心功能)
+- [使用指南](#-使用指南)
+- [高级特性](#-高级特性)
 
 ---
 
-## 核心功能点
-
-### 功能点1：ChatPromptTemplate 标准化
-
-**问题**：早期提示词混合系统指令和用户任务，难以维护和扩展。
-
-**解决方案**：使用 ChatPromptTemplate 标准格式，分离 System 和 Human 消息。
-
-```yaml
-_type: chat_prompt
-messages:
-  - role: system
-    content: |
-      你是一位资深的数据分析专家，拥有以下能力：
-      ## 核心能力
-      - 信息提取与结构化
-      - 深度洞察分析
-      ...
-  
-  - role: human
-    content: |
-      请根据以下参数生成报告：
-      主题：{topic}
-      风格：{style}
-      ...
-```
-
-**优势**：
-- ✅ 职责清晰：System 定义角色，Human 描述任务
-- ✅ 行为可控：System message 精确控制 AI 行为
-- ✅ 易于扩展：可添加 Few-shot 示例
-- ✅ 符合标准：LangChain/LangSmith 最佳实践
-
-### 功能点2：多参数提示词设计
-
-**问题**：单一提示词无法适应不同场景，为每个场景写新提示词维护成本高。
-
-**解决方案**：设计支持多参数的灵活提示词系统。
-
-```python
-# 6个核心参数
-{
-    "topic": "人工智能",           # 报告主题
-    "year_range": "2023-2024",    # 年份范围
-    "style": "formal",            # 风格：formal/casual/detailed/concise
-    "depth": "medium",            # 深度：shallow/medium/deep
-    "focus_areas": "技术创新,市场", # 关注领域
-    "search_results": "..."       # 动态搜索结果
-}
-```
-
-**优势**：
-- ✅ 一个提示词适应多种场景
-- ✅ 用户可精确控制输出
-- ✅ 便于 A/B 测试参数影响
-- ✅ 提高提示词复用率
-
-### 功能点3：YAML 格式提示词管理
-
-**问题**：提示词存储在代码中难以管理，JSON 格式不支持注释和换行。
-
-**解决方案**：使用 YAML 格式存储提示词。
-
-```yaml
-# parameter_parser.yaml
-name: parameter_parser
-version: v1.0
-description: 从用户输入中提取结构化参数
-
-input_variables:
-  - user_query
-  - topic
-  - year_range
-
-messages:
-  - role: system
-    content: |
-      # 清晰的注释
-      你的系统指令...
-  
-  - role: human
-    content: |
-      用户任务：{user_query}
-```
-
-**优势**：
-- ✅ 人类可读：支持注释、多行文本
-- ✅ Git 友好：diff 清晰，易于版本对比
-- ✅ 结构清晰：层次分明
-- ✅ 易于维护：独立文件，不混入代码
-
-### 功能点4：LangSmith Dataset 管理
-
-**问题**：手动测试提示词效果耗时且不够系统。
-
-**解决方案**：创建标准化测试数据集，使用 LangSmith evaluate 自动评估。
-
-```json
-// examples/test_cases.json
-[
-  {
-    "id": "test_001",
-    "input": {
-      "user_query": "生成AI行业报告",
-      "topic": "人工智能",
-      "style": "formal"
-    },
-    "expected_output": {
-      "min_length": 2000,
-      "must_include": ["技术创新", "市场规模"]
-    }
-  }
-]
-```
-
-**评估流程**：
-1. 创建数据集到 LangSmith
-2. 定义评估器（格式、长度、质量）
-3. 运行评估，获取分数
-4. 对比不同版本效果
-
-### 功能点5：PromptManager 自动化管理
-
-**问题**：手动上传下载提示词繁琐，多人协作容易出现版本冲突。
-
-**解决方案**：实现 PromptManager 自动化管理系统。
-
-**核心理念**：远程是唯一真相源
-
-```python
-# 自动拉取（默认行为）
-manager = PromptManager()
-config = manager.get('parameter_parser')
-# → 自动从 Hub 同步最新版本
-
-# 手动推送
-manager.push('parameter_parser')
-# → 验证 → 测试 → 推送到 Hub
-```
-
-**4步推送流程**：
-1. **验证格式** - 检查 YAML 格式正确性
-2. **自动测试** - 运行 LangSmith 评估，计算质量分数
-3. **推送到 Hub** - 更新远程版本
-4. **创建备份** - 可选的版本快照
-
-### 功能点6：LangSmith 追踪与调试
-
-**问题**：AI 应用的执行过程像黑盒，难以调试和优化。
-
-**解决方案**：使用 LangSmith 自动追踪每次执行。
-
-**可查看的信息**：
-- 📥 **输入参数**：所有传入的参数和变量
-- 🔄 **中间步骤**：每个节点的执行过程
-- 📤 **输出结果**：最终生成的内容
-- ⏱️ **性能数据**：执行时间、Token 使用量
-- 🎯 **质量评分**：评估器的打分结果
-
-**使用方式**：
-```python
-# 自动追踪（默认开启）
-python main.py --query "生成报告"
-
-# 查看追踪
-# → 访问 https://smith.langchain.com/
-```
-
-### 功能点7：提示词版本管理策略
-
-**问题**：如何管理提示词的多个版本？保留所有历史版本还是只保留最新？
-
-**解决方案**：本地只保留最新版本，历史版本通过 Hub 管理。
-
-**版本命名规则**：
-- 主版本：`parameter_parser`（Hub 上的当前版本）
-- 历史版本：`parameter_parser-v1.0.0`（Hub 上的备份）
-- 本地文件：`parameter_parser.yaml`（无版本号）
-
-**版本迭代流程**：
-```bash
-# 1. 修改本地文件
-vim prompts/parameter_parser.yaml
-
-# 2. 测试效果
-python main.py --query "测试"
-
-# 3. 推送到 Hub（可选创建备份）
-python -c "
-from prompts.prompt_manager import PromptManager
-manager = PromptManager()
-manager.push('parameter_parser', create_backup=True)
-"
-
-# 4. 其他人自动拉取最新版本
-# （下次运行时自动同步）
-```
-
----
-
-## 快速开始
+## 🚀 快速开始
 
 ### 1. 环境配置
 
 ```bash
 # 克隆项目
+git clone <your-repo>
 cd Langsmith-prompt-pipeline
 
 # 安装依赖
 pip install -r requirements.txt
 
 # 配置环境变量
-export AZURE_OPENAI_API_KEY="your-key"
-export LANGSMITH_API_KEY="your-key"
-export PERPLEXITY_API_KEY="your-key"
+cp .env.example .env
+# 编辑 .env 填入你的 API Keys
 ```
 
-### 2. 生成第一份报告
+**必需的环境变量**：
+```bash
+# LangSmith（必需）
+LANGSMITH_API_KEY="lsv2_pt_xxxxxxxxxxxx"
+LANGSMITH_PROJECT="prompt-pipeline"
+
+# LLM 配置（支持 Azure OpenAI 或 OpenAI）
+LLM_PROVIDER="azure"  # 或 "openai"
+
+# Azure OpenAI
+AZURE_ENDPOINT="https://your-resource.openai.azure.com/"
+AZURE_DEPLOYMENT="gpt-4"
+AZURE_API_KEY="your-key"
+AZURE_API_VERSION="2024-02-15-preview"
+
+# 或标准 OpenAI
+OPENAI_API_KEY="sk-xxxxx"
+OPENAI_MODEL="gpt-4o"
+```
+
+### 2. 验证安装
 
 ```bash
-python main.py --query "人工智能行业2024年发展分析"
+# 测试 LLM 连接
+python config/azure_config.py
+
+# 测试 LangSmith 连接
+python config/langsmith_config.py
+
+# 测试提示词管理器
+python prompts/prompt_manager.py
 ```
 
-### 3. 查看 LangSmith 追踪
+### 3. 运行第一个示例
 
-访问 https://smith.langchain.com/ 查看完整的执行过程。
+```bash
+# 生成报告（自动追踪到 LangSmith）
+python main.py --query "分析2024年AI行业发展趋势"
+```
 
-### 4. 使用 PromptManager
+访问 [LangSmith 控制台](https://smith.langchain.com/) 查看运行追踪 🎉
+
+---
+
+## 🎯 核心 SOP：提示词开发工作流
+
+### 标准操作流程（5步循环）
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  1. 开发   2. 测试   3. 评估   4. 优化   5. 部署           │
+│  ↓         ↓         ↓         ↓         ↓                  │
+│  YAML  →  Dataset →  LangSmith→ 调优  →  Hub 推送           │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Step 1: 开发提示词
+
+**创建或编辑 YAML 文件**（标准化格式）：
+
+```yaml
+# prompts/parameter_parser.yaml
+version: v1.0.0
+description: "从用户输入中提取结构化参数"
+
+messages:
+  - role: system
+    content: |
+      你是一个专业的参数提取助手。
+      从用户查询中提取以下参数：
+      - topic: 主题
+      - year_range: 年份范围
+      - style: 报告风格
+      - depth: 深度级别
+      
+      以 JSON 格式输出。
+
+  - role: user
+    content: "{user_query}"
+
+input_variables:
+  - user_query
+
+metadata:
+  author: "Your Name"
+  tags: ["parameter_extraction", "json_output"]
+```
+
+**配置提示词信息**（`prompts/prompts_config.yaml`）：
+
+```yaml
+prompts:
+  parameter_parser:
+    file: "parameter_parser.yaml"
+    hub_name: "parameter_parser"
+    test_dataset: "parameter_parser"  # 关联的测试数据集
+    
+    # 专属评估器
+    evaluators:
+      - "structure_evaluator"
+      - "parameter_extraction_evaluator"
+    
+    # 评估器权重
+    evaluator_weights:
+      structure_evaluator: 0.3
+      parameter_extraction_evaluator: 0.7
+```
+
+### Step 2: 创建测试数据集
+
+**方式 1：手动创建**
 
 ```python
-from prompts.prompt_manager import PromptManager
+from evaluation.datasets import DatasetManager
 
-# 初始化（自动拉取最新版本）
-manager = PromptManager()
+manager = DatasetManager()
 
-# 加载提示词
-config = manager.get('parameter_parser')
-prompt = manager.create_chat_prompt(config)
+test_cases = [
+    {
+        "input": {"user_query": "分析2023-2024年AI行业发展趋势，要详细的"},
+        "expected_params": {
+            "topic": "AI行业发展趋势",
+            "year_range": "2023-2024",
+            "depth": "详细"
+        }
+    },
+    # 更多测试用例...
+]
 
-# 使用提示词
-messages = prompt.format_messages(
-    user_query="生成AI报告",
-    topic="人工智能",
-    style="formal"
+# 创建数据集
+manager.create_dataset(
+    dataset_name="parameter_parser",
+    test_cases=test_cases
 )
 ```
 
----
+**方式 2：自动捕获**（推荐）
 
-## 项目结构
+```python
+# 在代码中使用 @capture_middle_result 装饰器
+from tools.capture import capture_middle_result
 
-```
-Langsmith-prompt-pipeline/
-├── prompts/                           # 📝 提示词管理
-│   ├── prompt_manager.py             # PromptManager 核心代码
-│   ├── prompts_config.yaml           # 提示词配置
-│   ├── parameter_parser.yaml         # 参数解析提示词
-│   ├── report_generator.yaml         # 报告生成提示词
-│   ├── example_usage.py              # 使用示例
-│   ├── PROMPT_MANAGER_GUIDE.md       # 详细使用指南
-│   └── .versions/                    # 版本信息（自动生成）
-│
-├── graph/                             # 🔄 LangGraph 工作流
-│   ├── state.py                      # 状态定义
-│   ├── nodes.py                      # 节点实现
-│   └── graph.py                      # Graph 构建
-│
-├── evaluation/                        # 📊 评估系统
-│   ├── datasets.py                   # 数据集管理
-│   └── evaluators.py                 # 评估器
-│
-├── tools/                             # 🔧 工具模块
-│   └── search_tool.py                # Perplexity 搜索
-│
-├── config/                            # ⚙️ 配置模块
-│   ├── azure_config.py               # Azure OpenAI 配置
-│   └── langsmith_config.py           # LangSmith 配置
-│
-├── examples/                          # 📋 测试数据
-│   └── test_cases.json               # 测试用例
-│
-├── main.py                            # 🎯 主程序入口
-├── requirements.txt                   # 📦 依赖包
-└── README.md                          # 📖 本文档
+@capture_middle_result(
+    dataset_name="parameter_parser",
+    step_name="parse_params"
+)
+def parse_parameters(user_query: str):
+    # 你的逻辑
+    return result
 ```
 
----
+运行程序后，中间结果自动保存到 LangSmith Dataset！
 
-## 核心功能演示
+### Step 3: 运行评估
 
-### 功能1：多参数报告生成
-
-```bash
-# 正式风格的深度分析
-python main.py \
-  --query "金融科技行业分析" \
-  --year-range "2023-2024" \
-  --style formal \
-  --depth deep \
-  --focus-areas "数字支付,区块链,智能投顾"
-
-# 简洁风格的快速概览
-python main.py \
-  --query "AI市场趋势" \
-  --style concise \
-  --depth shallow
-```
-
-### 功能2：提示词自动测试
+**方式 1：使用 PromptManager（推荐）**
 
 ```python
 from prompts.prompt_manager import PromptManager
 
 manager = PromptManager()
 
-# 运行 LangSmith 自动测试
-result = manager.test_with_langsmith('parameter_parser')
+# 评估提示词质量
+result = manager.evaluate_prompt('parameter_parser')
 
-print(f"质量分数: {result['quality_score']:.2%}")
-print(f"测试用例: {result['total']}")
-
-# 输出示例：
-# 质量分数: 92%
-# 测试用例: 5
+print(f"质量评分: {result['quality_score']:.2%}")
+print(f"测试用例数: {result['total']}")
 ```
 
-### 功能3：提示词版本管理
+**方式 2：使用 EvaluationRunner（高级）**
+
+```python
+from evaluation.evaluation import EvaluationRunner
+
+runner = EvaluationRunner()
+
+# 评估单个提示词
+result = runner.evaluate_prompt(
+    prompt_name='parameter_parser',
+    dataset_name='parameter_parser',
+    experiment_name='v1_test'
+)
+
+# 对比多个配置
+comparison = runner.compare_prompts(
+    prompt_name='parameter_parser',
+    dataset_name='parameter_parser',
+    llm_configs={
+        "gpt4": {"temperature": 0.3},
+        "gpt35": {"temperature": 0.7}
+    }
+)
+```
+
+**查看评估报告**：
+
+```
+============================================================
+LangSmith Evaluator - 提示词质量评估
+============================================================
+
+提示词: parameter_parser
+数据集: parameter_parser
+实验名称: eval_parameter_parser_20241027_143022
+评估器数量: 2
+
+开始评估...
+
+评估结果汇总:
+------------------------------------------------------------
+  structure_valid: 95.00%
+  parameter_extraction: 88.00%
+------------------------------------------------------------
+  总分: 91.50%
+  测试数: 10
+
+查看详细结果: https://smith.langchain.com/
+```
+
+### Step 4: 优化迭代
+
+**根据评估结果优化提示词**：
+
+1. **在 LangSmith Playground 中测试**
+   - 打开 [LangSmith Playground](https://smith.langchain.com/)
+   - 选择你的 Dataset
+   - 实时调整提示词
+   - 查看输出变化
+
+2. **本地修改 YAML**
+   ```yaml
+   # 优化后的 parameter_parser.yaml
+   messages:
+     - role: system
+       content: |
+         你是专业的参数提取助手。
+         
+         提取规则：
+         1. topic: 必需，提取主题关键词
+         2. year_range: 识别年份范围（如 "2023-2024"）
+         3. style: 可选，报告风格（专业/通俗）
+         4. depth: 可选，深度（简要/详细/深入）
+         
+         **输出格式**（必须是有效 JSON）：
+         {
+           "topic": "string",
+           "year_range": "string",
+           "style": "string",
+           "depth": "string"
+         }
+   ```
+
+3. **重新评估**
+   ```bash
+   python -c "from prompts.prompt_manager import PromptManager; \
+              PromptManager().evaluate_prompt('parameter_parser')"
+   ```
+
+4. **版本对比**
+   ```python
+   # 对比优化前后
+   runner.compare_prompts(
+       prompt_name='parameter_parser',
+       dataset_name='parameter_parser',
+       prompt_versions=['v1.0.0', 'v1.1.0']
+   )
+   ```
+
+### Step 5: 部署到生产
+
+**推送到 LangSmith Hub**：
 
 ```python
 from prompts.prompt_manager import PromptManager
 
 manager = PromptManager()
 
-# 检查同步状态
-manager.check_sync('parameter_parser')
+# 推送到 Hub（带版本号）
+manager.push(
+    prompt_name='parameter_parser',
+    commit_message='优化参数提取准确性',
+    change_type='minor'  # 'major' | 'minor' | 'patch'
+)
+```
 
+**团队协作 - 自动同步**：
+
+```python
+# 其他开发者拉取最新版本
+manager.pull('parameter_parser')  # 自动拉取最新版本
+
+# 或启用自动拉取（默认开启）
+manager = PromptManager(auto_pull=True)
+prompt = manager.get('parameter_parser')  # 自动获取最新版
+```
+
+**回滚版本**（如有问题）：
+
+```python
 # 查看历史版本
-versions = manager.list_versions('parameter_parser')
+manager.list_versions('parameter_parser')
 
 # 回滚到指定版本
 manager.rollback('parameter_parser', 'v1.0.0')
 ```
 
-### 功能4：提示词推送与同步
+---
 
+## 🏗️ 系统架构
+
+### 整体架构图
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        用户层                                │
+│  main.py  │  prompts/  │  evaluation/  │  LangSmith UI      │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+┌──────────────────────────┴──────────────────────────────────┐
+│                      核心模块层                              │
+├─────────────────┬─────────────────┬────────────────────────┤
+│  Prompt 管理    │   评估系统       │   LangGraph 流程       │
+│  - YAML存储     │   - 评估器注册表  │   - StateGraph       │
+│  - 版本管理     │   - 动态加载      │   - 节点编排          │
+│  - Hub同步      │   - 数据集管理    │   - 流式输出          │
+└─────────────────┴─────────────────┴────────────────────────┘
+                           │
+┌──────────────────────────┴──────────────────────────────────┐
+│                      基础服务层                              │
+│  LangSmith API  │  LLM (Azure/OpenAI)  │  外部工具          │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 核心设计理念
+
+#### 1. **配置驱动** - 一切皆配置
+```yaml
+# prompts_config.yaml
+prompts:
+  parameter_parser:
+    evaluators: ["structure_evaluator", "parameter_extraction_evaluator"]
+    evaluator_weights: {structure_evaluator: 0.3}
+```
+
+#### 2. **职责分离** - 单一职责原则
+```
+PromptManager   → 提示词管理（加载、保存、同步）
+EvaluationRunner → 评估流程编排（不包含业务逻辑）
+Evaluators      → 按提示词类型组织（report, parameter, summary...）
+```
+
+#### 3. **可扩展性** - 插件化架构
 ```python
-# 修改本地文件后推送
-manager = PromptManager()
-
-# 推送并自动测试
-result = manager.push('parameter_parser', with_test=True)
-
-# 推送并创建版本备份
-result = manager.push('parameter_parser', create_backup=True)
+# 新增提示词评估器
+# 1. 创建 evaluation/evaluators/your_type.py
+# 2. 注册到 EVALUATOR_REGISTRY
+# 3. 配置到 prompts_config.yaml
+# 完成！无需修改核心代码
 ```
 
 ---
 
-## 使用场景
+## 🔧 核心功能
 
-### 场景1：团队协作
+### 1. Prompt 管理系统
 
-**开发者 A**：
-```bash
-# 修改提示词
-vim prompts/parameter_parser.yaml
+**特性**：
+- ✅ YAML 标准化格式（ChatPromptTemplate）
+- ✅ 版本管理（语义化版本号）
+- ✅ LangSmith Hub 同步
+- ✅ 自动拉取最新版本
+- ✅ 一键回滚
+
+**文件结构**：
+```
+prompts/
+├── prompts_config.yaml      # 提示词配置清单
+├── parameter_parser.yaml    # 参数解析提示词
+├── report_generator.yaml    # 报告生成提示词
+└── prompt_manager.py        # 管理器核心代码
+```
+
+**核心 API**：
+```python
+from prompts.prompt_manager import PromptManager
+
+manager = PromptManager()
+
+# 获取提示词（自动拉取最新版）
+prompt_template = manager.build_prompt_from_name('parameter_parser')
 
 # 推送到 Hub
-python -c "
-from prompts.prompt_manager import PromptManager
-manager = PromptManager()
-manager.push('parameter_parser')
-"
+manager.push('parameter_parser', commit_message='优化提取准确性')
+
+# 评估质量
+result = manager.evaluate_prompt('parameter_parser')
 ```
 
-**开发者 B**：
-```bash
-# 运行程序（自动拉取 A 的修改）
-python main.py --query "测试"
-# → 自动从 Hub 同步最新版本
+### 2. 评估系统
+
+**架构设计**：
+```
+evaluation/
+├── evaluation.py           # 评估运行器（流程编排）
+├── datasets.py            # 数据集管理
+└── evaluators/            # 评估器目录（按提示词类型组织）
+    ├── __init__.py        # 评估器注册表
+    ├── report.py          # 报告评估器
+    └── parameter.py       # 参数评估器
 ```
 
-### 场景2：A/B 测试
-
-```bash
-# 测试不同风格的效果
-python main.py --query "AI报告" --style formal > formal.txt
-python main.py --query "AI报告" --style casual > casual.txt
-
-# 对比效果，选择最优
-diff formal.txt casual.txt
-```
-
-### 场景3：提示词优化迭代
-
+**评估器注册表**（动态加载）：
 ```python
-# 1. 评估当前版本
-result_v1 = manager.test_with_langsmith('report_generator')
-print(f"v1 质量分: {result_v1['quality_score']}")
+# evaluation/evaluators/__init__.py
+EVALUATOR_REGISTRY = {
+    # 通用评估器
+    "structure_evaluator": ReportEvaluators.structure_evaluator,
+    "content_completeness_evaluator": ReportEvaluators.content_completeness_evaluator,
+    
+    # 参数解析专用
+    "parameter_extraction_evaluator": ParameterEvaluators.parameter_extraction_evaluator,
+    "field_type_evaluator": ParameterEvaluators.field_type_evaluator,
+}
 
-# 2. 修改提示词（优化 system message）
-
-# 3. 重新测试
-result_v2 = manager.test_with_langsmith('report_generator')
-print(f"v2 质量分: {result_v2['quality_score']}")
-
-# 4. 如果提升，推送新版本
-if result_v2['quality_score'] > result_v1['quality_score']:
-    manager.push('report_generator', create_backup=True)
+# 根据配置自动加载评估器
+evaluators = get_evaluators_for_prompt(prompt_config)
 ```
 
----
+**评估器类型**：
 
-## LangSmith 完整工作流
+| 评估器 | 类型 | 用途 | 适用提示词 |
+|--------|------|------|-----------|
+| `structure_evaluator` | 规则 | 检查输出结构 | 所有 |
+| `content_completeness_evaluator` | 规则 | 检查内容完整性 | report_generator |
+| `relevance_evaluator` | LLM | 检查内容相关性 | report_generator |
+| `parameter_usage_evaluator` | 规则 | 检查参数使用 | report_generator |
+| `parameter_extraction_evaluator` | 规则 | 检查参数提取准确性 | parameter_parser |
+| `field_type_evaluator` | 规则 | 检查字段类型 | parameter_parser |
 
-### 1. 创建测试数据集
+**自定义评估器**：
+```python
+# evaluation/evaluators/your_type.py
+from langsmith.evaluation import EvaluationResult, run_evaluator
 
+class YourEvaluators:
+    @staticmethod
+    @run_evaluator
+    def your_custom_evaluator(run, example) -> EvaluationResult:
+        """自定义评估逻辑"""
+        output = run.outputs.get("report", "")
+        
+        # 你的评估逻辑
+        score = calculate_score(output)
+        
+        return EvaluationResult(
+            key="your_metric",
+            score=score,
+            comment="评估说明"
+        )
+```
+
+### 3. LangGraph 工作流
+
+**多步骤流程编排**：
+```python
+# graph/graph.py
+workflow = StateGraph(ReportState)
+
+# 添加节点
+workflow.add_node("parse_parameters", parse_parameters_node)
+workflow.add_node("web_search", web_search_node)
+workflow.add_node("generate_report", generate_report_node)
+workflow.add_node("quality_check", quality_check_node)
+
+# 定义流程
+workflow.set_entry_point("parse_parameters")
+workflow.add_edge("parse_parameters", "web_search")
+workflow.add_edge("web_search", "generate_report")
+workflow.add_edge("generate_report", "quality_check")
+```
+
+**状态管理**：
+```python
+# graph/state.py
+class ReportState(TypedDict):
+    user_query: str
+    topic: str
+    year_range: str
+    style: str
+    depth: str
+    search_results: List[Dict]
+    report: str
+    metadata: Dict[str, Any]
+```
+
+### 4. 中间结果捕获
+
+**自动捕获装饰器**：
+```python
+from tools.capture import capture_middle_result
+
+@capture_middle_result(
+    dataset_name="parameter_parser",
+    step_name="parse_params"
+)
+def parse_parameters(user_query: str):
+    # 解析逻辑
+    result = extract_params(user_query)
+    return result
+
+# 运行后，结果自动保存到 LangSmith Dataset！
+```
+
+**手动捕获**：
+```python
+from tools.capture import MiddleResultCapture
+
+capture = MiddleResultCapture("my_dataset")
+
+# 捕获输入输出
+capture.add_example(
+    inputs={"query": "用户输入"},
+    outputs={"result": "输出结果"},
+    metadata={"step": "parse_params"}
+)
+
+# 批量上传
+capture.upload_to_dataset()
+```
+
+### 5. LangSmith 完整集成
+
+**追踪（Tracing）**：
+```python
+from config.langsmith_config import LangSmithConfig
+
+# 启用追踪
+LangSmithConfig.enable_tracing(project_name="my_project")
+
+# 所有 LLM 调用自动追踪到 LangSmith！
+```
+
+**数据集管理**：
 ```python
 from evaluation.datasets import DatasetManager
 
-dm = DatasetManager()
+manager = DatasetManager()
 
-# 从 JSON 创建数据集
-dm.create_dataset_from_json('test_cases', 'examples/test_cases.json')
+# 创建数据集
+manager.create_dataset_from_file(
+    dataset_name="test_cases",
+    filepath="examples/test_cases.json"
+)
+
+# 列出所有数据集
+manager.list_datasets()
+
+# 删除数据集
+manager.delete_dataset("old_dataset")
 ```
 
-### 2. 定义评估器
+---
+
+## 📘 使用指南
+
+### 场景 1：开发新提示词
+
+```bash
+# 1. 创建 YAML 文件
+cat > prompts/summary.yaml << 'EOF'
+version: v1.0.0
+description: "生成内容摘要"
+messages:
+  - role: system
+    content: "你是摘要生成助手，提取关键信息。"
+  - role: user
+    content: "{content}"
+input_variables: ["content"]
+EOF
+
+# 2. 配置提示词
+# 编辑 prompts/prompts_config.yaml 添加配置
+
+# 3. 创建测试数据集
+python -c "
+from evaluation.datasets import DatasetManager
+manager = DatasetManager()
+manager.create_dataset('summary_test', test_cases=[...])
+"
+
+# 4. 测试提示词
+python -c "
+from prompts.prompt_manager import PromptManager
+result = PromptManager().evaluate_prompt('summary')
+print(f'质量评分: {result[\"quality_score\"]:.2%}')
+"
+
+# 5. 推送到 Hub
+python -c "
+from prompts.prompt_manager import PromptManager
+PromptManager().push('summary', commit_message='初始版本')
+"
+```
+
+### 场景 2：优化现有提示词
 
 ```python
-from langsmith.evaluation import run_evaluator, EvaluationResult
+from prompts.prompt_manager import PromptManager
+from evaluation.evaluation import EvaluationRunner
 
-@run_evaluator
-def format_check(run, example):
-    """检查输出格式"""
-    output = run.outputs.get("report", "")
-    has_content = len(output) > 500
-    return EvaluationResult(
-        key="format_check",
-        score=1.0 if has_content else 0.0
+manager = PromptManager()
+runner = EvaluationRunner()
+
+# 1. 评估当前版本
+baseline = runner.evaluate_prompt(
+    prompt_name='parameter_parser',
+    dataset_name='parameter_parser',
+    experiment_name='baseline_v1'
+)
+
+# 2. 修改 prompts/parameter_parser.yaml
+
+# 3. 评估优化版本
+optimized = runner.evaluate_prompt(
+    prompt_name='parameter_parser',
+    dataset_name='parameter_parser',
+    experiment_name='optimized_v2'
+)
+
+# 4. 对比结果
+print(f"Baseline 分数: {baseline['overall_score']:.2%}")
+print(f"优化后分数: {optimized['overall_score']:.2%}")
+print(f"提升: {(optimized['overall_score'] - baseline['overall_score']):.2%}")
+
+# 5. 如果提升明显，推送新版本
+if optimized['overall_score'] > baseline['overall_score']:
+    manager.push('parameter_parser', commit_message='提升准确性', change_type='minor')
+```
+
+### 场景 3：A/B 测试不同 LLM 配置
+
+```python
+from evaluation.evaluation import EvaluationRunner
+
+runner = EvaluationRunner()
+
+# 对比不同温度参数
+comparison = runner.compare_prompts(
+    prompt_name='report_generator',
+    dataset_name='report_test',
+    llm_configs={
+        "保守模式": {"temperature": 0.3},
+        "均衡模式": {"temperature": 0.7},
+        "创造模式": {"temperature": 0.9}
+    }
+)
+
+# 查看对比结果
+print("\n各配置得分:")
+for config_name, result in comparison.items():
+    print(f"  {config_name}: {result['overall_score']:.2%}")
+
+print(f"\n推荐配置: {comparison['recommended_version']}")
+```
+
+### 场景 4：团队协作
+
+**开发者 A - 优化提示词**：
+```python
+from prompts.prompt_manager import PromptManager
+
+manager = PromptManager()
+
+# 拉取最新版本
+manager.pull('parameter_parser')
+
+# 本地修改并测试
+result = manager.evaluate_prompt('parameter_parser')
+
+# 推送到 Hub
+if result['quality_score'] > 0.9:
+    manager.push('parameter_parser', commit_message='优化参数提取')
+```
+
+**开发者 B - 使用最新版本**：
+```python
+from prompts.prompt_manager import PromptManager
+
+# 自动拉取模式（默认）
+manager = PromptManager(auto_pull=True)
+
+# 使用提示词（自动获取最新版）
+prompt = manager.build_prompt_from_name('parameter_parser')
+
+# 无需手动同步，自动获取团队最新版本！
+```
+
+---
+
+## 🎓 高级特性
+
+### 1. 流式输出（Streaming）
+
+```python
+from graph.graph import ReportGraphBuilder
+import asyncio
+
+async def stream_report():
+    builder = ReportGraphBuilder()
+    
+    # 异步流式运行
+    final_state = await builder.arun(
+        user_query="分析AI行业2024年发展"
     )
+    
+    # 逐步输出每个节点的结果
+    # parse_parameters -> web_search -> generate_report -> quality_check
+
+asyncio.run(stream_report())
 ```
 
-### 3. 运行评估
+### 2. 自定义评估器
 
 ```python
-from langsmith.evaluation import evaluate
+# 1. 创建评估器
+# evaluation/evaluators/summary.py
+class SummaryEvaluators:
+    @staticmethod
+    @run_evaluator
+    def conciseness_evaluator(run, example):
+        """简洁性评估"""
+        output = run.outputs.get("summary", "")
+        word_count = len(output)
+        
+        # 评分逻辑：100-200字最佳
+        if 100 <= word_count <= 200:
+            score = 1.0
+        else:
+            score = max(0, 1 - abs(word_count - 150) / 150)
+        
+        return EvaluationResult(
+            key="conciseness",
+            score=score,
+            comment=f"字数: {word_count}"
+        )
 
-# 评估函数
-def test_function(inputs):
-    # 使用提示词生成输出
-    config = manager.get('report_generator')
-    prompt = manager.create_chat_prompt(config)
-    # ...
-    return {"report": generated_report}
+# 2. 注册评估器
+# evaluation/evaluators/__init__.py
+EVALUATOR_REGISTRY['conciseness_evaluator'] = SummaryEvaluators.conciseness_evaluator
 
-# 运行评估
-results = evaluate(
-    test_function,
-    data="test_cases",
-    evaluators=[format_check, length_check, quality_check]
+# 3. 配置使用
+# prompts_config.yaml
+prompts:
+  summary:
+    evaluators:
+      - "structure_evaluator"
+      - "conciseness_evaluator"  # 你的自定义评估器
+```
+
+### 3. 批量评估
+
+```python
+from evaluation.evaluation import EvaluationRunner
+
+runner = EvaluationRunner()
+
+# 批量评估所有提示词
+prompts = ['parameter_parser', 'report_generator', 'summary']
+
+results = {}
+for prompt_name in prompts:
+    results[prompt_name] = runner.evaluate_prompt(
+        prompt_name=prompt_name,
+        dataset_name=f"{prompt_name}_test"
+    )
+
+# 生成质量报告
+for name, result in results.items():
+    print(f"{name}: {result['overall_score']:.2%}")
+```
+
+### 4. 版本回滚
+
+```python
+from prompts.prompt_manager import PromptManager
+
+manager = PromptManager()
+
+# 查看历史版本
+versions = manager.list_versions('parameter_parser')
+# v1.0.0, v1.1.0, v1.2.0
+
+# 回滚到稳定版本
+manager.rollback('parameter_parser', 'v1.1.0')
+
+# 验证回滚效果
+result = manager.evaluate_prompt('parameter_parser')
+```
+
+### 5. 自动化 CI/CD
+
+```bash
+# .github/workflows/prompt_quality.yml
+name: Prompt Quality Check
+
+on: [push, pull_request]
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Setup Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.10'
+      
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      
+      - name: Run Evaluation
+        env:
+          LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
+        run: |
+          python -c "
+          from prompts.prompt_manager import PromptManager
+          manager = PromptManager()
+          
+          for prompt in ['parameter_parser', 'report_generator']:
+              result = manager.evaluate_prompt(prompt)
+              score = result['quality_score']
+              
+              if score < 0.8:
+                  print(f'❌ {prompt} 质量不达标: {score:.2%}')
+                  exit(1)
+              else:
+                  print(f'✅ {prompt} 质量合格: {score:.2%}')
+          "
+```
+
+---
+
+## 📁 项目结构
+
+```
+Langsmith-prompt-pipeline/
+├── config/                      # 配置模块
+│   ├── azure_config.py          # LLM 配置（Azure/OpenAI）
+│   └── langsmith_config.py      # LangSmith 配置
+│
+├── prompts/                     # 提示词管理
+│   ├── prompts_config.yaml      # 提示词配置清单
+│   ├── parameter_parser.yaml    # 参数解析提示词
+│   ├── report_generator.yaml    # 报告生成提示词
+│   └── prompt_manager.py        # 提示词管理器
+│
+├── evaluation/                  # 评估系统
+│   ├── evaluation.py            # 评估运行器
+│   ├── datasets.py              # 数据集管理
+│   └── evaluators/              # 评估器（按类型组织）
+│       ├── __init__.py          # 评估器注册表
+│       ├── report.py            # 报告评估器
+│       └── parameter.py         # 参数评估器
+│
+├── graph/                       # LangGraph 工作流
+│   ├── graph.py                 # Graph 构建器
+│   ├── state.py                 # 状态定义
+│   └── nodes.py                 # 节点实现
+│
+├── tools/                       # 工具模块
+│   ├── capture.py               # 中间结果捕获
+│   └── search_tool.py           # 搜索工具
+│
+├── main.py                      # 主程序入口
+├── requirements.txt             # 依赖清单
+└── README.md                    # 本文档
+```
+
+---
+
+## 🔍 常见问题
+
+### Q1: 如何切换 LLM 提供商？
+
+**A**: 修改 `.env` 文件：
+
+```bash
+# 使用 Azure OpenAI
+LLM_PROVIDER="azure"
+AZURE_ENDPOINT="..."
+AZURE_DEPLOYMENT="..."
+
+# 或使用标准 OpenAI
+LLM_PROVIDER="openai"
+OPENAI_API_KEY="sk-..."
+OPENAI_MODEL="gpt-4o"
+```
+
+### Q2: 评估器如何选择？
+
+**A**: 根据提示词类型选择：
+
+```yaml
+# 参数提取类提示词
+parameter_parser:
+  evaluators:
+    - "structure_evaluator"           # 检查 JSON 格式
+    - "parameter_extraction_evaluator" # 检查提取准确性
+    - "field_type_evaluator"          # 检查字段类型
+
+# 内容生成类提示词
+report_generator:
+  evaluators:
+    - "structure_evaluator"            # 检查结构
+    - "content_completeness_evaluator" # 检查完整性
+    - "relevance_evaluator"            # 检查相关性（LLM）
+```
+
+### Q3: 如何处理大规模测试数据集？
+
+**A**: 使用分批评估：
+
+```python
+from evaluation.evaluation import EvaluationRunner
+
+runner = EvaluationRunner()
+
+# 设置并发数
+result = runner.evaluate_prompt(
+    prompt_name='parameter_parser',
+    dataset_name='large_dataset',
+    max_concurrency=10  # 并发执行
 )
 ```
 
-### 4. 查看结果
+### Q4: 如何集成到现有项目？
 
-访问 LangSmith UI：
-- **Datasets**: 管理测试数据集
-- **Experiments**: 查看评估结果
-- **Traces**: 查看详细执行过程
-- **Hub**: 管理提示词版本
-
----
-
-## 进阶配置
-
-### 自定义评估器
+**A**: 三步集成：
 
 ```python
-# evaluation/evaluators.py
+# 1. 安装依赖
+pip install langsmith langchain-openai langgraph
 
-@staticmethod
-@run_evaluator
-def custom_evaluator(run, example) -> EvaluationResult:
-    """自定义评估逻辑"""
-    output = run.outputs.get("report", "")
-    
-    # 你的评估逻辑
-    score = calculate_score(output)
-    
-    return EvaluationResult(
-        key="custom_metric",
-        score=score,
-        comment="评估说明"
-    )
-```
+# 2. 复制模块到你的项目
+cp -r prompts/ evaluation/ config/ your_project/
 
-### 添加新的提示词
-
-```yaml
-# prompts/new_prompt.yaml
-_type: chat_prompt
-name: new_prompt
-version: v1.0
-
-messages:
-  - role: system
-    content: |
-      系统指令...
-  
-  - role: human
-    content: |
-      任务描述...
-
-input_variables:
-  - param1
-  - param2
-```
-
-```yaml
-# prompts/prompts_config.yaml
-prompts:
-  new_prompt:
-    file: new_prompt.yaml
-    hub_name: new_prompt
-    test_dataset: test_cases
-    min_quality_score: 0.8
+# 3. 使用
+from prompts.prompt_manager import PromptManager
+manager = PromptManager()
+prompt = manager.build_prompt_from_name('your_prompt')
 ```
 
 ---
 
-## 核心 API 参考
+## 📚 相关文档
 
-### PromptManager
+- [LangSmith 官方文档](https://docs.smith.langchain.com/)
+- [LangChain 官方文档](https://python.langchain.com/)
+- [LangGraph 官方文档](https://langchain-ai.github.io/langgraph/)
 
-```python
-class PromptManager:
-    def __init__(self, auto_pull=True):
-        """初始化，auto_pull 控制是否自动从 Hub 拉取"""
-    
-    def get(self, prompt_name: str) -> Dict:
-        """加载提示词配置（自动拉取最新版本）"""
-    
-    def push(self, prompt_name: str, 
-             with_test=True, 
-             create_backup=False) -> bool:
-        """推送本地修改到 Hub"""
-    
-    def test_with_langsmith(self, prompt_name: str) -> Dict:
-        """使用 LangSmith 自动测试提示词质量"""
-    
-    def check_sync(self, prompt_name: str):
-        """检查本地和远程的同步状态"""
-    
-    def list_versions(self, prompt_name: str) -> List[str]:
-        """列出所有历史版本"""
-    
-    def rollback(self, prompt_name: str, version: str):
-        """回滚到指定版本"""
-    
-    def create_chat_prompt(self, config: Dict) -> ChatPromptTemplate:
-        """从配置创建 ChatPromptTemplate"""
-```
+**项目内文档**：
+- `docs/evaluator-guide.md` - 评估器开发指南
+- `docs/evaluation-configuration-guide.md` - 评估配置详解
+- `docs/capture-decorator-guide.md` - 中间结果捕获指南
+- `EVALUATION_QA.md` - 评估系统 Q&A
+- `FEATURES_SUMMARY.md` - 功能特性总结
 
 ---
 
-## 最佳实践
+## 🤝 贡献指南
 
-### ✅ 推荐做法
+欢迎提交 Issue 和 Pull Request！
 
-1. **保持 auto_pull=True** - 始终使用最新版本
-2. **推送前先测试** - 使用 `with_test=True` 确保质量
-3. **重要版本创建备份** - 使用 `create_backup=True`
-4. **本地为主要修改源** - 避免在 Hub 网页直接修改
-5. **使用 System/Human 分离** - 遵循 ChatPromptTemplate 标准
-
-### ❌ 避免做法
-
-1. ~~在 Hub 网页上直接修改~~
-2. ~~跳过测试直接推送~~
-3. ~~提示词中混合系统指令和用户任务~~
-4. ~~多人同时修改同一提示词~~
+**开发流程**：
+1. Fork 项目
+2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 开启 Pull Request
 
 ---
 
-## 常见问题
+## 📄 许可证
 
-### Q1: 如何禁用自动拉取？
-
-```python
-# 临时禁用（用于本地测试）
-manager = PromptManager(auto_pull=False)
-```
-
-### Q2: 推送失败怎么办？
-
-检查清单：
-1. YAML 格式是否正确
-2. LangSmith API Key 是否有效
-3. 网络连接是否正常
-4. 测试分数是否达标
-
-### Q3: 如何查看提示词在 LangSmith 中的表现？
-
-访问 https://smith.langchain.com/
-- **Projects** → 查看追踪
-- **Datasets** → 管理测试数据
-- **Hub** → 查看提示词版本
-
-### Q4: 多人修改冲突如何处理？
-
-```python
-# 修改前检查同步状态
-manager.check_sync('parameter_parser')
-
-# 如果有人更新，先拉取
-config = manager.get('parameter_parser')  # 自动拉取
-
-# 合并修改后推送
-manager.push('parameter_parser')
-```
+MIT License - 详见 [LICENSE](LICENSE) 文件
 
 ---
 
-## 相关文档
+## 💬 联系方式
 
-- **`prompts/PROMPT_MANAGER_GUIDE.md`** - PromptManager 详细使用指南
-- **`prompts/example_usage.py`** - 完整使用示例
-- **`FINAL_IMPLEMENTATION_REPORT.md`** - 实施总结报告
-
----
-
-## 总结
-
-本项目展示了一个**生产级的提示词管理系统**，包含：
-
-✅ **标准化架构** - ChatPromptTemplate、YAML 格式、版本管理  
-✅ **自动化工作流** - 自动拉取、自动测试、一键推送  
-✅ **完整 LangSmith 集成** - 追踪、评估、数据集、Hub  
-✅ **团队协作友好** - 零手动同步，自动最新  
-✅ **最佳实践应用** - 2025年 LangChain/LangSmith 标准  
-
-**核心价值**：
-- 🎯 学习如何优雅地管理提示词
-- 📊 掌握 LangSmith 完整工作流
-- 🔄 实践提示词迭代优化
-- 🤝 团队协作最佳实践
+- 作者: Your Name
+- Email: your.email@example.com
+- 项目主页: https://github.com/your-username/langsmith-prompt-pipeline
 
 ---
 
-## 许可证
-
----
+<p align="center">
+  <b>🌟 如果这个项目对你有帮助，请给一个 Star！🌟</b>
+</p>

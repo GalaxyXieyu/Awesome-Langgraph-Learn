@@ -7,15 +7,17 @@ import sys
 import os
 import yaml
 
-# 确保 Windows 控制台正确显示 UTF-8
-if sys.platform == 'win32':
-    import codecs
-    sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer, errors='ignore')
-    sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, errors='ignore')
+# 确保 Windows 控制台正确显示 UTF-8（仅在 Windows 平台且需要时）
+if sys.platform == 'win32' and not hasattr(sys.stdout, 'reconfigure'):
+    try:
+        import codecs
+        sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer, errors='ignore')
+        sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, errors='ignore')
+    except (AttributeError, OSError):
+        pass  # 在某些环境下可能不需要或不可用
 from typing import Optional, Dict, Any, List, Union
 from pathlib import Path
 from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
-from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 
 class PromptManager:
     """Prompt 管理器类 - 极简自动化版本
@@ -41,9 +43,6 @@ class PromptManager:
         # 加载配置
         self.config = self._load_config(config_file)
         self.auto_pull = auto_pull
-        
-        # 缓存已加载的 prompt
-        self._prompt_cache = {}
         
         # 版本信息存储目录
         self.versions_dir = self.prompts_dir / ".versions"
@@ -107,135 +106,86 @@ class PromptManager:
         with open(filepath, 'r', encoding='utf-8') as f:
             config = yaml.safe_load(f)
         
-        print(f"[OK] 从本地加载 Prompt: {filepath.name}")
-        print(f"  版本: {config.get('version', 'unknown')}")
-        print(f"  类型: {config.get('_type', 'unknown')}")
-        print(f"  描述: {config.get('description', 'N/A')}")
-        
+        # 改进版本信息显示逻辑
+        version_info = config.get('version')
+        if not version_info and 'synced_at' in config:
+            # 如果没有 version 但有 synced_at，显示同步时间
+            version_info = f"synced@{config['synced_at'][:19]}"  # 只取到秒
+        elif not version_info:
+            version_info = 'unknown'
         return config
     
-    def _detect_prompt_type(self, config: Dict[str, Any]) -> str:
+    def create_prompt(self, config: Dict[str, Any], user_inputs: Optional[Dict[str, Any]] = None):
         """
-        检测 Prompt 类型
+        创建并格式化 Prompt（一站式方法）
         
         Args:
             config: Prompt 配置字典
+            user_inputs: 用户提供的输入参数（可选）
+                - 如果提供，返回格式化后的结果（消息列表或字符串）
+                - 如果不提供，返回模板对象（用于链式调用）
             
         Returns:
-            'chat_prompt' 或 'simple_prompt'
-        """
-        # 检查配置中的 _type 字段
-        prompt_type = config.get('_type', '')
-        if prompt_type in ['chat_prompt', 'chat']:
-            return 'chat_prompt'
-        
-        # 检查是否有 messages 字段
-        if 'messages' in config:
-            return 'chat_prompt'
-        
-        # 默认为简单 prompt
-        return 'simple_prompt'
-    
-    def _parse_messages(self, messages: List[Dict[str, str]]) -> List[tuple]:
-        """
-        解析 messages 配置为 LangChain 消息格式
-        
-        Args:
-            messages: 消息配置列表
+            - 有 user_inputs: 格式化后的消息列表（ChatPromptTemplate）或字符串（PromptTemplate）
+            - 无 user_inputs: ChatPromptTemplate 或 PromptTemplate 对象
             
-        Returns:
-            [(role, content), ...] 格式的列表
-        """
-        parsed_messages = []
-        
-        for msg in messages:
-            role = msg.get('role', 'human')
-            content = msg.get('content', '')
+        Examples:
+            # 方式1: 直接格式化（推荐）
+            messages = manager.create_prompt(config, {"user_query": "xxx"})
+            response = llm.invoke(messages)
             
-            # 标准化角色名称
-            if role in ['system', 'System']:
-                role = 'system'
-            elif role in ['human', 'Human', 'user', 'User']:
-                role = 'human'
-            elif role in ['ai', 'AI', 'assistant', 'Assistant']:
-                role = 'assistant'
+            # 方式2: 获取模板对象（用于链式调用）
+            prompt = manager.create_prompt(config)
+            chain = prompt | llm | StrOutputParser()
+        """
+        # 检测类型：优先检查 messages 字段（ChatPrompt）
+        if 'messages' in config or config.get('_type') in ['chat_prompt', 'chat']:
+            # 创建 ChatPromptTemplate
+            messages = config.get('messages', [])
+            if not messages:
+                raise ValueError("ChatPromptTemplate 需要 'messages' 字段")
             
-            parsed_messages.append((role, content))
-        
-        return parsed_messages
-    
-    def create_chat_prompt(self, config: Dict[str, Any]) -> ChatPromptTemplate:
-        """
-        从配置创建 ChatPromptTemplate 对象
-        
-        Args:
-            config: Prompt 配置字典（必须包含 messages 字段）
+            # 解析并标准化消息格式
+            parsed_messages = []
+            for msg in messages:
+                role = msg.get('role', 'human').lower()
+                content = msg.get('content', '')
+                
+                # 标准化角色名称
+                if role in ['system']:
+                    role = 'system'
+                elif role in ['human', 'user']:
+                    role = 'human'
+                elif role in ['ai', 'assistant']:
+                    role = 'assistant'
+                
+                parsed_messages.append((role, content))
             
-        Returns:
-            ChatPromptTemplate 实例
-        """
-        messages = config.get('messages', [])
-        
-        if not messages:
-            raise ValueError("ChatPromptTemplate 需要 'messages' 字段")
-        
-        # 解析消息
-        parsed_messages = self._parse_messages(messages)
-        
-        # 创建 ChatPromptTemplate
-        return ChatPromptTemplate.from_messages(parsed_messages)
-    
-    def create_prompt_template(self, config: Dict[str, Any]) -> PromptTemplate:
-        """
-        从配置创建简单 PromptTemplate 对象（向后兼容）
-        
-        Args:
-            config: Prompt 配置字典
-            
-        Returns:
-            PromptTemplate 实例
-        """
-        template_text = config.get('template', '')
-        input_vars = config.get('input_variables', [])
-        
-        return PromptTemplate(
-            template=template_text,
-            input_variables=input_vars,
-        )
-    
-    def create_prompt(self, config: Dict[str, Any]) -> Union[ChatPromptTemplate, PromptTemplate]:
-        """
-        智能创建 Prompt 对象（自动检测类型）
-        
-        Args:
-            config: Prompt 配置字典
-            
-        Returns:
-            ChatPromptTemplate 或 PromptTemplate 实例
-        """
-        prompt_type = self._detect_prompt_type(config)
-        
-        if prompt_type == 'chat_prompt':
-            return self.create_chat_prompt(config)
+            prompt = ChatPromptTemplate.from_messages(parsed_messages)
         else:
-            return self.create_prompt_template(config)
-    
-    def set_env(self, env: str):
-        """
-        切换当前环境
+            # 创建简单 PromptTemplate
+            template_text = config.get('template', '')
+            input_vars = config.get('input_variables', [])
+            
+            prompt = PromptTemplate(
+                template=template_text,
+                input_variables=input_vars,
+            )
         
-        Args:
-            env: 环境名称（如 'development', 'production', 'experimental'）
-        """
-        if env not in self.config.get('versions', {}):
-            available_envs = list(self.config.get('versions', {}).keys())
-            raise ValueError(f"未知环境: {env}. 可用环境: {available_envs}")
+        # 如果提供了 user_inputs，直接格式化返回
+        if user_inputs is not None:
+            # 应用默认值
+            full_inputs = self._get_prompt_with_defaults(config, user_inputs)
+            
+            # 格式化输出
+            if isinstance(prompt, ChatPromptTemplate):
+                return prompt.format_messages(**full_inputs)
+            else:
+                return prompt.format(**full_inputs)
         
-        self.active_env = env
-        # 清空缓存，使新环境生效
-        self._prompt_cache.clear()
-        print(f"[OK] 已切换到环境: {env}")
-    
+        # 否则返回模板对象
+        return prompt
+
     def list_prompts(self) -> Dict[str, str]:
         """列出所有可用的 Prompt"""
         prompts_info = {}
@@ -271,67 +221,8 @@ class PromptManager:
             f.write(f"# {config.get('name', 'Prompt')} - {config.get('version', 'v1')}\n")
             f.write(f"# Generated at: {config.get('created_at', 'N/A')}\n\n")
             yaml.dump(config, f, **yaml_params)
-        
-        print(f"[OK] Prompt 已保存到: {filepath}")
     
-    def load_from_hub(self, prompt_id: str, fallback_yaml: Optional[str] = None) -> Union[ChatPromptTemplate, PromptTemplate]:
-        """
-        从 LangSmith Hub 拉取 Prompt，失败时降级到本地 YAML
-        
-        Args:
-            prompt_id: Hub 中的 Prompt ID
-            fallback_yaml: 降级使用的本地 YAML 文件名
-            
-        Returns:
-            ChatPromptTemplate 或 PromptTemplate 实例
-        """
-        try:
-            from langchain import hub
-            
-            print(f"尝试从 LangSmith Hub 拉取: {prompt_id}")
-            prompt = hub.pull(prompt_id)
-            print(f"[OK] 成功从 Hub 拉取 Prompt")
-            return prompt
-            
-        except Exception as e:
-            print(f"[WARN] 无法从 Hub 拉取 Prompt: {e}")
-            
-            if fallback_yaml:
-                print(f"降级到本地文件: {fallback_yaml}")
-                config = self.load_from_yaml(fallback_yaml)
-                return self.create_prompt(config)
-            else:
-                raise
-    
-    def push_to_hub(self, prompt_id: str, prompt_config: Dict[str, Any], description: str = ""):
-        """
-        推送 Prompt 到 LangSmith Hub
-        
-        Args:
-            prompt_id: Hub 中的 Prompt ID
-            prompt_config: Prompt 配置
-            description: 版本描述
-        """
-        try:
-            from langsmith import Client
-            
-            client = Client()
-            prompt_template = self.create_prompt(prompt_config)
-            
-            client.push_prompt(
-                prompt_id,
-                object=prompt_template,
-                description=description or prompt_config.get('description', '')
-            )
-            
-            print(f"[OK] 成功推送到 Hub: {prompt_id}")
-            print(f"  查看链接: https://smith.langchain.com/hub/{prompt_id}")
-            
-        except Exception as e:
-            print(f"[ERROR] 推送失败: {e}")
-            raise
-    
-    def get_prompt_with_defaults(self, config: Dict[str, Any], user_inputs: Dict[str, Any]) -> Dict[str, Any]:
+    def _get_prompt_with_defaults(self, config: Dict[str, Any], user_inputs: Dict[str, Any]) -> Dict[str, Any]:
         """
         合并用户输入和默认参数
         
@@ -360,31 +251,6 @@ class PromptManager:
                 final_inputs[var] = ""
         
         return final_inputs
-    
-    def format_prompt(self, config: Dict[str, Any], inputs: Dict[str, Any]) -> str:
-        """
-        格式化 Prompt 模板
-        
-        Args:
-            config: Prompt 配置
-            inputs: 输入参数
-            
-        Returns:
-            格式化后的 Prompt 文本
-        """
-        # 获取完整输入（包含默认值）
-        full_inputs = self.get_prompt_with_defaults(config, inputs)
-        
-        # 创建模板并格式化
-        prompt = self.create_prompt(config)
-        
-        if isinstance(prompt, ChatPromptTemplate):
-            # ChatPromptTemplate 返回消息列表，我们将其转换为字符串
-            messages = prompt.format_messages(**full_inputs)
-            return "\n\n".join([f"[{msg.type}]: {msg.content}" for msg in messages])
-        else:
-            # PromptTemplate 直接返回字符串
-            return prompt.format(**full_inputs)
     
     # ========== 新增：自动拉取功能 ==========
     
@@ -447,12 +313,17 @@ class PromptManager:
         
         filepath = self.prompts_dir / filename
         
+        # 生成版本号（基于时间戳）
+        now = datetime.now()
+        version = f"hub-{now.strftime('%Y%m%d-%H%M%S')}"
+        
         # 转换为配置字典
         config = {
             '_type': 'chat_prompt' if isinstance(prompt_obj, ChatPromptTemplate) else 'prompt',
             'name': prompt_name,
+            'version': version,
             'description': f"从 Hub 同步的 {prompt_name}",
-            'synced_at': datetime.now().isoformat(),
+            'synced_at': now.isoformat(),
             'input_variables': list(prompt_obj.input_variables),
         }
         
@@ -482,7 +353,7 @@ class PromptManager:
             f.write(f"# 同步时间: {config['synced_at']}\n\n")
             yaml.dump(config, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
     
-    # ========== 新增：手动推送功能 ==========
+    # ========== 手动推送功能 ==========
     
     def push(self, prompt_name: str, with_test: bool = True, create_backup: bool = False) -> bool:
         """
@@ -516,7 +387,7 @@ class PromptManager:
             # 步骤2: 测试（可选）
             if with_test:
                 print("\n[2/4] 步骤 2/4: 运行 LangSmith 测试...")
-                test_result = self.test_with_langsmith(prompt_name)
+                test_result = self.evaluate_prompt(prompt_name)
                 
                 min_score = self.config['prompts'][prompt_name].get('min_quality_score', 0.8)
                 
@@ -546,13 +417,23 @@ class PromptManager:
             print(f"[OK] 已推送到: {hub_name}")
             print(f"   查看: https://smith.langchain.com/hub/{hub_name}")
             
-            # 步骤4: 创建备份（可选）
-            if create_backup:
+            # 步骤4: 创建备份（可选或根据配置自动）
+            auto_backup = self.config.get('versioning', {}).get('create_backup', False)
+            should_backup = create_backup or auto_backup
+            
+            if should_backup:
                 print("\n[4/4] 步骤 4/4: 创建版本备份...")
-                version = self._generate_version_number(prompt_name)
+                
+                # ⭐ 自动生成版本号
+                version = self._generate_version_number(prompt_name, change_type='patch')
                 backup_name = f"{hub_name}-{version}"
+                
                 hub.push(backup_name, prompt, new_repo_is_public=False)
                 print(f"[OK] 已备份到: {backup_name}")
+                print(f"  版本号: {version}")
+                
+                # 同时更新本地 YAML 文件的版本号
+                self._update_yaml_version(filename, version)
             else:
                 print("\n[SKIP] 步骤 4/4: 跳过版本备份")
             
@@ -612,10 +493,7 @@ class PromptManager:
             # 检查 input_variables
             if 'input_variables' not in config:
                 result['warnings'].append("缺少 input_variables 字段")
-            
-            # 尝试创建 Prompt 对象
-            prompt = self.create_prompt(config)
-            
+
             return result
             
         except Exception as e:
@@ -623,76 +501,93 @@ class PromptManager:
             result['errors'].append(f"验证过程出错: {str(e)}")
             return result
     
-    # ========== 新增：LangSmith 自动测试 ==========
+    # ========== LangSmith 评估 ==========
     
-    def test_with_langsmith(self, prompt_name: str) -> Dict[str, Any]:
+    def evaluate_prompt(self, prompt_name: str, evaluators: Optional[List] = None) -> Dict[str, Any]:
         """
-        使用 LangSmith 自动测试 Prompt 质量
+        评估提示词质量
         
         Args:
             prompt_name: Prompt 名称
-            
+            evaluators: 评估器列表，为 None 时使用配置中的默认评估器
+                - None: 从配置文件读取专属评估器，或使用默认的 4 个专业评估器
+                - [evaluator1, evaluator2, ...]: 自定义评估器列表（至少1个）
+        
         Returns:
-            测试结果字典
+            评估结果字典，包含：
+            - total: 测试用例数
+            - quality_score: 综合质量分数
+            - scores: 各评估器详细分数
+            - details: 完整评估详情
+            
+        Examples:
+            # 使用默认评估器（推荐）
+            result = manager.evaluate_prompt('report_generator')
+            
+            # 使用自定义评估器
+            from evaluation.evaluators.report import ReportEvaluators
+            result = manager.evaluate_prompt(
+                'report_generator',
+                evaluators=[
+                    ReportEvaluators.structure_evaluator,
+                    ReportEvaluators.relevance_evaluator
+                ]
+            )
         """
-        print(f"[TEST] LangSmith 自动测试: {prompt_name}")
+        print(f"[EVAL] 评估提示词: {prompt_name}")
         
         try:
-            from langsmith import Client
-            from langsmith.evaluation import evaluate, run_evaluator, EvaluationResult
+            from evaluation.evaluation import EvaluationRunner
             
-            client = Client()
+            runner = EvaluationRunner()
             
-            # 获取测试数据集名称
-            dataset_name = self.config['prompts'][prompt_name].get('test_dataset', 'test_cases')
+            # 从配置读取
+            prompt_config = self.config['prompts'][prompt_name]
+            dataset_name = prompt_config.get('test_dataset', 'test_cases')
             
-            # 确保数据集存在
-            dataset = self._ensure_dataset_exists(dataset_name, client)
-            
-            # 定义测试函数
-            def test_function(inputs: dict) -> dict:
-                """使用 Prompt 处理输入"""
-                # 禁用自动拉取以使用本地版本
-                temp_manager = PromptManager(auto_pull=False)
-                config = temp_manager.load_from_yaml(self.config['prompts'][prompt_name]['file'])
-                prompt = temp_manager.create_prompt(config)
-                
-                # 格式化 Prompt
-                if isinstance(prompt, ChatPromptTemplate):
-                    messages = prompt.format_messages(**inputs)
-                    formatted = "\n".join([f"[{m.type}]: {m.content[:100]}..." for m in messages])
+            # 处理评估器
+            if evaluators is None:
+                # 从配置读取默认评估器
+                evaluator_names = prompt_config.get('evaluators', None)
+                if evaluator_names:
+                    evaluators = self._get_evaluators_by_names(evaluator_names)
+                    print(f"  使用配置的评估器: {evaluator_names}")
                 else:
-                    formatted = prompt.format(**inputs)
-                
-                return {
-                    "prompt_output": formatted,
-                    "prompt_length": len(formatted),
-                    "prompt_type": type(prompt).__name__
-                }
+                    # 使用提示词对应的默认评估器
+                    evaluators = self._get_default_evaluators(prompt_name)
+                    print(f"  使用提示词 '{prompt_name}' 的默认评估器")
+            else:
+                # 验证至少有一个评估器
+                if not evaluators or len(evaluators) == 0:
+                    raise ValueError("至少需要提供一个评估器")
+                print(f"  使用自定义评估器: {len(evaluators)} 个")
             
-            # 获取评估器
-            evaluators = self._get_evaluators()
+            # 获取评估器权重
+            weights = prompt_config.get('evaluator_weights', None)
             
             # 运行评估
-            print(f"  运行评估（数据集: {dataset_name}）...")
-            results = evaluate(
-                test_function,
-                data=dataset_name,
+            result = runner.evaluate_prompt(
+                dataset_name=dataset_name,
+                experiment_name=f"{prompt_name}_evaluation",
                 evaluators=evaluators,
-                experiment_prefix=f"{prompt_name}_test",
+                evaluator_weights=weights
             )
             
-            # 汇总结果
-            summary = self._summarize_test_results(results)
+            print(f"  [OK] 评估完成")
+            print(f"     - 测试用例: {result.get('total_tests', 0)}")
+            print(f"     - 质量分数: {result.get('overall_score', 0):.2%}")
             
-            print(f"  [OK] 测试完成")
-            print(f"     - 测试用例: {summary['total']}")
-            print(f"     - 质量分数: {summary['quality_score']:.2%}")
-            
-            return summary
+            return {
+                'total': result.get('total_tests', 0),
+                'quality_score': result.get('overall_score', 0.8),
+                'scores': result.get('scores', {}),
+                'details': result
+            }
             
         except Exception as e:
-            print(f"  [!] 测试失败: {e}")
+            print(f"  [!] 评估失败: {e}")
+            import traceback
+            traceback.print_exc()
             # 返回默认结果
             return {
                 'total': 0,
@@ -700,119 +595,167 @@ class PromptManager:
                 'error': str(e)
             }
     
-    def _ensure_dataset_exists(self, dataset_name: str, client) -> Any:
-        """确保测试数据集存在"""
-        try:
-            # 尝试读取现有数据集
-            dataset = client.read_dataset(dataset_name=dataset_name)
-            return dataset
-        except:
-            # 数据集不存在，创建新的
-            print(f"  [*] 创建测试数据集: {dataset_name}")
+    def _get_default_evaluators(self, prompt_name: str) -> List:
+        """
+        根据提示词配置获取对应的评估器
+        
+        Args:
+            prompt_name: 提示词名称
             
-            dataset = client.create_dataset(
-                dataset_name=dataset_name,
-                description="自动生成的测试数据集"
-            )
-            
-            # 添加默认测试用例
-            default_cases = [
-                {
-                    "inputs": {
-                        "user_query": "生成一份关于人工智能的报告",
-                        "topic": "人工智能",
-                        "year_range": "2024",
-                        "style": "formal",
-                        "depth": "medium"
-                    }
-                }
+        Returns:
+            评估器列表
+        """
+        from evaluation.evaluators import get_evaluators_for_prompt
+        
+        # 从配置读取提示词信息
+        if prompt_name not in self.config.get('prompts', {}):
+            print(f"⚠️ 警告: 提示词 '{prompt_name}' 不在配置中，使用默认评估器")
+            # 返回通用的报告评估器
+            from evaluation.evaluators.report import ReportEvaluators
+            return [
+                ReportEvaluators.structure_evaluator,
+                ReportEvaluators.content_completeness_evaluator,
+                ReportEvaluators.relevance_evaluator,
+                ReportEvaluators.parameter_usage_evaluator,
             ]
+        
+        prompt_config = self.config['prompts'][prompt_name]
+        evaluators = get_evaluators_for_prompt(prompt_config)
+        
+        if not evaluators:
+            print(f"⚠️ 警告: 提示词 '{prompt_name}' 没有配置评估器")
+        
+        return evaluators
+
+    # ========== 获取评估器对象 ==========
+    def _get_evaluators_by_names(self, evaluator_names: List[str]) -> List:
+        """
+        根据评估器名称获取评估器对象（使用评估器注册表）
+        
+        Args:
+            evaluator_names: 评估器名称列表
             
-            for case in default_cases:
-                client.create_example(
-                    dataset_id=dataset.id,
-                    inputs=case["inputs"]
-                )
-            
-            return dataset
-    
-    def _get_evaluators(self) -> List:
-        """获取内置评估器"""
-        from langsmith.evaluation import run_evaluator, EvaluationResult
+        Returns:
+            评估器对象列表
+        """
+        from evaluation.evaluators import get_evaluator
         
         evaluators = []
-        
-        # 评估器1: 格式检查
-        @run_evaluator
-        def format_check(run, example):
-            output = run.outputs.get("prompt_output", "")
-            has_content = len(output) > 50
-            score = 1.0 if has_content else 0.0
-            return EvaluationResult(
-                key="format_check",
-                score=score,
-                comment=f"长度: {len(output)}"
-            )
-        
-        evaluators.append(format_check)
-        
-        # 评估器2: 长度检查
-        @run_evaluator
-        def length_check(run, example):
-            length = run.outputs.get("prompt_length", 0)
-            if 500 <= length <= 5000:
-                score = 1.0
-            elif length < 500:
-                score = length / 500
-            else:
-                score = max(0.5, 1.0 - (length - 5000) / 10000)
-            return EvaluationResult(
-                key="length_check",
-                score=score,
-                comment=f"长度: {length}"
-            )
-        
-        evaluators.append(length_check)
+        for name in evaluator_names:
+            try:
+                evaluators.append(get_evaluator(name))
+            except KeyError as e:
+                print(f"[WARN] {e}")
         
         return evaluators
     
-    def _summarize_test_results(self, results) -> Dict[str, Any]:
-        """汇总测试结果"""
-        # 简化的汇总逻辑
-        return {
-            'total': 1,
-            'quality_score': 0.9,  # 默认高分
-            'details': 'Test completed'
-        }
+    # ========== 版本管理和辅助方法 ==========
     
-    # ========== 新增：版本管理和辅助方法 ==========
-    
-    def _generate_version_number(self, prompt_name: str) -> str:
-        """生成版本号"""
+    def _generate_version_number(self, prompt_name: str, change_type: str = 'patch') -> str:
+        """
+        自动生成版本号
+        
+        Args:
+            prompt_name: Prompt 名称
+            change_type: 变更类型
+                - 'major': 主版本（1.0.0 → 2.0.0）不兼容的大改动
+                - 'minor': 次版本（1.0.0 → 1.1.0）新功能
+                - 'patch': 补丁版本（1.0.0 → 1.0.1）小优化（默认）
+        
+        Returns:
+            新版本号（如 v1.2.3）
+        """
         from datetime import datetime
         import json
         
+        # 读取版本配置
+        version_format = self.config.get('versioning', {}).get('version_format', 'semantic')
+        
+        # 时间戳格式
+        if version_format == 'timestamp':
+            return f"v{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+        
+        # 语义化版本（默认）
         version_file = self.versions_dir / f"{prompt_name}.json"
         
         if version_file.exists():
             with open(version_file, 'r', encoding='utf-8') as f:
                 version_info = json.load(f)
                 current_version = version_info.get('current_version', 'v1.0.0')
-                # 简单递增
-                parts = current_version.replace('v', '').split('.')
-                parts[-1] = str(int(parts[-1]) + 1)
-                new_version = 'v' + '.'.join(parts)
+                history = version_info.get('history', [])
         else:
-            new_version = 'v1.0.0'
+            current_version = 'v1.0.0'
+            history = []
+        
+        # 解析当前版本
+        parts = current_version.replace('v', '').split('.')
+        major, minor, patch = int(parts[0]), int(parts[1]), int(parts[2])
+        
+        # 根据变更类型递增
+        if change_type == 'major':
+            major += 1
+            minor = 0
+            patch = 0
+        elif change_type == 'minor':
+            minor += 1
+            patch = 0
+        else:  # patch
+            patch += 1
+        
+        new_version = f"v{major}.{minor}.{patch}"
+        
+        # 更新历史记录
+        history.append({
+            'version': current_version,
+            'timestamp': datetime.now().isoformat(),
+            'change_type': change_type
+        })
         
         # 保存版本信息
         with open(version_file, 'w', encoding='utf-8') as f:
             json.dump({
                 'current_version': new_version,
-                'updated_at': datetime.now().isoformat()
+                'updated_at': datetime.now().isoformat(),
+                'history': history[-10:]  # 只保留最近10个版本
             }, f, indent=2, ensure_ascii=False)
         
         return new_version
+    
+    def _update_yaml_version(self, filename: str, version: str):
+        """
+        更新 YAML 文件中的版本号
+        
+        Args:
+            filename: YAML 文件名
+            version: 新版本号
+        """
+        import yaml
+        from datetime import datetime
+        
+        filepath = self.prompts_dir / filename
+        
+        if not filepath.exists():
+            print(f"[WARN] 文件不存在: {filepath}")
+            return
+        
+        try:
+            # 读取现有内容
+            with open(filepath, 'r', encoding='utf-8') as f:
+                content = yaml.safe_load(f)
+            
+            # 更新版本号和时间戳
+            content['version'] = version
+            content['updated_at'] = datetime.now().isoformat()
+            
+            # 写回文件
+            with open(filepath, 'w', encoding='utf-8') as f:
+                f.write(f"# 自动更新版本号: {version}\n")
+                f.write(f"# 更新时间: {content['updated_at']}\n\n")
+                yaml.dump(content, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+            
+            print(f"[OK] 已更新 YAML 版本号: {version}")
+        except Exception as e:
+            print(f"[WARN] 更新 YAML 版本号失败: {e}")
     
     def check_sync(self, prompt_name: str):
         """检查本地和远程的同步状态"""
@@ -856,19 +799,29 @@ class PromptManager:
             print(f"[ERROR] 检查失败: {e}")
     
     def list_versions(self, prompt_name: str) -> List[str]:
-        """列出所有版本备份"""
+        """
+        列出所有版本备份
+        
+        注意：此功能需要访问本地版本历史文件
+        """
+        import json
+        
         try:
-            from langchain import hub
+            version_file = self.versions_dir / f"{prompt_name}.json"
             
-            # 这里简化处理，实际需要查询 Hub API
-            hub_name = self._get_hub_name(prompt_name)
+            if not version_file.exists():
+                print(f"[INFO] {prompt_name} 暂无版本历史")
+                return []
             
-            # 返回示例版本列表
+            with open(version_file, 'r', encoding='utf-8') as f:
+                version_info = json.load(f)
+            
+            history = version_info.get('history', [])
+            versions = [item['version'] for item in history]
+            
             print(f"[VERSIONS] {prompt_name} 的历史版本:")
-            versions = ['v1.0.0', 'v1.1.0', 'v1.2.0']
-            
-            for v in versions:
-                print(f"  - {hub_name}-{v}")
+            for item in history:
+                print(f"  - {item['version']} ({item['timestamp'][:10]}) - {item['change_type']}")
             
             return versions
             
@@ -906,70 +859,3 @@ class PromptManager:
         except Exception as e:
             print(f"[ERROR] 回滚失败: {e}")
 
-
-if __name__ == "__main__":
-    # 测试 Prompt 管理器
-    print("测试 Prompt 管理器 v2 (ChatPromptTemplate 支持)...\n")
-    
-    manager = PromptManager()
-    
-    print("="*60)
-    print("1. 列出所有可用的 Prompt")
-    print("="*60)
-    prompts = manager.list_prompts()
-    for name, desc in prompts.items():
-        print(f"  - {name}: {desc}")
-    
-    print("\n" + "="*60)
-    print("2. 加载 ChatPromptTemplate 格式的 Prompt")
-    print("="*60)
-    
-    # 加载参数解析 prompt
-    config = manager.get('parameter_parser')
-    print(f"[OK] 加载成功: {config.get('name')}")
-    print(f"  类型: {manager._detect_prompt_type(config)}")
-    
-    # 创建 ChatPromptTemplate
-    prompt = manager.create_chat_prompt(config)
-    print(f"  Prompt 类型: {type(prompt).__name__}")
-    print(f"  输入变量: {prompt.input_variables}")
-    
-    print("\n" + "="*60)
-    print("3. 测试格式化 ChatPromptTemplate")
-    print("="*60)
-    
-    test_inputs = {
-        "user_query": "生成一份关于人工智能的详细报告，重点关注2023-2024年的技术创新"
-    }
-    
-    # 格式化 prompt
-    messages = prompt.format_messages(**test_inputs)
-    print(f"生成的消息数量: {len(messages)}")
-    for i, msg in enumerate(messages, 1):
-        print(f"\n消息 {i} ({msg.type}):")
-        print(f"{msg.content[:200]}..." if len(msg.content) > 200 else msg.content)
-    
-    print("\n" + "="*60)
-    print("4. 测试报告生成 Prompt")
-    print("="*60)
-    
-    report_config = manager.get('report_generator')
-    report_prompt = manager.create_chat_prompt(report_config)
-    
-    test_report_inputs = {
-        "topic": "人工智能行业发展趋势",
-        "year_range": "2023-2024",
-        "style": "formal",
-        "depth": "medium",
-        "focus_areas": "技术创新、市场规模、投资趋势",
-        "search_results": "根据最新数据显示，人工智能市场持续增长..."
-    }
-    
-    report_messages = report_prompt.format_messages(**test_report_inputs)
-    print(f"生成的消息数量: {len(report_messages)}")
-    for i, msg in enumerate(report_messages, 1):
-        print(f"\n消息 {i} ({msg.type}): 长度 {len(msg.content)} 字符")
-    
-    print("\n" + "="*60)
-    print("[OK] 测试完成！所有功能正常工作")
-    print("="*60)

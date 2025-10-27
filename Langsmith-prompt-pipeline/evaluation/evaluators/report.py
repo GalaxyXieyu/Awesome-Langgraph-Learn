@@ -141,31 +141,31 @@ class ReportEvaluators:
             llm = AzureConfig.get_fast_llm()
             
             eval_prompt = f"""
-请评估以下报告是否与主题相关且内容质量良好。
+            请评估以下报告是否与主题相关且内容质量良好。
 
-**主题**: {topic}
+            **主题**: {topic}
 
-**报告内容** (前 1000 字符):
-{output[:1000]}
+            **报告内容** (前 1000 字符):
+            {output[:1000]}
 
-请从以下几个维度评估（每项 0-1 分）：
-1. 主题相关性：内容是否紧扣主题
-2. 信息丰富度：是否提供了有价值的信息
-3. 逻辑连贯性：内容是否有逻辑性
-4. 专业性：语言和分析是否专业
+            请从以下几个维度评估（每项 0-1 分）：
+            1. 主题相关性：内容是否紧扣主题
+            2. 信息丰富度：是否提供了有价值的信息
+            3. 逻辑连贯性：内容是否有逻辑性
+            4. 专业性：语言和分析是否专业
 
-返回 JSON 格式：
-{{
-    "relevance": 0.9,
-    "information": 0.8,
-    "coherence": 0.85,
-    "professionalism": 0.9,
-    "overall": 0.88,
-    "comment": "简短评价"
-}}
+            返回 JSON 格式：
+            {{
+                "relevance": 0.9,
+                "information": 0.8,
+                "coherence": 0.85,
+                "professionalism": 0.9,
+                "overall": 0.88,
+                "comment": "简短评价"
+            }}
 
-只返回 JSON，不要其他内容。
-"""
+            只返回 JSON，不要其他内容。
+            """
             
             response = llm.invoke(eval_prompt)
             

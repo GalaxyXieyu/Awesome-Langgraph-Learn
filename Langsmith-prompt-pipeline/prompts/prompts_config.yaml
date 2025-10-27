@@ -1,25 +1,55 @@
-# Prompts 配置文件 - 极简版
+# Prompts 配置文件 - 完整版
 # 核心理念：远程是唯一真相源，本地是工作副本
 
 # 同步配置
 sync:
   auto_pull: true              # 默认自动拉取（建议保持 true）
 
+# 版本管理配置
+versioning:
+  auto_increment: true         # 自动递增版本号
+  version_format: "semantic"   # semantic: v1.2.3 | timestamp: v20241027-153000
+  create_backup: true          # 推送时自动创建备份
+
 # Prompt 配置
 prompts:
   # 参数解析 Prompt
   parameter_parser:
     file: "parameter_parser.yaml"
-    hub_name: "parameter_parser"     # Hub 上的名称（可选，默认用 key）
-    test_dataset: "test_cases"       # 测试数据集名称
-    min_quality_score: 0.8           # 最低质量要求
+    hub_name: "parameter_parser"
+    test_dataset: "parameter_parser"  # ⭐ 每个提示词有独立 Dataset
+    min_quality_score: 0.8
     description: "从用户输入中提取结构化参数"
+    
+    # ⭐ 专属评估器配置
+    evaluators:
+      - "structure_evaluator"         # 使用通用评估器
+      - "parameter_extraction_evaluator"  # 专属评估器
+    
+    # ⭐ 评估器权重（可选）
+    evaluator_weights:
+      structure_evaluator: 0.3
+      parameter_extraction_evaluator: 0.7
     
   # 报告生成 Prompt
   report_generator:
     file: "report_generator.yaml"
     hub_name: "report_generator"
-    test_dataset: "test_cases"
+    test_dataset: "report_generator"  # ⭐ 独立 Dataset
     min_quality_score: 0.85
     description: "生成结构化的分析报告"
+    
+    # ⭐ 专属评估器配置
+    evaluators:
+      - "structure_evaluator"             # 通用评估器
+      - "content_completeness_evaluator"  # 通用评估器
+      - "relevance_evaluator"             # 通用评估器（LLM）
+      - "parameter_usage_evaluator"       # 通用评估器
+    
+    # ⭐ 评估器权重
+    evaluator_weights:
+      structure_evaluator: 0.20
+      content_completeness_evaluator: 0.25
+      relevance_evaluator: 0.35          # 最重要
+      parameter_usage_evaluator: 0.20
 
