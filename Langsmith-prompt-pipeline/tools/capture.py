@@ -175,11 +175,20 @@ def _sync_to_langsmith(
         )
         dataset_id = str(dataset.id)
     
+    # 处理 outputs：确保是字典类型
+    if outputs is None:
+        outputs_dict = {}
+    elif isinstance(outputs, dict):
+        outputs_dict = outputs
+    else:
+        # 如果不是字典，包装成字典
+        outputs_dict = {"output": outputs}
+    
     # 创建 example
     client.create_example(
         dataset_id=dataset_id,
         inputs=inputs,
-        outputs=outputs or {},
+        outputs=outputs_dict,
         metadata=metadata or {}
     )
     

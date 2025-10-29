@@ -3,7 +3,13 @@
 提供命令行界面运行报告生成流程
 """
 import sys
-sys.stdout.reconfigure(encoding='utf-8')
+
+# 尝试配置输出编码（某些环境可能不支持）
+try:
+    sys.stdout.reconfigure(encoding='utf-8')
+except AttributeError:
+    # Jupyter/IPython 环境通常不需要这个配置
+    pass
 
 import argparse
 from pathlib import Path

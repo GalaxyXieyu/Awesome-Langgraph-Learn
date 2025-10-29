@@ -1,12 +1,12 @@
 # parameter_parser
 # 从 LangSmith Hub 同步
-# 同步时间: 2025-10-27T22:11:52.235630
+# 同步时间: 2025-10-28T23:32:17.865232
 
 _type: chat_prompt
 name: parameter_parser
-version: hub-20251027-221152
+version: hub-20251028-233217
 description: 从 Hub 同步的 parameter_parser
-synced_at: '2025-10-27T22:11:52.235630'
+synced_at: '2025-10-28T23:32:17.865232'
 input_variables:
 - user_query
 messages:

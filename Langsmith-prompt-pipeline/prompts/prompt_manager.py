@@ -115,6 +115,18 @@ class PromptManager:
             version_info = 'unknown'
         return config
     
+    def build_prompt(self, config: Dict[str, Any]):
+        """
+        构建 Prompt 模板对象（别名方法，用于兼容）
+        
+        Args:
+            config: Prompt 配置字典
+            
+        Returns:
+            ChatPromptTemplate 或 PromptTemplate 对象
+        """
+        return self.create_prompt(config, user_inputs=None)
+    
     def create_prompt(self, config: Dict[str, Any], user_inputs: Optional[Dict[str, Any]] = None):
         """
         创建并格式化 Prompt（一站式方法）
@@ -562,15 +574,12 @@ class PromptManager:
                     raise ValueError("至少需要提供一个评估器")
                 print(f"  使用自定义评估器: {len(evaluators)} 个")
             
-            # 获取评估器权重
-            weights = prompt_config.get('evaluator_weights', None)
-            
             # 运行评估
             result = runner.evaluate_prompt(
+                prompt_name=prompt_name,
                 dataset_name=dataset_name,
                 experiment_name=f"{prompt_name}_evaluation",
-                evaluators=evaluators,
-                evaluator_weights=weights
+                evaluators=evaluators
             )
             
             print(f"  [OK] 评估完成")
