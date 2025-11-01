@@ -1,12 +1,12 @@
 # report_generator
 # 从 LangSmith Hub 同步
-# 同步时间: 2025-10-28T21:57:31.712042
+# 同步时间: 2025-11-01T15:28:44.427768
 
 _type: chat_prompt
 name: report_generator
-version: hub-20251028-215731
+version: hub-20251101-152844
 description: 从 Hub 同步的 report_generator
-synced_at: '2025-10-28T21:57:31.712042'
+synced_at: '2025-11-01T15:28:44.427768'
 input_variables:
 - depth
 - focus_areas
@@ -225,7 +225,5 @@ messages:
 
 
     请按照以上要求开始编制报告：
-
-    测试修改
 
     '

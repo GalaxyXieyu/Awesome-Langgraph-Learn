@@ -1,0 +1,21 @@
+{
+  "prompt_name": "parameter_parser",
+  "dataset_name": "parameter_parser",
+  "timestamp": "2025-11-01T15:28:32.039057",
+  "run_id": "bb3cdae4-8f91-44a5-9d98-d7979798636b",
+  "inputs": {
+    "user_query": "写一份关于区块链技术2024年应用趋势的分析报告"
+  },
+  "outputs": {
+    "topic": "区块链技术2024年应用趋势",
+    "year_range": "2023-2024",
+    "style": "formal",
+    "depth": "medium",
+    "focus_areas": "市场趋势,技术发展,竞争格局",
+    "metadata": {}
+  },
+  "metadata": {
+    "prompt_version": "hub-20251101-152830"
+  },
+  "synced": false
+}
