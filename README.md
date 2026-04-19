@@ -1,3 +1,20 @@
+# Awesome-Langgraph-Learn
+
+> A LangGraph practice repo with runnable examples for multi-agent handoff, async execution, and memory patterns.
+
+[GitHub](https://github.com/GalaxyXieyu/Awesome-Langgraph-Learn) · [AgentsGalaxy](https://aigalaxy.top/)
+
+This repository is meant to be a modular LangGraph learning ground. Instead of packaging one polished product, it keeps multiple examples and tutorial folders so you can explore different graph patterns side by side.
+
+## What you will find here
+
+- multi-agent handoff experiments
+- async chat and worker patterns
+- Redis-backed memory examples
+- tutorial-style references for LangGraph exploration
+
+## 中文说明
+
 # LangGraph 学习仓库
 
 本仓库是关于 LangGraph 框架的学习与实践集合，包含了多个示例、教程和项目。每个目录都是一个独立的模块，用于演示 LangGraph 的特定功能或应用场景。
