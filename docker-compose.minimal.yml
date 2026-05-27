@@ -1,0 +1,52 @@
+services:
+  # PostgreSQL: 供 LangGraph Checkpoint 使用
+  postgres:
+    image: postgres:16-alpine
+    container_name: langgraph_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-langgraph}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-langgraph}
+      POSTGRES_DB: ${POSTGRES_DB:-langgraph}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-langgraph} -d ${POSTGRES_DB:-langgraph}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - langgraph-network
+
+  # Redis: 供 LangGraph 缓存使用
+  redis:
+    image: redis:7-alpine
+    container_name: langgraph_redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD:-redis}
+      --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redis}", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - langgraph-network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  langgraph-network:
+    driver: bridge
