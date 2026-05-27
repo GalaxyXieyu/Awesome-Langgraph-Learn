@@ -1,0 +1,126 @@
+/* ─── 01-coldopen ─── */
+.co-scene {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+}
+
+/* Step 0 — Typewriter */
+.co-terminal {
+  font-family: var(--font-mono);
+  font-size: clamp(48px, 4vw, 72px);
+  color: var(--text);
+  text-shadow: var(--text-shadow);
+}
+
+.co-prompt {
+  color: var(--accent);
+}
+
+.co-typewriter {
+  letter-spacing: 0.05em;
+}
+
+.co-cursor {
+  display: inline-block;
+  width: 3px;
+  height: 1em;
+  background: var(--accent);
+  margin-left: 4px;
+  vertical-align: text-bottom;
+  animation: co-caret-blink 1s step-end infinite;
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+
+@keyframes co-caret-blink {
+  50% { opacity: 0; }
+}
+
+/* Step 1 — Framework list */
+.co-list-box {
+  font-family: var(--font-mono);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  align-items: flex-start;
+}
+
+.co-list-item {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  font-size: clamp(32px, 3vw, 52px);
+  opacity: 0;
+  transform: translateX(-20px);
+  transition: opacity 300ms linear, transform 300ms var(--ease-quart);
+}
+
+.co-list-item.co-visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.co-bullet {
+  color: var(--accent);
+  font-size: 0.8em;
+}
+
+.co-fw-name {
+  color: var(--text);
+  text-shadow: var(--text-shadow);
+}
+
+.co-fw-name.co-dim {
+  color: var(--text-faint);
+}
+
+.co-ellipsis {
+  margin-top: 8px;
+}
+
+/* Step 2 — Question */
+.co-question-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 600ms var(--ease-quart), transform 600ms var(--ease-quart);
+}
+
+.co-question-wrap.co-in {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.co-question {
+  font-family: var(--font-mono);
+  font-size: clamp(80px, 8vw, 140px);
+  font-weight: 700;
+  color: var(--accent);
+  text-shadow: 0 0 30px var(--accent-glow), 0 0 60px rgba(65, 255, 151, 0.3);
+  letter-spacing: 0.08em;
+}
+
+.co-cursor-lg {
+  width: 4px;
+  height: 0.8em;
+  background: var(--accent);
+  animation: co-caret-blink 1s step-end infinite;
+  box-shadow: 0 0 12px var(--accent-glow);
+}
+
+.co-hint {
+  position: absolute;
+  bottom: 120px;
+  font-family: var(--font-mono);
+  font-size: 18px;
+  color: var(--text-mute);
+  letter-spacing: 0.1em;
+  opacity: 0;
+  transition: opacity 800ms var(--ease-quart) 400ms;
+}
+
+.co-hint.co-in {
+  opacity: 1;
+}
