@@ -1,0 +1,15 @@
+{
+  "prompt_name": "parameter_parser",
+  "dataset_name": "param_parser_tests",
+  "timestamp": "2025-10-28T22:26:15.407629",
+  "run_id": "d23e2e97-5168-4a0d-9cf2-af991d22e198",
+  "inputs": {
+    "user_query": "写一份人工智能行业2024年发展报告"
+  },
+  "outputs": "```json\n{\n    \"topic\": \"人工智能行业发展\",\n    \"year_range\": \"2024\",\n    \"style\": \"formal\",\n    \"depth\": \"medium\",\n    \"focus_areas\": \"市场趋势,技术发展,竞争格局\"\n}\n```",
+  "metadata": {
+    "source": "tutorial_demo"
+  },
+  "synced": true,
+  "synced_at": "2025-10-28T22:35:45.647321"
+}

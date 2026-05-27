@@ -1,0 +1,1454 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LangSmith Prompt 工程化平台</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap');
+        
+        * {
+            font-family: 'Noto Sans SC', 'Inter', sans-serif;
+        }
+        
+        body {
+            overflow: hidden;
+            transition: background-color 0.3s ease, color 0.3s ease;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        }
+        
+        .dark body {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        }
+        
+        /* 苹果风格滚动条 - 更精致 */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: rgba(79, 172, 254, 0.25);
+            border-radius: 10px;
+            transition: all 0.2s ease;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(79, 172, 254, 0.4);
+        }
+        
+        ::-webkit-scrollbar-thumb:active {
+            background: rgba(79, 172, 254, 0.5);
+        }
+        
+        .dark ::-webkit-scrollbar-thumb {
+            background: rgba(79, 172, 254, 0.3);
+        }
+        
+        .dark ::-webkit-scrollbar-thumb:hover {
+            background: rgba(79, 172, 254, 0.45);
+        }
+        
+        .dark ::-webkit-scrollbar-thumb:active {
+            background: rgba(79, 172, 254, 0.6);
+        }
+        
+        /* Firefox滚动条 */
+        * {
+            scrollbar-width: thin;
+            scrollbar-color: rgba(79, 172, 254, 0.25) transparent;
+        }
+        
+        .dark * {
+            scrollbar-color: rgba(79, 172, 254, 0.3) transparent;
+        }
+        
+        /* 滚动条只在滚动时显示 - macOS风格 */
+        .slide:not(:hover)::-webkit-scrollbar-thumb {
+            background: transparent;
+        }
+        
+        .slide::-webkit-scrollbar-thumb {
+            transition: background 0.3s ease;
+        }
+        
+        .slide {
+            opacity: 0;
+            transform: translateX(100%);
+            transition: opacity 0.5s ease, transform 0.5s ease;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100vh;
+            overflow-y: auto;
+            overflow-x: hidden;
+            display: none;
+        }
+        
+        .slide.active {
+            opacity: 1;
+            transform: translateX(0);
+            display: block;
+        }
+        
+        .slide.prev {
+            transform: translateX(-100%);
+        }
+        
+        /* 玻璃态效果 */
+        .glass {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+        }
+        
+        .dark .glass {
+            background: rgba(30, 30, 46, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+        }
+        
+        /* 主渐变色 - 浅蓝色系 */
+        .gradient-bg {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+        
+        .dark .gradient-bg {
+            background: linear-gradient(135deg, #2e5090 0%, #1e3c72 100%);
+        }
+        
+        .card-hover {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+        
+        .dark .card-hover {
+            background: rgba(30, 30, 46, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .card-hover:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 40px 0 rgba(79, 172, 254, 0.2);
+            border-color: rgba(79, 172, 254, 0.5);
+        }
+        
+        .progress-bar {
+            height: 3px;
+            background: linear-gradient(90deg, #4facfe 0%, #00f2fe 100%);
+            position: fixed;
+            top: 0;
+            left: 0;
+            transition: width 0.3s ease;
+            z-index: 9999;
+            box-shadow: 0 0 10px rgba(79, 172, 254, 0.5);
+        }
+        
+        .btn-hover {
+            transition: all 0.2s ease;
+        }
+        
+        .btn-hover:hover {
+            transform: scale(1.05);
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.6s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .code-block {
+            background: rgba(30, 41, 59, 0.95);
+            color: #e2e8f0;
+            border-radius: 12px;
+            padding: 1.5rem;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.875rem;
+            line-height: 1.7;
+            border: 1px solid rgba(79, 172, 254, 0.2);
+        }
+        
+        .dark .code-block {
+            background: rgba(15, 23, 42, 0.95);
+            border: 1px solid rgba(79, 172, 254, 0.3);
+        }
+        
+        .nav-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.2);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .dark .nav-dot {
+            background: rgba(255, 255, 255, 0.2);
+        }
+        
+        .nav-dot.active {
+            background: #4facfe;
+            width: 24px;
+            border-radius: 4px;
+            box-shadow: 0 0 10px rgba(79, 172, 254, 0.5);
+        }
+        
+        .pyramid {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin: 2rem auto;
+        }
+        
+        .pyramid-level {
+            text-align: center;
+            padding: 1.5rem;
+            margin: 0.5rem auto;
+            border-radius: 12px;
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+        
+        .dark .pyramid-level {
+            background: rgba(30, 30, 46, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .pyramid-level:hover {
+            transform: scale(1.02);
+            box-shadow: 0 10px 30px rgba(79, 172, 254, 0.2);
+            border-color: rgba(79, 172, 254, 0.5);
+        }
+        
+        .icon-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            font-size: 24px;
+            margin-bottom: 1rem;
+            background: rgba(79, 172, 254, 0.1);
+            border: 1px solid rgba(79, 172, 254, 0.2);
+        }
+        
+        /* 简约按钮样式 */
+        .apple-btn {
+            background: rgba(79, 172, 254, 0.1);
+            border: 1px solid rgba(79, 172, 254, 0.3);
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+        }
+        
+        .apple-btn:hover {
+            background: rgba(79, 172, 254, 0.2);
+            border-color: rgba(79, 172, 254, 0.5);
+            box-shadow: 0 4px 20px rgba(79, 172, 254, 0.3);
+        }
+        
+        /* 移除过度滚动 */
+        .slide-content {
+            height: 100vh;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+    <!-- Progress Bar -->
+    <div class="progress-bar" id="progressBar"></div>
+    
+    <!-- Theme Toggle -->
+    <button id="themeToggle" class="fixed top-6 right-6 z-50 p-3 rounded-full glass btn-hover">
+        <i class="fas fa-moon dark:hidden text-gray-700"></i>
+        <i class="fas fa-sun hidden dark:inline text-blue-400"></i>
+    </button>
+    
+    <!-- Navigation Controls -->
+    <div class="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50 flex items-center gap-4 glass px-6 py-3 rounded-full">
+        <button id="prevBtn" class="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition">
+            <i class="fas fa-chevron-left text-gray-700 dark:text-gray-300"></i>
+        </button>
+        <div id="navDots" class="flex gap-2"></div>
+        <button id="nextBtn" class="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition">
+            <i class="fas fa-chevron-right text-gray-700 dark:text-gray-300"></i>
+        </button>
+    </div>
+    
+    <!-- Slide Counter -->
+    <div class="fixed top-6 left-6 z-50 text-sm glass px-4 py-2 rounded-full">
+        <span id="currentSlide">1</span> / <span id="totalSlides">0</span>
+    </div>
+    
+    <!-- Slides Container -->
+    <div id="slidesContainer" class="w-full h-screen">
+        
+        <!-- Slide 1: Title -->
+        <div class="slide active">
+            <div class="gradient-bg h-full flex items-center justify-center text-white">
+                <div class="text-center fade-in px-4">
+                    <i class="fas fa-rocket text-6xl mb-6 animate-pulse"></i>
+                    <h1 class="text-5xl md:text-7xl font-bold mb-6">LangSmith Prompt</h1>
+                    <h2 class="text-3xl md:text-5xl font-bold mb-8">工程化平台</h2>
+                    <p class="text-xl md:text-2xl mb-4 opacity-90">企业级提示词开发完整解决方案</p>
+                    <p class="text-lg opacity-80">时长：14-15分钟 | 目标受众：AI应用开发者、提示词工程师</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Slide 2: Pain Points -->
+        <div class="slide">
+            <div class="container mx-auto px-8 py-16 min-h-full">
+                <h2 class="text-4xl font-bold mb-8 text-center">
+                    <i class="fas fa-exclamation-triangle text-blue-500 mr-3"></i>
+                    你是否遇到过这些问题？
+                </h2>
+                <div class="grid md:grid-cols-2 gap-6 max-w-6xl mx-auto">
+                    <div class="card-hover p-6 rounded-xl shadow-lg">
+                        <div class="icon-badge">
+                            <i class="fas fa-folder-open text-blue-500"></i>
+                        </div>
+                        <h3 class="text-2xl font-bold mb-4">提示词管理混乱</h3>
+                        <ul class="space-y-2 text-gray-600 dark:text-gray-400">
+                            <li><i class="fas fa-times text-blue-400 mr-2"></i>提示词散落在代码各处，难以维护</li>
+                            <li><i class="fas fa-times text-blue-400 mr-2"></i>不知道从哪里开始优化</li>
+                            <li><i class="fas fa-times text-blue-400 mr-2"></i>团队成员各自维护不同版本</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="card-hover p-6 rounded-xl shadow-lg">
+                        <div class="icon-badge">
+                            <i class="fas fa-flask text-cyan-500"></i>
+                        </div>
+                        <h3 class="text-2xl font-bold mb-4">测试成本高昂</h3>
+                        <ul class="space-y-2 text-gray-600 dark:text-gray-400">
+                            <li><i class="fas fa-times text-cyan-400 mr-2"></i>每次修改都要手动构建测试用例</li>
+                            <li><i class="fas fa-times text-cyan-400 mr-2"></i>不停地复制粘贴参数</li>
+                            <li><i class="fas fa-times text-cyan-400 mr-2"></i>测试数据和真实场景脱节</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="card-hover p-6 rounded-xl shadow-lg">
+                        <div class="icon-badge">
+                            <i class="fas fa-users text-blue-600"></i>
+                        </div>
+                        <h3 class="text-2xl font-bold mb-4">团队协作困难</h3>
+                        <ul class="space-y-2 text-gray-600 dark:text-gray-400">
+                            <li><i class="fas fa-times text-blue-400 mr-2"></i>A优化了提示词，B还在用旧版本</li>
+                            <li><i class="fas fa-times text-blue-400 mr-2"></i>不知道当前版本的质量如何</li>
+                            <li><i class="fas fa-times text-blue-400 mr-2"></i>回滚版本很麻烦</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="card-hover p-6 rounded-xl shadow-lg">
+                        <div class="icon-badge">
+                            <i class="fas fa-chart-line text-cyan-600"></i>
+                        </div>
+                        <h3 class="text-2xl font-bold mb-4">质量无法量化</h3>
+                        <ul class="space-y-2 text-gray-600 dark:text-gray-400">
+                            <li><i class="fas fa-times text-cyan-400 mr-2"></i>不知道改进后效果如何</li>
+                            <li><i class="fas fa-times text-cyan-400 mr-2"></i>缺乏标准化的评估流程</li>
+                            <li><i class="fas fa-times text-cyan-400 mr-2"></i>上线后才发现问题</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Slide 3: Pyramid Methodology -->
+        <div class="slide">
+            <div class="container mx-auto px-8 py-16 min-h-full">
+                <h2 class="text-4xl font-bold mb-8 text-center">
+                    <i class="fas fa-mountain text-blue-500 mr-3"></i>
+                    金字塔设计方法论
+                </h2>
+                <p class="text-center text-xl mb-8 text-gray-600 dark:text-gray-400">自上而下的设计思维</p>
+                
+                <div class="pyramid">
+                    <div class="pyramid-level bg-gradient-to-r from-blue-400 to-cyan-400 text-white" style="width: 100%;">
+                        <h3 class="text-2xl font-bold mb-2">第一层：业务需求</h3>
+                        <p class="text-lg">What & Why</p>
+                        <p class="text-sm mt-2 opacity-90">明确要做什么、为什么做、给谁用</p>
+                    </div>
+                    
+                    <div class="pyramid-level bg-gradient-to-r from-blue-500 to-cyan-500 text-white" style="width: 85%;">
+                        <h3 class="text-2xl font-bold mb-2">第二层：功能要求</h3>
+                        <p class="text-lg">How</p>
+                        <p class="text-sm mt-2 opacity-90">输入要求 + 输出要求 + 约束条件</p>
+                    </div>
+                    
+                    <div class="pyramid-level bg-gradient-to-r from-blue-600 to-cyan-600 text-white" style="width: 70%;">
+                        <h3 class="text-2xl font-bold mb-2">第三层：评估方法</h3>
+                        <p class="text-lg">Measure</p>
+                        <p class="text-sm mt-2 opacity-90">可量化的质量标准与评估器</p>
+                    </div>
+                </div>
+                
+                <div class="max-w-3xl mx-auto mt-8 bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg">
+                    <h3 class="text-xl font-bold mb-4 flex items-center">
+                        <i class="fas fa-lightbulb text-blue-400 mr-2"></i>
+                        核心价值
+                    </h3>
+                    <ul class="space-y-3 text-gray-700 dark:text-gray-300">
+                        <li><i class="fas fa-check-circle text-blue-500 mr-2"></i>从业务到技术的完整闭环</li>
+                        <li><i class="fas fa-check-circle text-blue-500 mr-2"></i>可量化的质量标准</li>
+                        <li><i class="fas fa-check-circle text-blue-500 mr-2"></i>团队协作的统一语言</li>
+                        <li><i class="fas fa-check-circle text-blue-500 mr-2"></i>持续优化的数据支撑</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Slide 4: Case Study -->
+        <div class="slide">
+            <div class="container mx-auto px-8 py-16 min-h-full">
+                <h2 class="text-4xl font-bold mb-8 text-center">
+                    <i class="fas fa-file-alt text-blue-600 mr-3"></i>
+                    实战案例：行业报告生成
+                </h2>
+                
+                <div class="grid md:grid-cols-3 gap-6 max-w-6xl mx-auto">
+                    <div class="card-hover bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg">
+                        <div class="text-3xl mb-4">📋</div>
+                        <h3 class="text-xl font-bold mb-3">第一层：业务需求</h3>
+                        <div class="space-y-2 text-sm text-gray-600 dark:text-gray-400">
+                            <p><strong>What:</strong> 生成专业行业分析报告</p>
+                            <p><strong>Why:</strong> 快速了解行业动态</p>
+                            <p><strong>Who:</strong> 企业决策者、分析师</p>
+                            <p><strong>When:</strong> 战略制定、投资决策</p>
+                        </div>
+                    </div>
+                    
+                    <div class="card-hover bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg">
+                        <div class="text-3xl mb-4">⚙️</div>
+                        <h3 class="text-xl font-bold mb-3">第二层：功能要求</h3>
+                        <div class="space-y-2 text-sm text-gray-600 dark:text-gray-400">
+                            <p><strong>输入:</strong> 主题、年份、风格、深度</p>
+                            <p><strong>输出:</strong> 结构化Markdown报告</p>
+                            <p><strong>约束:</strong> 专业性、客观性、时效性</p>
+                            <p><strong>要求:</strong> 2000-3000字，含数据支撑</p>
+                        </div>
+                    </div>
+                    
+                    <div class="card-hover bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg">
+                        <div class="text-3xl mb-4">📊</div>
+                        <h3 class="text-xl font-bold mb-3">第三层：评估方法</h3>
+                        <div class="space-y-2 text-sm text-gray-600 dark:text-gray-400">
+                            <p><strong>结构:</strong> 章节完整性检查</p>
+                            <p><strong>内容:</strong> 字数、数据、格式验证</p>
+                            <p><strong>相关性:</strong> LLM评审打分</p>
+                            <p><strong>参数:</strong> 输入参数使用检查</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="max-w-4xl mx-auto mt-8 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-gray-800 dark:to-gray-700 p-6 rounded-xl">
+                    <h3 class="text-xl font-bold mb-4 text-center">评估器配置示例</h3>
+                    <div class="code-block">
+prompts:
+  report_generator:
+    evaluators:
+      - structure_evaluator          # 结构完整性 (20%)
+      - content_completeness_evaluator # 内容完整性 (30%)
+      - relevance_evaluator          # 内容相关性 (40%)
+      - parameter_usage_evaluator    # 参数使用 (10%)
+    
+    min_quality_score: 0.85          # 85%以上才能推送
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Slide 5: Platform Philosophy -->
+        <div class="slide">
+            <div class="container mx-auto px-8 py-16 min-h-full">
+                <h2 class="text-4xl font-bold mb-12 text-center">
+                    <i class="fas fa-cogs text-blue-500 mr-3"></i>
+                    工程化平台核心理念
+                </h2>
+                
+                <div class="max-w-5xl mx-auto space-y-6">
+                    <div class="card-hover bg-gradient-to-r from-blue-400 to-cyan-400 text-white p-8 rounded-xl shadow-lg">
+                        <div class="flex items-start gap-4">
+                            <div class="text-5xl">🎯</div>
+                            <div>
+                                <h3 class="text-2xl font-bold mb-3">远程Hub是唯一真相源</h3>
+                                <p class="text-lg opacity-90">团队成员启动程序时，自动拉取最新版本，避免版本冲突，确保使用统一版本</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card-hover bg-gradient-to-r from-blue-500 to-cyan-500 text-white p-8 rounded-xl shadow-lg">
+                        <div class="flex items-start gap-4">
+                            <div class="text-5xl">⚡</div>
+                            <div>
+                                <h3 class="text-2xl font-bold mb-3">运行即捕获</h3>
+                                <p class="text-lg opacity-90">每次运行自动保存真实参数到Dataset，不需要手动构建测试用例，测试数据来自真实场景</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card-hover bg-gradient-to-r from-blue-600 to-cyan-600 text-white p-8 rounded-xl shadow-lg">
+                        <div class="flex items-start gap-4">
+                            <div class="text-5xl">🛡️</div>
+                            <div>
+                                <h3 class="text-2xl font-bold mb-3">质量门禁</h3>
+                                <p class="text-lg opacity-90">推送前自动测试，质量不达标会警告，确保每次推送都经过验证</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Slide 6: Architecture -->
+        <div class="slide">
+            <div class="container mx-auto px-8 py-16 min-h-full">
+                <h2 class="text-4xl font-bold mb-8 text-center">
+                    <i class="fas fa-sitemap text-blue-600 mr-3"></i>
+                    系统架构
+                </h2>
+                
+                <div class="max-w-4xl mx-auto space-y-4">
+                    <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg">
+                        <h3 class="text-xl font-bold mb-4 text-center text-gray-700 dark:text-gray-300">用户层</h3>
+                        <div class="flex justify-center gap-4 flex-wrap">
+                            <span class="px-4 py-2 bg-blue-100 dark:bg-blue-900 rounded-lg">main.py</span>
+                            <span class="px-4 py-2 bg-blue-100 dark:bg-blue-900 rounded-lg">提示词 YAML</span>
+                            <span class="px-4 py-2 bg-blue-100 dark:bg-blue-900 rounded-lg">LangSmith Web UI</span>
+                        </div>
+                    </div>
+                    
+                    <div class="text-center text-3xl text-gray-400">
+                        <i class="fas fa-arrow-down"></i>
+                    </div>
+                    
+                    <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg">
+                        <h3 class="text-xl font-bold mb-4 text-center text-gray-700 dark:text-gray-300">核心模块层</h3>
+                        <div class="grid md:grid-cols-3 gap-4">
+                            <div class="bg-green-50 dark:bg-green-900 p-4 rounded-lg">
+                                <h4 class="font-bold mb-2 text-green-700 dark:text-green-300">🟢 Prompt管理</h4>
+                                <ul class="text-sm space-y-1 text-gray-600 dark:text-gray-400">
+                                    <li>• 自动拉取</li>
+                                    <li>• 智能推送</li>
+                                    <li>• 版本管理</li>
+                                </ul>
+                            </div>
+                            <div class="bg-green-50 dark:bg-green-900 p-4 rounded-lg">
+                                <h4 class="font-bold mb-2 text-green-700 dark:text-green-300">🟢 Dataset捕获</h4>
+                                <ul class="text-sm space-y-1 text-gray-600 dark:text-gray-400">
+                                    <li>• 装饰器捕获</li>
+                                    <li>• 自动同步</li>
+                                    <li>• 真实参数</li>
+                                </ul>
+                            </div>
+                            <div class="bg-green-50 dark:bg-green-900 p-4 rounded-lg">
+                                <h4 class="font-bold mb-2 text-green-700 dark:text-green-300">🟢 评估系统</h4>
+                                <ul class="text-sm space-y-1 text-gray-600 dark:text-gray-400">
+                                    <li>• 自动评估</li>
+                                    <li>• 质量打分</li>
+                                    <li>• 对比报告</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="text-center text-3xl text-gray-400">
+                        <i class="fas fa-arrow-down"></i>
+                    </div>
+                    
+                    <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg">
+                        <h3 class="text-xl font-bold mb-4 text-center text-gray-700 dark:text-gray-300">基础服务层</h3>
+                        <div class="flex justify-center gap-4 flex-wrap">
+                            <span class="px-4 py-2 bg-blue-100 dark:bg-blue-900 rounded-lg">🔵 LangSmith API</span>
+                            <span class="px-4 py-2 bg-blue-100 dark:bg-blue-900 rounded-lg">🔵 Azure OpenAI</span>
+                            <span class="px-4 py-2 bg-blue-100 dark:bg-blue-900 rounded-lg">🔵 LangGraph</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-8 max-w-3xl mx-auto">
+                    <div class="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-gray-800 dark:to-gray-700 p-6 rounded-xl">
+                        <div class="grid md:grid-cols-2 gap-4">
+                            <div>
+                                <h4 class="font-bold mb-2 text-blue-600 dark:text-blue-400">🔵 LangSmith 原生功能</h4>
+                                <p class="text-sm text-gray-600 dark:text-gray-400">Hub、Dataset、Playground、Evaluation</p>
+                            </div>
+                            <div>
+                                <h4 class="font-bold mb-2 text-cyan-600 dark:text-green-400">🟢 自研工程化功能</h4>
+                                <p class="text-sm text-gray-600 dark:text-gray-400">自动拉取、自动捕获、智能推送、配置化</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Slide 7: Prompt Management -->
+        <div class="slide">
+            <div class="container mx-auto px-8 py-16 min-h-full">
+                <h2 class="text-4xl font-bold mb-8 text-center">
+                    <i class="fas fa-code text-cyan-600 mr-3"></i>
+                    Prompt管理系统
+                </h2>
+                
+                <div class="max-w-4xl mx-auto space-y-6">
+                    <div class="card-hover bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg">
+                        <h3 class="text-2xl font-bold mb-4 flex items-center">
+                            <span class="text-blue-500 mr-2">🟢</span>
+                            标准化的YAML格式
+                        </h3>
+                        <div class="code-block">
+# prompts/report_generator.yaml
+version: v1.2.0
+description: "生成行业分析报告"
+
+messages:
+  - role: system
+    content: |
+      你是专业的行业分析师
+      根据提供的信息生成结构化报告
+      
+  - role: user
+    content: |
+      主题: {topic}
+      年份: {year_range}
+      请生成报告
+
+input_variables:
+  - topic
+  - year_range
+  - style
+                        </div>
+                    </div>
+                    
+                    <div class="grid md:grid-cols-2 gap-6">
+                        <div class="card-hover bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-gray-800 dark:to-gray-700 p-6 rounded-xl shadow-lg">
+                            <h3 class="text-xl font-bold mb-4 flex items-center">
+                                <span class="text-blue-500 mr-2">🟢</span>
+                                自动拉取机制
+                            </h3>
+                            <div class="space-y-3 text-sm">
+                                <div class="flex items-start gap-2">
+                                    <i class="fas fa-check-circle text-blue-500 mt-1"></i>
+                                    <p>启动时自动检查Hub最新版本</p>
+                                </div>
+                                <div class="flex items-start gap-2">
+                                    <i class="fas fa-check-circle text-blue-500 mt-1"></i>
+                                    <p>对比本地版本号，自动下载更新</p>
+                                </div>
+                                <div class="flex items-start gap-2">
+                                    <i class="fas fa-check-circle text-blue-500 mt-1"></i>
+                                    <p>团队无需手动同步</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card-hover bg-gradient-to-br from-purple-50 to-pink-50 dark:from-gray-800 dark:to-gray-700 p-6 rounded-xl shadow-lg">
+                            <h3 class="text-xl font-bold mb-4 flex items-center">
+                                <span class="text-blue-500 mr-2">🟢</span>
+                                智能推送
+                            </h3>
+                            <div class="space-y-3 text-sm">
+                                <div class="flex items-start gap-2">
+                                    <i class="fas fa-shield-alt text-blue-500 mt-1"></i>
+                                    <p>推送前自动运行评估器</p>
+                                </div>
+                                <div class="flex items-start gap-2">
+                                    <i class="fas fa-shield-alt text-blue-500 mt-1"></i>
+                                    <p>质量分数低于阈值会警告</p>
+                                </div>
+                                <div class="flex items-start gap-2">
+                                    <i class="fas fa-shield-alt text-blue-500 mt-1"></i>
+                                    <p>自动创建版本备份</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Slide 8: Dataset Capture -->
+        <div class="slide">
+            <div class="container mx-auto px-8 py-16 min-h-full">
+                <h2 class="text-4xl font-bold mb-8 text-center">
+                    <i class="fas fa-database text-blue-600 mr-3"></i>
+                    Dataset自动捕获系统
+                </h2>
+                
+                <div class="max-w-4xl mx-auto space-y-6">
+                    <div class="bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-gray-800 dark:to-gray-700 p-6 rounded-xl">
+                        <h3 class="text-2xl font-bold mb-4 text-center">运行即捕获 🟢</h3>
+                        <p class="text-center text-lg text-gray-700 dark:text-gray-300">告别手动构建测试用例，每次运行自动保存真实参数</p>
+                    </div>
+                    
+                    <div class="card-hover bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg">
+                        <h3 class="text-xl font-bold mb-4">装饰器自动捕获</h3>
+                        <div class="code-block">
+from tools.capture import capture_dataset
+from langsmith import traceable
+
+@traceable  # 🔵 LangSmith追踪
+@capture_dataset(
+    prompt_name="report_generator",
+    dataset_name="report_generator",
+    auto_sync=True  # 🟢 自动同步
+)
+def generate_report_node(self, state):
+    inputs = {
+        "topic": state.get("topic"),
+        "year_range": state.get("year_range"),
+        "style": state.get("style")
+    }
+    
+    capture_inputs(inputs)  # 🟢 标记要捕获的参数
+    result = chain.invoke(inputs)
+    return result
+                        </div>
+                    </div>
+                    
+                    <div class="grid md:grid-cols-3 gap-4">
+                        <div class="card-hover bg-blue-50 dark:bg-gray-800 p-4 rounded-xl text-center">
+                            <div class="text-3xl mb-2">📝</div>
+                            <h4 class="font-bold mb-2">自动捕获</h4>
+                            <p class="text-sm text-gray-600 dark:text-gray-400">捕获函数调用的原始参数字典</p>
+                        </div>
+                        <div class="card-hover bg-green-50 dark:bg-gray-800 p-4 rounded-xl text-center">
+                            <div class="text-3xl mb-2">💾</div>
+                            <h4 class="font-bold mb-2">本地缓存</h4>
+                            <p class="text-sm text-gray-600 dark:text-gray-400">保存到.dataset_cache/</p>
+                        </div>
+                        <div class="card-hover bg-purple-50 dark:bg-gray-800 p-4 rounded-xl text-center">
+                            <div class="text-3xl mb-2">☁️</div>
+                            <h4 class="font-bold mb-2">自动同步</h4>
+                            <p class="text-sm text-gray-600 dark:text-gray-400">推送到LangSmith Dataset</p>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-gray-800 dark:to-gray-700 p-6 rounded-xl">
+                        <h4 class="font-bold mb-3 text-lg">核心价值</h4>
+                        <ul class="grid md:grid-cols-2 gap-3 text-sm">
+                            <li class="flex items-center gap-2">
+                                <i class="fas fa-star text-blue-400"></i>
+                                <span>测试数据来自真实运行</span>
+                            </li>
+                            <li class="flex items-center gap-2">
+                                <i class="fas fa-star text-blue-400"></i>
+                                <span>无需手动复制粘贴参数</span>
+                            </li>
+                            <li class="flex items-center gap-2">
+                                <i class="fas fa-star text-blue-400"></i>
+                                <span>在Playground中一键切换版本对比</span>
+                            </li>
+                            <li class="flex items-center gap-2">
+                                <i class="fas fa-star text-blue-400"></i>
+                                <span>节省95%的测试准备时间</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Slide 9: Evaluation System -->
+        <div class="slide">
+            <div class="container mx-auto px-8 py-16 min-h-full">
+                <h2 class="text-4xl font-bold mb-8 text-center">
+                    <i class="fas fa-check-double text-blue-500 mr-3"></i>
+                    评估系统
+                </h2>
+                
+                <div class="max-w-5xl mx-auto space-y-6">
+                    <div class="text-center mb-8">
+                        <p class="text-xl text-gray-600 dark:text-gray-400">实现金字塔方法论的第三层：评估方法可配置化</p>
+                    </div>
+                    
+                    <div class="grid md:grid-cols-2 gap-6">
+                        <div class="card-hover bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg">
+                            <h3 class="text-xl font-bold mb-4 flex items-center">
+                                <span class="text-blue-500 mr-2">🟢</span>
+                                评估器注册表
+                            </h3>
+                            <div class="space-y-2 text-sm">
+                                <div class="bg-blue-50 dark:bg-gray-700 p-3 rounded">
+                                    <strong>structure_evaluator</strong>
+                                    <p class="text-gray-600 dark:text-gray-400">检查报告结构完整性</p>
+                                </div>
+                                <div class="bg-blue-50 dark:bg-gray-700 p-3 rounded">
+                                    <strong>content_completeness</strong>
+                                    <p class="text-gray-600 dark:text-gray-400">验证内容充实度</p>
+                                </div>
+                                <div class="bg-blue-50 dark:bg-gray-700 p-3 rounded">
+                                    <strong>relevance_evaluator</strong>
+                                    <p class="text-gray-600 dark:text-gray-400">LLM评审内容相关性</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card-hover bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg">
+                            <h3 class="text-xl font-bold mb-4 flex items-center">
+                                <span class="text-blue-500 mr-2">🟢</span>
+                                配置化评估
+                            </h3>
+                            <div class="code-block text-xs">
+evaluators:
+  - structure_evaluator
+  - content_completeness
+  - relevance_evaluator
+
+evaluator_weights:
+  structure_evaluator: 0.2
+  content_completeness: 0.3
+  relevance_evaluator: 0.5
+
+min_quality_score: 0.85
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gradient-to-r from-blue-400 to-blue-500 text-white p-8 rounded-xl shadow-lg">
+                        <h3 class="text-2xl font-bold mb-6 text-center">评估报告示例</h3>
+                        <div class="bg-white bg-opacity-10 backdrop-blur-sm p-6 rounded-lg font-mono text-sm">
+                            <div class="mb-4">
+                                <strong>提示词:</strong> report_generator<br>
+                                <strong>测试用例数:</strong> 15
+                            </div>
+                            <div class="border-t border-white border-opacity-30 pt-4">
+                                <div class="space-y-2">
+                                    <div>structure_valid: <strong>95.0%</strong> (权重: 0.2)</div>
+                                    <div>content_completeness: <strong>88.0%</strong> (权重: 0.3)</div>
+                                    <div>relevance_score: <strong>92.0%</strong> (权重: 0.5)</div>
+                                </div>
+                            </div>
+                            <div class="border-t border-white border-opacity-30 mt-4 pt-4 text-center">
+                                <div class="text-2xl font-bold">综合质量分数: 90.9% ✅</div>
+                                <div class="mt-2">状态: 通过（阈值: 85%）</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Slide 10: Complete Workflow -->
+        <div class="slide">
+            <div class="container mx-auto px-8 py-16 min-h-full">
+                <h2 class="text-4xl font-bold mb-8 text-center">
+                    <i class="fas fa-project-diagram text-blue-600 mr-3"></i>
+                    完整工作流
+                </h2>
+                
+                <div class="max-w-5xl mx-auto">
+                    <div class="grid md:grid-cols-2 gap-8">
+                        <!-- Developer A -->
+                        <div class="space-y-4">
+                            <h3 class="text-2xl font-bold text-center mb-6 text-blue-500 dark:text-purple-400">开发者A：优化提示词</h3>
+                            
+                            <div class="card-hover bg-white dark:bg-gray-800 p-4 rounded-xl shadow-lg">
+                                <div class="flex items-start gap-3">
+                                    <div class="w-8 h-8 bg-purple-500 text-white rounded-full flex items-center justify-center font-bold flex-shrink-0">1</div>
+                                    <div>
+                                        <h4 class="font-bold mb-1">修改YAML文件</h4>
+                                        <p class="text-sm text-gray-600 dark:text-gray-400">优化提示词内容</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="card-hover bg-white dark:bg-gray-800 p-4 rounded-xl shadow-lg">
+                                <div class="flex items-start gap-3">
+                                    <div class="w-8 h-8 bg-purple-500 text-white rounded-full flex items-center justify-center font-bold flex-shrink-0">2</div>
+                                    <div>
+                                        <h4 class="font-bold mb-1">本地测试 🟢</h4>
+                                        <p class="text-sm text-gray-600 dark:text-gray-400">运行程序，自动捕获参数</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="card-hover bg-white dark:bg-gray-800 p-4 rounded-xl shadow-lg">
+                                <div class="flex items-start gap-3">
+                                    <div class="w-8 h-8 bg-purple-500 text-white rounded-full flex items-center justify-center font-bold flex-shrink-0">3</div>
+                                    <div>
+                                        <h4 class="font-bold mb-1">Playground验证 🔵</h4>
+                                        <p class="text-sm text-gray-600 dark:text-gray-400">对比不同版本输出</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="card-hover bg-white dark:bg-gray-800 p-4 rounded-xl shadow-lg">
+                                <div class="flex items-start gap-3">
+                                    <div class="w-8 h-8 bg-purple-500 text-white rounded-full flex items-center justify-center font-bold flex-shrink-0">4</div>
+                                    <div>
+                                        <h4 class="font-bold mb-1">智能推送 🟢</h4>
+                                        <p class="text-sm text-gray-600 dark:text-gray-400">自动测试→质量检查→推送</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Developer B -->
+                        <div class="space-y-4">
+                            <h3 class="text-2xl font-bold text-center mb-6 text-blue-600 dark:text-blue-400">开发者B：自动同步</h3>
+                            
+                            <div class="card-hover bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-gray-800 dark:to-gray-700 p-6 rounded-xl shadow-lg">
+                                <div class="text-center">
+                                    <div class="text-4xl mb-4">🚀</div>
+                                    <h4 class="font-bold text-xl mb-3">第二天来上班</h4>
+                                    <p class="text-gray-600 dark:text-gray-400 mb-4">运行程序时自动发生：</p>
+                                </div>
+                                <div class="space-y-3">
+                                    <div class="flex items-center gap-2 bg-white dark:bg-gray-800 p-3 rounded">
+                                        <i class="fas fa-check text-blue-500"></i>
+                                        <span class="text-sm">检查Hub最新版本</span>
+                                    </div>
+                                    <div class="flex items-center gap-2 bg-white dark:bg-gray-800 p-3 rounded">
+                                        <i class="fas fa-check text-blue-500"></i>
+                                        <span class="text-sm">发现新版本，自动下载</span>
+                                    </div>
+                                    <div class="flex items-center gap-2 bg-white dark:bg-gray-800 p-3 rounded">
+                                        <i class="fas fa-check text-blue-500"></i>
+                                        <span class="text-sm">更新本地YAML文件</span>
+                                    </div>
+                                    <div class="flex items-center gap-2 bg-white dark:bg-gray-800 p-3 rounded">
+                                        <i class="fas fa-check text-blue-500"></i>
+                                        <span class="text-sm">使用最新版本运行</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-8 bg-gradient-to-r from-cyan-500 to-blue-500 text-white p-6 rounded-xl text-center">
+                        <h3 class="text-2xl font-bold mb-3">无缝协作</h3>
+                        <p class="text-lg">A推送 → Hub更新 → B自动拉取</p>
+                        <p class="mt-2 opacity-90">全程自动化，团队始终使用统一版本</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Slide 11: Value Comparison -->
+        <div class="slide">
+            <div class="container mx-auto px-8 py-16 min-h-full">
+                <h2 class="text-4xl font-bold mb-8 text-center">
+                    <i class="fas fa-chart-bar text-cyan-600 mr-3"></i>
+                    效率提升对比
+                </h2>
+                
+                <div class="max-w-4xl mx-auto space-y-6">
+                    <div class="bg-gradient-to-r from-yellow-400 to-orange-500 text-white p-8 rounded-xl text-center shadow-2xl">
+                        <h3 class="text-5xl font-bold mb-2">2小时 → 10分钟</h3>
+                        <p class="text-2xl">总体效率提升 🚀</p>
+                    </div>
+                    
+                    <div class="grid gap-4">
+                        <div class="card-hover bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="font-bold">手动构建测试用例</span>
+                                <span class="text-cyan-600 dark:text-green-400 font-bold">节省 90%</span>
+                            </div>
+                            <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+                                <div class="bg-gradient-to-r from-green-400 to-green-600 h-3 rounded-full" style="width: 90%"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="card-hover bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="font-bold">复制粘贴参数</span>
+                                <span class="text-cyan-600 dark:text-green-400 font-bold">节省 95%</span>
+                            </div>
+                            <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+                                <div class="bg-gradient-to-r from-green-400 to-green-600 h-3 rounded-full" style="width: 95%"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="card-hover bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="font-bold">通知团队更新</span>
+                                <span class="text-cyan-600 dark:text-green-400 font-bold">节省 100%</span>
+                            </div>
+                            <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+                                <div class="bg-gradient-to-r from-green-400 to-green-600 h-3 rounded-full" style="width: 100%"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="card-hover bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="font-bold">版本记录管理</span>
+                                <span class="text-cyan-600 dark:text-green-400 font-bold">节省 100%</span>
+                            </div>
+                            <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+                                <div class="bg-gradient-to-r from-green-400 to-green-600 h-3 rounded-full" style="width: 100%"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="card-hover bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="font-bold">测试评估流程</span>
+                                <span class="text-cyan-600 dark:text-green-400 font-bold">节省 85%</span>
+                            </div>
+                            <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+                                <div class="bg-gradient-to-r from-green-400 to-green-600 h-3 rounded-full" style="width: 85%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Slide 12: Core Advantages -->
+        <div class="slide">
+            <div class="container mx-auto px-8 py-16 min-h-full">
+                <h2 class="text-4xl font-bold mb-12 text-center">
+                    <i class="fas fa-trophy text-blue-400 mr-3"></i>
+                    核心优势
+                </h2>
+                
+                <div class="max-w-6xl mx-auto grid md:grid-cols-2 gap-6">
+                    <div class="card-hover bg-gradient-to-br from-blue-500 to-cyan-500 text-white p-8 rounded-xl shadow-lg">
+                        <div class="text-5xl mb-4">⚡</div>
+                        <h3 class="text-3xl font-bold mb-4">自动化</h3>
+                        <ul class="space-y-2 text-lg opacity-90">
+                            <li>• 自动拉取最新版本</li>
+                            <li>• 自动捕获测试数据</li>
+                            <li>• 自动同步到云端</li>
+                            <li>• 自动评估质量</li>
+                            <li class="font-bold mt-3">减少90%手动操作</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="card-hover bg-gradient-to-br from-blue-400 to-blue-500 text-white p-8 rounded-xl shadow-lg">
+                        <div class="text-5xl mb-4">📐</div>
+                        <h3 class="text-3xl font-bold mb-4">标准化</h3>
+                        <ul class="space-y-2 text-lg opacity-90">
+                            <li>• 统一的YAML格式</li>
+                            <li>• 标准化工作流程</li>
+                            <li>• 可复制的最佳实践</li>
+                            <li>• 团队协作规范</li>
+                            <li class="font-bold mt-3">一次配置，永久受益</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="card-hover bg-gradient-to-br from-cyan-500 to-blue-500 text-white p-8 rounded-xl shadow-lg">
+                        <div class="text-5xl mb-4">🔧</div>
+                        <h3 class="text-3xl font-bold mb-4">工程化</h3>
+                        <ul class="space-y-2 text-lg opacity-90">
+                            <li>• 完整的版本管理</li>
+                            <li>• 质量门禁机制</li>
+                            <li>• 无缝团队协作</li>
+                            <li>• 可追溯的历史记录</li>
+                            <li class="font-bold mt-3">专业级开发体验</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="card-hover bg-gradient-to-br from-blue-400 to-cyan-500 text-white p-8 rounded-xl shadow-lg">
+                        <div class="text-5xl mb-4">📊</div>
+                        <h3 class="text-3xl font-bold mb-4">可视化</h3>
+                        <ul class="space-y-2 text-lg opacity-90">
+                            <li>• 清晰的质量分数</li>
+                            <li>• 版本对比报告</li>
+                            <li>• 完整流程追踪</li>
+                            <li>• 数据驱动决策</li>
+                            <li class="font-bold mt-3">一目了然的洞察</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Slide 13: Use Cases -->
+        <div class="slide">
+            <div class="container mx-auto px-8 py-16 min-h-full">
+                <h2 class="text-4xl font-bold mb-12 text-center">
+                    <i class="fas fa-bullseye text-blue-500 mr-3"></i>
+                    适用场景
+                </h2>
+                
+                <div class="max-w-5xl mx-auto space-y-6">
+                    <div class="card-hover bg-white dark:bg-gray-800 p-8 rounded-xl shadow-lg">
+                        <div class="flex items-start gap-6">
+                            <div class="text-6xl flex-shrink-0">🏢</div>
+                            <div>
+                                <h3 class="text-2xl font-bold mb-3">企业级AI应用开发</h3>
+                                <div class="grid md:grid-cols-3 gap-4">
+                                    <div class="flex items-center gap-2">
+                                        <i class="fas fa-check-circle text-blue-500"></i>
+                                        <span>需要团队协作</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <i class="fas fa-check-circle text-blue-500"></i>
+                                        <span>提示词数量多</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <i class="fas fa-check-circle text-blue-500"></i>
+                                        <span>质量要求高</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card-hover bg-white dark:bg-gray-800 p-8 rounded-xl shadow-lg">
+                        <div class="flex items-start gap-6">
+                            <div class="text-6xl flex-shrink-0">👨‍💻</div>
+                            <div>
+                                <h3 class="text-2xl font-bold mb-3">提示词工程师</h3>
+                                <div class="grid md:grid-cols-3 gap-4">
+                                    <div class="flex items-center gap-2">
+                                        <i class="fas fa-check-circle text-blue-500"></i>
+                                        <span>频繁优化提示词</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <i class="fas fa-check-circle text-blue-500"></i>
+                                        <span>需要对比测试效果</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <i class="fas fa-check-circle text-blue-500"></i>
+                                        <span>量化质量提升</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card-hover bg-white dark:bg-gray-800 p-8 rounded-xl shadow-lg">
+                        <div class="flex items-start gap-6">
+                            <div class="text-6xl flex-shrink-0">🚀</div>
+                            <div>
+                                <h3 class="text-2xl font-bold mb-3">AI应用产品化</h3>
+                                <div class="grid md:grid-cols-3 gap-4">
+                                    <div class="flex items-center gap-2">
+                                        <i class="fas fa-check-circle text-blue-500"></i>
+                                        <span>需要持续优化</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <i class="fas fa-check-circle text-blue-500"></i>
+                                        <span>需要版本管理</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <i class="fas fa-check-circle text-blue-500"></i>
+                                        <span>需要质量保障</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Slide 14: Summary -->
+        <div class="slide">
+            <div class="container mx-auto px-8 py-16 min-h-full">
+                <h2 class="text-4xl font-bold mb-12 text-center">
+                    <i class="fas fa-star text-blue-400 mr-3"></i>
+                    核心要点回顾
+                </h2>
+                
+                <div class="max-w-4xl mx-auto space-y-6">
+                    <div class="card-hover bg-gradient-to-r from-blue-400 to-blue-500 text-white p-6 rounded-xl shadow-lg">
+                        <h3 class="text-2xl font-bold mb-3">1️⃣ 金字塔设计方法论</h3>
+                        <p class="text-lg opacity-90">业务需求 → 功能要求 → 评估方法</p>
+                        <p class="opacity-80">从 What & Why 到 How 再到 Measure</p>
+                    </div>
+                    
+                    <div class="card-hover bg-gradient-to-r from-blue-500 to-cyan-500 text-white p-6 rounded-xl shadow-lg">
+                        <h3 class="text-2xl font-bold mb-3">2️⃣ 三大工程化理念</h3>
+                        <ul class="space-y-2 text-lg opacity-90">
+                            <li>• 远程Hub是唯一真相源（自动拉取）</li>
+                            <li>• 运行即捕获（自动测试数据）</li>
+                            <li>• 质量门禁（推送前验证）</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="card-hover bg-gradient-to-r from-cyan-500 to-blue-500 text-white p-6 rounded-xl shadow-lg">
+                        <h3 class="text-2xl font-bold mb-3">3️⃣ 两大创新功能</h3>
+                        <div class="grid md:grid-cols-2 gap-4 mt-3">
+                            <div class="bg-white bg-opacity-20 p-4 rounded">
+                                <p class="font-bold">🟢 Prompt管理</p>
+                                <p class="text-sm opacity-90">自动拉取 + 智能推送</p>
+                            </div>
+                            <div class="bg-white bg-opacity-20 p-4 rounded">
+                                <p class="font-bold">🟢 Dataset捕获</p>
+                                <p class="text-sm opacity-90">装饰器捕获 + 自动同步</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card-hover bg-gradient-to-r from-blue-400 to-cyan-500 text-white p-6 rounded-xl shadow-lg">
+                        <h3 class="text-2xl font-bold mb-3">4️⃣ 一套完整SOP</h3>
+                        <p class="text-lg opacity-90">设计 → 开发 → 测试 → 评估 → 优化 → 部署</p>
+                        <p class="opacity-80 mt-2">全流程自动化，10倍效率提升</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Slide 15: Get Started -->
+        <div class="slide">
+            <div class="container mx-auto px-8 py-16 min-h-full">
+                <h2 class="text-4xl font-bold mb-8 text-center">
+                    <i class="fas fa-rocket text-blue-500 mr-3"></i>
+                    开始使用
+                </h2>
+                
+                <div class="max-w-3xl mx-auto space-y-6">
+                    <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-lg">
+                        <h3 class="text-2xl font-bold mb-4">快速上手</h3>
+                        <div class="code-block">
+# 1. 克隆项目
+git clone <your-repo>
+cd Langsmith-prompt-pipeline
+
+# 2. 安装依赖
+pip install -r requirements.txt
+
+# 3. 配置环境变量
+cp .env.example .env
+# 编辑 .env 填入 API Keys
+
+# 4. 运行第一个示例
+python main.py --query "生成AI行业报告"
+
+# 5. 查看 LangSmith 控制台
+# https://smith.langchain.com/
+                        </div>
+                    </div>
+                    
+                    <div class="grid md:grid-cols-3 gap-4">
+                        <div class="card-hover bg-green-50 dark:bg-gray-800 p-6 rounded-xl text-center shadow-lg">
+                            <i class="fas fa-rocket text-4xl text-cyan-600 mb-3"></i>
+                            <h4 class="font-bold mb-2">10倍效率</h4>
+                            <p class="text-sm text-gray-600 dark:text-gray-400">大幅提升开发速度</p>
+                        </div>
+                        <div class="card-hover bg-blue-50 dark:bg-gray-800 p-6 rounded-xl text-center shadow-lg">
+                            <i class="fas fa-shield-alt text-4xl text-blue-600 mb-3"></i>
+                            <h4 class="font-bold mb-2">质量保障</h4>
+                            <p class="text-sm text-gray-600 dark:text-gray-400">自动化质量检测</p>
+                        </div>
+                        <div class="card-hover bg-purple-50 dark:bg-gray-800 p-6 rounded-xl text-center shadow-lg">
+                            <i class="fas fa-users text-4xl text-blue-500 mb-3"></i>
+                            <h4 class="font-bold mb-2">无缝协作</h4>
+                            <p class="text-sm text-gray-600 dark:text-gray-400">团队高效配合</p>
+                        </div>
+                    </div>
+                    
+                    <div class="text-center space-y-4">
+                        <p class="text-xl text-gray-700 dark:text-gray-300">如果你对这个项目感兴趣，欢迎：</p>
+                        <div class="flex justify-center gap-4 flex-wrap">
+                            <button class="btn-hover apple-btn text-blue-600 dark:text-blue-400 px-6 py-3 rounded-lg font-bold">
+                                <i class="fas fa-star mr-2"></i>Star 项目
+                            </button>
+                            <button class="btn-hover apple-btn text-blue-600 dark:text-blue-400 px-6 py-3 rounded-lg font-bold">
+                                <i class="fas fa-book mr-2"></i>查看文档
+                            </button>
+                            <button class="btn-hover apple-btn text-blue-600 dark:text-blue-400 px-6 py-3 rounded-lg font-bold">
+                                <i class="fas fa-code-branch mr-2"></i>提交 PR
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Slide 16: Thank You -->
+        <div class="slide">
+            <div class="gradient-bg h-full flex items-center justify-center text-white">
+                <div class="text-center fade-in px-4">
+                    <i class="fas fa-heart text-6xl mb-6 animate-pulse"></i>
+                    <h1 class="text-5xl md:text-7xl font-bold mb-8">感谢观看！</h1>
+                    <p class="text-2xl md:text-3xl mb-8">希望这套方案能帮助你的团队</p>
+                    <div class="space-y-4 text-xl max-w-2xl mx-auto">
+                        <p><i class="fas fa-check-circle mr-2"></i>提升 10 倍开发效率</p>
+                        <p><i class="fas fa-check-circle mr-2"></i>保障提示词质量</p>
+                        <p><i class="fas fa-check-circle mr-2"></i>实现团队无缝协作</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Slide 17: Author Info -->
+        <div class="slide">
+            <div class="container mx-auto px-8 py-16 min-h-full flex items-center justify-center">
+                <div class="max-w-3xl w-full">
+                    <h2 class="text-4xl font-bold mb-12 text-center">
+                        <i class="fas fa-user-circle text-blue-600 mr-3"></i>
+                        作者信息
+                    </h2>
+                    
+                    <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-12">
+                        <div class="text-center mb-8">
+                            <div class="w-32 h-32 bg-gradient-to-r from-blue-400 to-blue-500 rounded-full mx-auto mb-6 flex items-center justify-center">
+                                <i class="fas fa-user text-6xl text-white"></i>
+                            </div>
+                            <h3 class="text-3xl font-bold mb-2">作者姓名</h3>
+                            <p class="text-gray-600 dark:text-gray-400 text-lg">AI工程化专家 | 提示词工程师</p>
+                        </div>
+                        
+                        <div class="space-y-4 mb-8">
+                            <a href="#" class="card-hover flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-600 transition">
+                                <i class="fab fa-github text-3xl text-gray-800 dark:text-gray-200"></i>
+                                <div>
+                                    <p class="font-bold">GitHub</p>
+                                    <p class="text-sm text-gray-600 dark:text-gray-400">@yourusername</p>
+                                </div>
+                            </a>
+                            
+                            <a href="#" class="card-hover flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-600 transition">
+                                <i class="fab fa-twitter text-3xl text-blue-400"></i>
+                                <div>
+                                    <p class="font-bold">Twitter / X</p>
+                                    <p class="text-sm text-gray-600 dark:text-gray-400">@yourusername</p>
+                                </div>
+                            </a>
+                            
+                            <a href="#" class="card-hover flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-600 transition">
+                                <i class="fab fa-linkedin text-3xl text-blue-600"></i>
+                                <div>
+                                    <p class="font-bold">LinkedIn</p>
+                                    <p class="text-sm text-gray-600 dark:text-gray-400">@yourusername</p>
+                                </div>
+                            </a>
+                        </div>
+                        
+                        <div class="text-center pt-6 border-t border-gray-200 dark:border-gray-700">
+                            <p class="text-gray-600 dark:text-gray-400">© 2025 版权所有</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+    </div>
+    
+    <script>
+        // Theme Toggle
+        const themeToggle = document.getElementById('themeToggle');
+        const html = document.documentElement;
+        
+        // Check system preference
+        if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            html.classList.add('dark');
+        }
+        
+        themeToggle.addEventListener('click', () => {
+            html.classList.toggle('dark');
+        });
+        
+        // Slide Navigation
+        const slides = document.querySelectorAll('.slide');
+        const totalSlides = slides.length;
+        let currentSlide = 0;
+        
+        document.getElementById('totalSlides').textContent = totalSlides;
+        
+        // Create navigation dots
+        const navDots = document.getElementById('navDots');
+        for (let i = 0; i < totalSlides; i++) {
+            const dot = document.createElement('div');
+            dot.className = 'nav-dot' + (i === 0 ? ' active' : '');
+            dot.addEventListener('click', () => goToSlide(i));
+            navDots.appendChild(dot);
+        }
+        
+        function updateSlide() {
+            slides.forEach((slide, index) => {
+                slide.classList.remove('active', 'prev');
+                if (index === currentSlide) {
+                    slide.classList.add('active');
+                } else if (index < currentSlide) {
+                    slide.classList.add('prev');
+                }
+            });
+            
+            // Update navigation dots
+            document.querySelectorAll('.nav-dot').forEach((dot, index) => {
+                dot.classList.toggle('active', index === currentSlide);
+            });
+            
+            // Update counter
+            document.getElementById('currentSlide').textContent = currentSlide + 1;
+            
+            // Update progress bar
+            const progress = ((currentSlide + 1) / totalSlides) * 100;
+            document.getElementById('progressBar').style.width = progress + '%';
+        }
+        
+        function goToSlide(index) {
+            if (index >= 0 && index < totalSlides) {
+                currentSlide = index;
+                updateSlide();
+            }
+        }
+        
+        function nextSlide() {
+            if (currentSlide < totalSlides - 1) {
+                currentSlide++;
+                updateSlide();
+            }
+        }
+        
+        function prevSlide() {
+            if (currentSlide > 0) {
+                currentSlide--;
+                updateSlide();
+            }
+        }
+        
+        // Event Listeners
+        document.getElementById('nextBtn').addEventListener('click', nextSlide);
+        document.getElementById('prevBtn').addEventListener('click', prevSlide);
+        
+        // Keyboard Navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === ' ') {
+                e.preventDefault();
+                nextSlide();
+            } else if (e.key === 'ArrowLeft') {
+                e.preventDefault();
+                prevSlide();
+            }
+        });
+        
+        // Touch Swipe
+        let touchStartX = 0;
+        let touchEndX = 0;
+        
+        document.addEventListener('touchstart', (e) => {
+            touchStartX = e.changedTouches[0].screenX;
+        });
+        
+        document.addEventListener('touchend', (e) => {
+            touchEndX = e.changedTouches[0].screenX;
+            handleSwipe();
+        });
+        
+        function handleSwipe() {
+            if (touchEndX < touchStartX - 50) nextSlide();
+            if (touchEndX > touchStartX + 50) prevSlide();
+        }
+        
+        // Initialize
+        updateSlide();
+    </script>
+</body>
+</html>

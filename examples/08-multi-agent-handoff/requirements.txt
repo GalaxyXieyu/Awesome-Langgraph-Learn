@@ -1,0 +1,22 @@
+# LangGraph Multi-Agent Handoff 项目依赖
+
+# 核心框架
+langgraph>=0.2.0
+langchain>=0.3.0
+langchain-core>=0.3.0
+
+# LLM提供商
+langchain-openai>=0.2.0
+langchain-anthropic>=0.2.0
+
+# 数据处理和验证
+pydantic>=2.0.0
+
+# 可选依赖 - 用于更好的开发体验
+jupyter>=1.0.0  # 如果需要notebook支持
+python-dotenv>=1.0.0  # 用于加载环境变量
+
+# 开发工具 (可选)
+pytest>=7.0.0  # 用于单元测试
+black>=23.0.0  # 代码格式化
+isort>=5.0.0   # 导入排序

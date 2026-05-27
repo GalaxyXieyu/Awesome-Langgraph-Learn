@@ -1,0 +1,15 @@
+{
+  "prompt_name": "parameter_parser",
+  "dataset_name": "param_parser_tests",
+  "timestamp": "2025-10-28T22:29:54.607669",
+  "run_id": null,
+  "inputs": {
+    "user_query": "分析金融科技2024年趋势，要求正式风格，深度分析"
+  },
+  "outputs": "```json\n{\n    \"topic\": \"金融科技2024年趋势\",\n    \"year_range\": \"2023-2024\",\n    \"style\": \"formal\",\n    \"depth\": \"deep\",\n    \"focus_areas\": \"市场趋势,技术发展,竞争格局\"\n}\n```",
+  "metadata": {
+    "source": "tutorial_demo"
+  },
+  "synced": true,
+  "synced_at": "2025-10-28T22:35:52.595565"
+}

@@ -1,0 +1,52 @@
+evaluators:
+  structure_evaluator:
+    file: report.py
+    class: ReportEvaluators
+    description: 结构评估器 - 检查报告的基本结构（标题、段落、长度）
+    dataset: report_generator
+    created_at: '2025-01-01T00:00:00'
+    synced_at: '2025-11-01T16:31:26.322164'
+    langsmith_id: structure_evaluator
+  content_completeness_evaluator:
+    file: report.py
+    class: ReportEvaluators
+    description: 内容完整性评估器 - 检查报告是否包含必要的章节
+    dataset: report_generator
+    created_at: '2025-01-01T00:00:00'
+    synced_at: '2025-11-01T16:31:26.341460'
+    langsmith_id: content_completeness_evaluator
+  relevance_evaluator:
+    file: report.py
+    class: ReportEvaluators
+    description: 相关性评估器 - 使用 LLM 评估报告内容是否与主题相关
+    dataset: report_generator
+    created_at: '2025-01-01T00:00:00'
+    synced_at: '2025-11-01T16:31:26.348531'
+    langsmith_id: relevance_evaluator
+  parameter_usage_evaluator:
+    file: report.py
+    class: ReportEvaluators
+    description: 参数使用评估器 - 检查多参数是否被正确使用
+    dataset: report_generator
+    created_at: '2025-01-01T00:00:00'
+    synced_at: '2025-11-01T16:31:26.355208'
+    langsmith_id: parameter_usage_evaluator
+  parameter_extraction_evaluator:
+    file: parameter.py
+    class: ParameterEvaluators
+    description: 参数提取评估器 - 检查提取的参数是否准确
+    dataset: parameter_parser
+    created_at: '2025-01-01T00:00:00'
+    synced_at: '2025-11-01T16:31:26.361726'
+    langsmith_id: parameter_extraction_evaluator
+  field_type_evaluator:
+    file: parameter.py
+    class: ParameterEvaluators
+    description: 字段类型评估器 - 检查字段值的类型和格式
+    dataset: parameter_parser
+    created_at: '2025-01-01T00:00:00'
+    synced_at: '2025-11-01T16:31:26.367424'
+    langsmith_id: field_type_evaluator
+versioning:
+  version_format: semantic
+  create_backup: false
