@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LG-04 记忆系统</title>
+<link rel="stylesheet" href="/Users/galaxyxieyu/.claude/skills/html-ppt-skill/assets/fonts.css">
+<link rel="stylesheet" href="/Users/galaxyxieyu/.claude/skills/html-ppt-skill/assets/base.css">
+<link rel="stylesheet" id="theme-link" href="/Users/galaxyxieyu/.claude/skills/html-ppt-skill/assets/themes/tokyo-night.css">
+<link rel="stylesheet" href="/Users/galaxyxieyu/.claude/skills/html-ppt-skill/assets/animations/animations.css">
+<style>
+body { width: 720pt; height: 405pt; margin: 0; padding: 0; overflow: hidden; font-family: 'Inter','Noto Sans SC',sans-serif; background: #0f172a; color: #e2e8f0; }
+.slide { width: 720pt; height: 405pt; padding: 36px 48px; box-sizing: border-box; display: none; position: relative; }
+.slide.is-active { display: flex; flex-direction: column; }
+.kicker { font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; color: #94a3b8; margin-bottom: 8px; }
+.h1 { font-size: 42px; font-weight: 800; line-height: 1.2; margin: 0 0 16px 0; color: #f8fafc; }
+.h2 { font-size: 28px; font-weight: 700; line-height: 1.3; margin: 0 0 12px 0; color: #f1f5f9; }
+.lede { font-size: 16px; line-height: 1.6; color: #cbd5e1; margin: 0; }
+.card { background: rgba(30,41,59,0.8); border: 1px solid rgba(148,163,184,0.2); border-radius: 8px; padding: 16px; }
+.card h4 { font-size: 14px; font-weight: 600; margin: 0 0 8px 0; color: #38bdf8; }
+.card p { font-size: 12px; line-height: 1.5; color: #94a3b8; margin: 0; }
+.grid { display: grid; gap: 12px; }
+.g2 { grid-template-columns: 1fr 1fr; }
+.g3 { grid-template-columns: 1fr 1fr 1fr; }
+.g4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+.mt-l { margin-top: 24px; }
+.mt-m { margin-top: 16px; }
+.tc { text-align: center; align-items: center; justify-content: center; }
+.center { display: flex; align-items: center; justify-content: center; }
+.deck-footer { position: absolute; bottom: 16px; left: 48px; right: 48px; display: flex; justify-content: space-between; font-size: 11px; color: #64748b; }
+.notes { display: none; }
+ul { margin: 0; padding-left: 20px; }
+li { font-size: 13px; line-height: 1.7; color: #cbd5e1; margin-bottom: 4px; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 12px; }
+th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid rgba(148,163,184,0.2); }
+th { color: #38bdf8; font-weight: 600; background: rgba(30,41,59,0.6); }
+td { color: #cbd5e1; }
+.layer-box { background: rgba(30,41,59,0.8); border-left: 4px solid #38bdf8; border-radius: 6px; padding: 12px 16px; margin-bottom: 10px; }
+.layer-box h4 { font-size: 14px; font-weight: 700; margin: 0 0 4px 0; color: #38bdf8; }
+.layer-box p { font-size: 12px; line-height: 1.5; color: #94a3b8; margin: 0; }
+.code-block { background: rgba(15,23,42,0.9); border: 1px solid rgba(148,163,184,0.15); border-radius: 6px; padding: 12px 16px; font-family: 'JetBrains Mono','Fira Code',monospace; font-size: 11px; line-height: 1.6; color: #a5b4fc; overflow-x: auto; }
+.highlight { color: #f472b6; }
+.tag { display: inline-block; background: rgba(56,189,248,0.15); color: #38bdf8; font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 4px; margin-right: 6px; }
+
+@media print {
+  .slide { display: flex !important; page-break-after: always; break-after: page; }
+  .slide:last-child { page-break-after: auto; }
+  body { width: 100%; height: 100%; background: #0f172a; }
+}
+</style>
+</head>
+<body>
+<div class="deck">
+
+<!-- Slide 1: 封面 -->
+<section class="slide tc" data-title="封面">
+  <div style="margin-bottom: 12px;"><span class="tag">LG-04</span></div>
+  <h1 class="h1" style="font-size: 48px; margin-bottom: 16px;">记忆系统全景</h1>
+  <p class="lede" style="font-size: 18px; color: #94a3b8;">让 LangGraph 学会记住：State / Checkpoint / Store / Cache 四层架构</p>
+  <div style="margin-top: 32px; display: flex; gap: 16px; justify-content: center;">
+    <div class="card" style="text-align: center; min-width: 120px;">
+      <div style="font-size: 24px; margin-bottom: 4px;">&#128161;</div>
+      <div style="font-size: 12px; color: #38bdf8; font-weight: 600;">State</div>
+      <div style="font-size: 11px; color: #64748b;">工作记忆</div>
+    </div>
+    <div class="card" style="text-align: center; min-width: 120px;">
+      <div style="font-size: 24px; margin-bottom: 4px;">&#128190;</div>
+      <div style="font-size: 12px; color: #38bdf8; font-weight: 600;">Checkpoint</div>
+      <div style="font-size: 11px; color: #64748b;">短期记忆</div>
+    </div>
+    <div class="card" style="text-align: center; min-width: 120px;">
+      <div style="font-size: 24px; margin-bottom: 4px;">&#128214;</div>
+      <div style="font-size: 12px; color: #38bdf8; font-weight: 600;">Store</div>
+      <div style="font-size: 11px; color: #64748b;">长期记忆</div>
+    </div>
+    <div class="card" style="text-align: center; min-width: 120px;">
+      <div style="font-size: 24px; margin-bottom: 4px;">&#9889;</div>
+      <div style="font-size: 12px; color: #38bdf8; font-weight: 600;">Cache</div>
+      <div style="font-size: 11px; color: #64748b;">加速记忆</div>
+    </div>
+  </div>
+  <div class="deck-footer"><span>LangGraph 渐进式教程</span><span>LG-04</span></div>
+  <div class="notes">开场引入：前三节课 State 存在内存里，invoke 结束就消失。这节课解决「让图记住」的问题，不是简单存数据库，而是一套分层记忆系统。</div>
+</section>
+
+<!-- Slide 2: 目录 -->
+<section class="slide" data-title="目录">
+  <div class="kicker">CONTENTS</div>
+  <h2 class="h2">本节课内容</h2>
+  <div class="grid g2 mt-l">
+    <div class="card">
+      <h4>01. 四层记忆模型</h4>
+      <p>State / Checkpoint / Store / Cache 的分层架构与各层对比</p>
+    </div>
+    <div class="card">
+      <h4>02. Checkpoint 短期记忆</h4>
+      <p>自动保存机制、PostgreSQL 表结构、生产环境迁移路径</p>
+    </div>
+    <div class="card">
+      <h4>03. Store 长期记忆</h4>
+      <p>命名空间设计、aput/aget/asearch API、pgvector 语义检索</p>
+    </div>
+    <div class="card">
+      <h4>04. Cache 加速记忆</h4>
+      <p>CachePolicy 配置、TTL 策略、防雪崩与后端选择</p>
+    </div>
+    <div class="card">
+      <h4>05. 上下文工程</h4>
+      <p>trim_messages 裁剪、增量摘要、pre_model_hook 统一入口</p>
+    </div>
+    <div class="card">
+      <h4>06. 实战：MemoryPal</h4>
+      <p>四层记忆的完整应用与常见误区</p>
+    </div>
+  </div>
+  <div class="deck-footer"><span>LangGraph 渐进式教程</span><span>LG-04</span></div>
+  <div class="notes">本节课六个主题，从四层记忆模型讲起，到 Checkpoint/Store/Cache 各层深入，再到上下文工程控制记忆大小，最后实战 MemoryPal。</div>
+</section>
+
+<!-- Slide 3: 四层记忆模型 -->
+<section class="slide" data-title="四层记忆模型">
+  <div class="kicker">MEMORY LAYERS</div>
+  <h2 class="h2">四层记忆全景图</h2>
+  <div class="mt-m">
+    <div class="layer-box" style="border-left-color: #f472b6;">
+      <h4 style="color: #f472b6;">Layer 1: State（工作记忆）</h4>
+      <p>载体：Python dict / TypedDict / Pydantic &nbsp;|&nbsp; 生命周期：1 个 super-step &nbsp;|&nbsp; 管理：你直接读写</p>
+    </div>
+    <div class="layer-box" style="border-left-color: #38bdf8;">
+      <h4 style="color: #38bdf8;">Layer 2: Checkpoint（短期记忆）</h4>
+      <p>载体：Postgres / SQLite / Redis checkpoints 表 &nbsp;|&nbsp; 生命周期：整个 thread &nbsp;|&nbsp; 管理：LangGraph 自动保存</p>
+    </div>
+    <div class="layer-box" style="border-left-color: #a78bfa;">
+      <h4 style="color: #a78bfa;">Layer 3: Store（长期记忆）</h4>
+      <p>载体：Postgres store 表（JSONB + 向量索引） &nbsp;|&nbsp; 生命周期：永久或 TTL &nbsp;|&nbsp; 管理：你手动 aput/aget/asearch</p>
+    </div>
+    <div class="layer-box" style="border-left-color: #34d399;">
+      <h4 style="color: #34d399;">Layer 4: Cache（加速记忆）</h4>
+      <p>载体：Postgres / Redis（复用连接池） &nbsp;|&nbsp; 生命周期：TTL 控制 &nbsp;|&nbsp; 管理：LangGraph 自动命中/写入</p>
+    </div>
+  </div>
+  <div class="deck-footer"><span>LangGraph 渐进式教程</span><span>LG-04</span></div>
+  <div class="notes">四层记忆模型是本章核心框架。State 是瞬时工作记忆，Checkpoint 是自动保存的短期记忆，Store 是手动管理的长期记忆，Cache 是避免重复计算的加速层。每层有不同的生命周期、管理方和成本结构。</div>
+</section>
+
+<!-- Slide 4: 各层对比表 -->
+<section class="slide" data-title="各层对比">
+  <div class="kicker">COMPARISON</div>
+  <h2 class="h2">四层记忆对比</h2>
+  <table class="mt-m">
+    <tr>
+      <th>维度</th>
+      <th>State</th>
+      <th>Checkpoint</th>
+      <th>Store</th>
+      <th>Cache</th>
+    </tr>
+    <tr>
+      <td><strong>谁在管</strong></td>
+      <td>你</td>
+      <td>LangGraph 自动</td>
+      <td>你手动读写</td>
+      <td>LangGraph 自动</td>
+    </tr>
+    <tr>
+      <td><strong>存在多久</strong></td>
+      <td>1 个 super-step</td>
+      <td>整个 thread 生命周期</td>
+      <td>永久（或 TTL）</td>
+      <td>TTL 到期</td>
+    </tr>
+    <tr>
+      <td><strong>按什么隔离</strong></td>
+      <td>当前执行上下文</td>
+      <td>thread_id</td>
+      <td>namespace + key</td>
+      <td>输入哈希</td>
+    </tr>
+    <tr>
+      <td><strong>怎么查</strong></td>
+      <td>直接 dict 访问</td>
+      <td>get_state(config)</td>
+      <td>aget / aput / asearch</td>
+      <td>自动命中</td>
+    </tr>
+    <tr>
+      <td><strong>典型成本</strong></td>
+      <td>零</td>
+      <td>每次 step 一次写</td>
+      <td>按需读写</td>
+      <td>一次哈希比较</td>
+    </tr>
+  </table>
+  <div class="mt-m" style="background: rgba(245,158,11,0.1); border-left: 3px solid #f59e0b; padding: 10px 14px; border-radius: 4px;">
+    <p style="font-size: 12px; color: #fbbf24; margin: 0;"><strong>推荐：</strong>PostgreSQL 作为统一底座 — ACID + JSONB + pgvector + pgBouncer，一库解决三层记忆。</p>
+  </div>
+  <div class="deck-footer"><span>LangGraph 渐进式教程</span><span>LG-04</span></div>
+  <div class="notes">对比表是学员理解四层记忆的关键。强调 PostgreSQL 作为统一底座的优势：关系查询、向量检索、连接管理三位一体。</div>
+</section>
+
+<!-- Slide 5: Checkpoint 短期记忆 -->
+<section class="slide" data-title="Checkpoint 短期记忆">
+  <div class="kicker">CHECKPOINT</div>
+  <h2 class="h2">Checkpoint：自动状态快照</h2>
+  <div class="grid g2 mt-m">
+    <div>
+      <div class="card" style="margin-bottom: 10px;">
+        <h4>Checkpoint 的组成</h4>
+        <ul>
+          <li><code>channel_values</code>：当前所有 channel 的值</li>
+          <li><code>channel_versions</code>：每个 channel 版本号</li>
+          <li><code>versions_seen</code>：节点看到的版本号</li>
+          <li><code>pending_writes</code>：尚未应用的 writes</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>开发到生产迁移</h4>
+        <div class="code-block" style="margin-top: 8px;">
+<span class="highlight"># 开发环境</span><br>
+from langgraph.checkpoint.memory import MemorySaver<br>
+graph = builder.compile(checkpointer=MemorySaver())<br><br>
+<span class="highlight"># 生产环境</span><br>
+from langgraph.checkpoint.postgres import PostgresSaver<br>
+saver = PostgresSaver(pool)<br>
+await saver.setup()<br>
+graph = builder.compile(checkpointer=saver)
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="card" style="margin-bottom: 10px;">
+        <h4>thread_id 设计建议</h4>
+        <table style="margin-top: 8px;">
+          <tr><th>场景</th><th>格式</th></tr>
+          <tr><td>单用户单会话</td><td><code>{user_id}_{session_id}</code></td></tr>
+          <tr><td>单用户多会话</td><td><code>{user_id}_{timestamp}</code></td></tr>
+          <tr><td>匿名用户</td><td><code>anon_{uuid}</code></td></tr>
+        </table>
+        <p style="margin-top: 10px; font-size: 11px; color: #f87171;">⚠️ 两个用户共享 thread_id 会看到彼此对话历史</p>
+      </div>
+      <div class="card mt-m">
+        <h4>为什么选 PostgreSQL？</h4>
+        <ul>
+          <li>ACID + JSONB：强一致性 + 嵌套字典兼容</li>
+          <li>pgvector：官方向量扩展，无需单独维护</li>
+          <li>pgBouncer：事务级连接池，高并发保障</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="deck-footer"><span>LangGraph 渐进式教程</span><span>LG-04</span></div>
+  <div class="notes">Checkpoint 是每个 super-step 结束后自动保存的状态快照。开发用 MemorySaver，生产用 PostgresSaver。thread_id 是隔离关键，必须包含 user_id。</div>
+</section>
+
+<!-- Slide 6: Store 长期记忆 -->
+<section class="slide" data-title="Store 长期记忆">
+  <div class="kicker">LONG-TERM MEMORY</div>
+  <h2 class="h2">Store：手动管理的长期记忆</h2>
+  <div class="grid g2 mt-m">
+    <div>
+      <div class="card" style="margin-bottom: 10px;">
+        <h4>Checkpoint vs Store 本质区别</h4>
+        <table style="margin-top: 8px;">
+          <tr><th>维度</th><th>Checkpoint</th><th>Store</th></tr>
+          <tr><td>管理方</td><td>自动</td><td>手动</td></tr>
+          <tr><td>存在时间</td><td>随对话增长</td><td>永久或 TTL</td></tr>
+          <tr><td>查询方式</td><td>thread_id 遍历</td><td>namespace + key</td></tr>
+          <tr><td>类比</td><td>游戏自动存档</td><td>手动保存的装备配置</td></tr>
+        </table>
+      </div>
+      <div class="card">
+        <h4>命名空间设计（推荐二元组）</h4>
+        <div class="code-block" style="margin-top: 8px;">
+ns_prefs = ("user_prefs", user_id)<br>
+ns_history = ("chat_history", user_id)<br>
+ns_knowledge = ("knowledge", user_id)<br>
+ns_research = ("deepresearch:artifacts", user_id)
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="card" style="margin-bottom: 10px;">
+        <h4>Store API 速查</h4>
+        <table style="margin-top: 8px;">
+          <tr><th>方法</th><th>用途</th></tr>
+          <tr><td><code>aput(ns, key, value)</code></td><td>写入/更新</td></tr>
+          <tr><td><code>aget(ns, key)</code></td><td>精确读取</td></tr>
+          <tr><td><code>asearch(ns, query, filter, limit)</code></td><td>列表/语义检索</td></tr>
+        </table>
+      </div>
+      <div class="card">
+        <h4>何时用 Store、何时用 Checkpoint？</h4>
+        <ul>
+          <li>对话消息历史 → <strong>Checkpoint</strong>（自动管理）</li>
+          <li>用户偏好（语言、风格）→ <strong>Store</strong>（跨会话）</li>
+          <li>知识库片段 → <strong>Store + 向量索引</strong></li>
+          <li>工具调用结果缓存 → <strong>Store</strong>（可选 TTL）</li>
+          <li>当前执行位置 → <strong>Checkpoint</strong>（中断恢复）</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="deck-footer"><span>LangGraph 渐进式教程</span><span>LG-04</span></div>
+  <div class="notes">Store 是手动管理的长期记忆，通过 namespace 做数据隔离。推荐 (bucket, user_id) 二元组。支持精确读取和语义检索（pgvector）。</div>
+</section>
+
+<!-- Slide 7: Cache 加速记忆 -->
+<section class="slide" data-title="Cache 加速记忆">
+  <div class="kicker">CACHE LAYER</div>
+  <h2 class="h2">Cache：记忆的加速层</h2>
+  <div class="grid g2 mt-m">
+    <div>
+      <div class="card" style="margin-bottom: 10px;">
+        <h4>Cache 与 Checkpoint 的关键区分</h4>
+        <ul>
+          <li><code>checkpointer=</code>：存整个图的状态，用于恢复</li>
+          <li><code>cache=</code>：存单个节点的输出，用于避免重复计算</li>
+          <li>两者可复用同一个 PostgresSaver 实例</li>
+          <li>底层用不同 thread_id 前缀隔离</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>CachePolicy 配置</h4>
+        <div class="code-block" style="margin-top: 8px;">
+from langgraph.types import CachePolicy<br><br>
+<span class="highlight"># 基础 TTL</span><br>
+CachePolicy(ttl=300)  <span style="color: #64748b;"># 5 分钟</span><br><br>
+<span class="highlight"># 自定义缓存键</span><br>
+CachePolicy(ttl=600, key_func=my_key_func)<br><br>
+<span class="highlight"># 条件缓存（只读操作才缓存）</span><br>
+CachePolicy(ttl=300, key_func=conditional_key)
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="card" style="margin-bottom: 10px;">
+        <h4>TTL 设置建议</h4>
+        <table style="margin-top: 8px;">
+          <tr><th>数据类型</th><th>TTL</th><th>理由</th></tr>
+          <tr><td>股票价格、实时天气</td><td>30 秒</td><td>几乎实时</td></tr>
+          <tr><td>数据库查询结果</td><td>10 分钟</td><td>中等动态</td></tr>
+          <tr><td>LLM 对话结果</td><td>30 分钟</td><td>上下文稳定</td></tr>
+          <tr><td>配置信息</td><td>24 小时</td><td>几乎不变</td></tr>
+        </table>
+      </div>
+      <div class="card">
+        <h4>缓存后端选择</h4>
+        <table style="margin-top: 8px;">
+          <tr><th>场景</th><th>推荐后端</th></tr>
+          <tr><td>本地开发</td><td>MemorySaver</td></tr>
+          <tr><td>生产环境</td><td>PostgresSaver（复用）</td></tr>
+          <tr><td>极致性能</td><td>RedisSaver</td></tr>
+        </table>
+        <p style="margin-top: 8px; font-size: 11px; color: #fbbf24;">💡 防雪崩：TTL 加随机偏移，避免大量缓存同时失效</p>
+      </div>
+    </div>
+  </div>
+  <div class="deck-footer"><span>LangGraph 渐进式教程</span><span>LG-04</span></div>
+  <div class="notes">Cache 不是独立基础设施，而是与 Checkpoint 复用同一后端的加速层。CachePolicy 控制 TTL 和缓存键。生产推荐复用 PostgresSaver。</div>
+</section>
+
+<!-- Slide 8: 上下文工程 -->
+<section class="slide" data-title="上下文工程">
+  <div class="kicker">CONTEXT ENGINEERING</div>
+  <h2 class="h2">上下文工程：控制记忆的大小</h2>
+  <div class="grid g2 mt-m">
+    <div>
+      <div class="card" style="margin-bottom: 10px; background: rgba(248,113,113,0.1); border-color: rgba(248,113,113,0.3);">
+        <h4 style="color: #f87171;">Token 危机</h4>
+        <ul>
+          <li>20 轮对话 ≈ 4000-6000 tokens</li>
+          <li>50 轮对话 ≈ 10000-15000 tokens</li>
+          <li>超出窗口 → 报错</li>
+          <li>未超出但接近 → "lost in the middle"</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>trim_messages 裁剪</h4>
+        <div class="code-block" style="margin-top: 8px;">
+def build_pre_model_hook(max_tokens=800):<br>
+&nbsp;&nbsp;def pre_model_hook(state):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;trimmed = trim_messages(<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;messages,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;strategy="last",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;max_tokens=max_tokens,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;include_system=True,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;return {"llm_input_messages": trimmed}<br>
+&nbsp;&nbsp;return pre_model_hook
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="card" style="margin-bottom: 10px;">
+        <h4>增量摘要压缩</h4>
+        <div class="code-block" style="margin-top: 8px;">
+if count_tokens_approx(messages) &gt; budget * 2:<br>
+&nbsp;&nbsp;early, recent = split_history(messages, keep_last=6)<br>
+&nbsp;&nbsp;summary = await llm.ainvoke(...)<br>
+&nbsp;&nbsp;new_messages = [<br>
+&nbsp;&nbsp;&nbsp;&nbsp;{"type": "system", "content": f"[历史摘要] {summary}"},<br>
+&nbsp;&nbsp;&nbsp;&nbsp;*recent,<br>
+&nbsp;&nbsp;]
+        </div>
+      </div>
+      <div class="card">
+        <h4>硬约束窗口</h4>
+        <div class="code-block" style="margin-top: 8px;">
+def window_messages(state, keep_last=12):<br>
+&nbsp;&nbsp;msgs = state.get("messages", [])<br>
+&nbsp;&nbsp;head = msgs[:1] if msgs[0].type == "system" else []<br>
+&nbsp;&nbsp;tail = msgs[-keep_last:]<br>
+&nbsp;&nbsp;return {"messages": head + tail}
+        </div>
+        <p style="margin-top: 8px; font-size: 11px; color: #fbbf24;">⚠️ 裁剪后确保消息序列合法：以 System/Human 开始，以 Human/Tool 结束</p>
+      </div>
+    </div>
+  </div>
+  <div class="deck-footer"><span>LangGraph 渐进式教程</span><span>LG-04</span></div>
+  <div class="notes">上下文工程是生产环境必须掌握的技能。trim_messages 保留最近消息，增量摘要把早期对话压缩为要点，硬约束窗口直接截断。pre_model_hook 是统一入口。</div>
+</section>
+
+<!-- Slide 9: 实战 MemoryPal -->
+<section class="slide" data-title="实战 MemoryPal">
+  <div class="kicker">CASE STUDY</div>
+  <h2 class="h2">MemoryPal：四层记忆的实战应用</h2>
+  <div class="grid g2 mt-m">
+    <div>
+      <div class="card" style="margin-bottom: 10px;">
+        <h4>概念对应</h4>
+        <table style="margin-top: 8px; font-size: 11px;">
+          <tr><th>概念</th><th>MemoryPal 体现</th></tr>
+          <tr><td>State</td><td>当前 super-step 的消息列表</td></tr>
+          <tr><td>Checkpoint</td><td>多轮对话自动保存，刷新续接</td></tr>
+          <tr><td>Store</td><td>记住用户偏好、语言、风格</td></tr>
+          <tr><td>Store 向量检索</td><td>检索用户历史记忆</td></tr>
+          <tr><td>Cache</td><td>天气等频繁查询结果缓存</td></tr>
+          <tr><td>trim_messages</td><td>超长对话自动裁剪</td></tr>
+        </table>
+      </div>
+      <div class="card">
+        <h4>三层记忆注入编译</h4>
+        <div class="code-block" style="margin-top: 8px;">
+app = agent.compile(<br>
+&nbsp;&nbsp;checkpointer=saver,  <span style="color: #64748b;"># 短期记忆</span><br>
+&nbsp;&nbsp;store=store,         <span style="color: #64748b;"># 长期记忆</span><br>
+&nbsp;&nbsp;cache=saver,         <span style="color: #64748b;"># 加速记忆</span><br>
+)
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="card" style="margin-bottom: 10px;">
+        <h4>常见误区</h4>
+        <ul>
+          <li>忘记传 config → 每次调用都是新对话</li>
+          <li>Store 没传 user_id → 没有用户隔离</li>
+          <li>Cache 和 Checkpointer 混淆 → 以为 cache= 存的是状态</li>
+          <li>向量维度不匹配 → dims=1536 但模型输出 1024</li>
+          <li>没调 setup() → 首次使用报错 "表不存在"</li>
+          <li>上下文裁剪太激进 → LLM 丢失关键上下文</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>记忆口诀</h4>
+        <p style="font-size: 12px; line-height: 1.7; color: #cbd5e1; margin: 0;">
+          "State 是脑子，Checkpoint 是草稿，Store 是笔记本，Cache 是小纸条；<br>
+          PostgreSQL 装所有，pgvector 做检索，pgBouncer 管连接，四层记忆一盘棋。"
+        </p>
+      </div>
+    </div>
+  </div>
+  <div class="deck-footer"><span>LangGraph 渐进式教程</span><span>LG-04</span></div>
+  <div class="notes">MemoryPal 是四层记忆的完整实战案例。关键转折点：天气查询结果存 Cache（会重复查且不需要持久化）；两个用户共享 thread_id 会看到对方对话；cache=saver 和 checkpointer=saver 不会冲突，底层用不同前缀隔离。</div>
+</section>
+
+<!-- Slide 10: 总结 -->
+<section class="slide" data-title="总结">
+  <div class="kicker">SUMMARY</div>
+  <h2 class="h2">核心要点回顾</h2>
+  <div class="grid g2 mt-m">
+    <div class="card">
+      <h4>四层记忆架构</h4>
+      <ul>
+        <li><strong>State</strong>：工作记忆，1 个 super-step</li>
+        <li><strong>Checkpoint</strong>：短期记忆，自动保存，thread_id 隔离</li>
+        <li><strong>Store</strong>：长期记忆，手动读写，namespace 隔离</li>
+        <li><strong>Cache</strong>：加速记忆，TTL 控制，避免重复计算</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>PostgreSQL 统一底座</h4>
+      <ul>
+        <li>ACID + JSONB：关系查询与强一致性</li>
+        <li>pgvector：向量检索，无需单独维护</li>
+        <li>pgBouncer：事务级连接池，高并发</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>上下文工程</h4>
+      <ul>
+        <li>trim_messages：Token 窗口控制</li>
+        <li>增量摘要：超长对话压缩</li>
+        <li>pre_model_hook：统一入口</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>与下一章衔接</h4>
+      <p>记忆系统已完备，但图仍是「单线程串行」。下节课 LG-05 学习并行执行与子图 —— Fan-out/Fan-in、Reducer、动态 Map-Reduce、子图模块化复用。</p>
+    </div>
+  </div>
+  <div class="deck-footer"><span>LangGraph 渐进式教程</span><span>LG-04</span></div>
+  <div class="notes">总结四层记忆的核心要点，强调 PostgreSQL 作为统一底座的三大优势，上下文工程的三个手段，并预告下节课并行执行与子图的内容。</div>
+</section>
+
+</div>
+<script src="/Users/galaxyxieyu/.claude/skills/html-ppt-skill/assets/runtime.js"></script>
+</body></html>

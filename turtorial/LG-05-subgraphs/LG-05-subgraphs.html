@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LG-05 并行执行与子图</title>
+<link rel="stylesheet" href="/Users/galaxyxieyu/.claude/skills/html-ppt-skill/assets/fonts.css">
+<link rel="stylesheet" href="/Users/galaxyxieyu/.claude/skills/html-ppt-skill/assets/base.css">
+<link rel="stylesheet" id="theme-link" href="/Users/galaxyxieyu/.claude/skills/html-ppt-skill/assets/themes/tokyo-night.css">
+<link rel="stylesheet" href="/Users/galaxyxieyu/.claude/skills/html-ppt-skill/assets/animations/animations.css">
+<style>
+body { width: 720pt; height: 405pt; margin: 0; padding: 0; overflow: hidden; font-family: 'Inter','Noto Sans SC',sans-serif; background: #0f172a; color: #e2e8f0; }
+.slide { width: 720pt; height: 405pt; padding: 36px 48px; box-sizing: border-box; display: none; position: relative; }
+.slide.is-active { display: flex; flex-direction: column; }
+.kicker { font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; color: #94a3b8; margin-bottom: 8px; }
+.h1 { font-size: 42px; font-weight: 800; line-height: 1.2; margin: 0 0 16px 0; color: #f8fafc; }
+.h2 { font-size: 28px; font-weight: 700; line-height: 1.3; margin: 0 0 12px 0; color: #f1f5f9; }
+.lede { font-size: 16px; line-height: 1.6; color: #cbd5e1; margin: 0; }
+.card { background: rgba(30,41,59,0.8); border: 1px solid rgba(148,163,184,0.2); border-radius: 8px; padding: 16px; }
+.card h4 { font-size: 14px; font-weight: 600; margin: 0 0 8px 0; color: #38bdf8; }
+.card p { font-size: 12px; line-height: 1.5; color: #94a3b8; margin: 0; }
+.grid { display: grid; gap: 12px; }
+.g2 { grid-template-columns: 1fr 1fr; }
+.g3 { grid-template-columns: 1fr 1fr 1fr; }
+.g4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+.mt-l { margin-top: 24px; }
+.mt-m { margin-top: 16px; }
+.tc { text-align: center; align-items: center; justify-content: center; }
+.center { display: flex; align-items: center; justify-content: center; }
+.deck-footer { position: absolute; bottom: 16px; left: 48px; right: 48px; display: flex; justify-content: space-between; font-size: 11px; color: #64748b; }
+.notes { display: none; }
+ul { margin: 0; padding-left: 20px; }
+li { font-size: 13px; line-height: 1.7; color: #cbd5e1; margin-bottom: 4px; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 12px; }
+th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid rgba(148,163,184,0.2); }
+th { color: #38bdf8; font-weight: 600; background: rgba(30,41,59,0.6); }
+td { color: #cbd5e1; }
+.flow-box { background: rgba(30,41,59,0.8); border-radius: 6px; padding: 10px 14px; text-align: center; font-size: 12px; font-weight: 600; }
+.flow-arrow { display: flex; align-items: center; justify-content: center; color: #38bdf8; font-size: 18px; }
+.code-block { background: rgba(15,23,42,0.9); border: 1px solid rgba(148,163,184,0.15); border-radius: 6px; padding: 12px 16px; font-family: 'JetBrains Mono','Fira Code',monospace; font-size: 11px; line-height: 1.6; color: #a5b4fc; overflow-x: auto; }
+.highlight { color: #f472b6; }
+.tag { display: inline-block; background: rgba(56,189,248,0.15); color: #38bdf8; font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 4px; margin-right: 6px; }
+.pitfall { background: rgba(248,113,113,0.1); border-left: 3px solid #f87171; padding: 8px 12px; border-radius: 4px; margin-top: 8px; }
+.pitfall p { color: #fca5a5; font-size: 11px; margin: 0; }
+
+@media print {
+  .slide { display: flex !important; page-break-after: always; break-after: page; }
+  .slide:last-child { page-break-after: auto; }
+  body { width: 100%; height: 100%; background: #0f172a; }
+}
+</style>
+</head>
+<body>
+<div class="deck">
+
+<!-- Slide 1: 封面 -->
+<section class="slide tc" data-title="封面">
+  <div style="margin-bottom: 12px;"><span class="tag">LG-05</span></div>
+  <h1 class="h1" style="font-size: 48px; margin-bottom: 16px;">并行执行与子图</h1>
+  <p class="lede" style="font-size: 18px; color: #94a3b8;">让图学会「分工合作」：Fan-out / Fan-in、Reducer、Send、Subgraph</p>
+  <div style="margin-top: 32px; display: flex; gap: 16px; justify-content: center;">
+    <div class="card" style="text-align: center; min-width: 120px;">
+      <div style="font-size: 24px; margin-bottom: 4px;">&#128640;</div>
+      <div style="font-size: 12px; color: #38bdf8; font-weight: 600;">Fan-out</div>
+      <div style="font-size: 11px; color: #64748b;">并行分发</div>
+    </div>
+    <div class="card" style="text-align: center; min-width: 120px;">
+      <div style="font-size: 24px; margin-bottom: 4px;">&#128230;</div>
+      <div style="font-size: 12px; color: #38bdf8; font-weight: 600;">Fan-in</div>
+      <div style="font-size: 11px; color: #64748b;">汇聚等待</div>
+    </div>
+    <div class="card" style="text-align: center; min-width: 120px;">
+      <div style="font-size: 24px; margin-bottom: 4px;">&#129522;</div>
+      <div style="font-size: 12px; color: #38bdf8; font-weight: 600;">Reducer</div>
+      <div style="font-size: 11px; color: #64748b;">结果合并</div>
+    </div>
+    <div class="card" style="text-align: center; min-width: 120px;">
+      <div style="font-size: 24px; margin-bottom: 4px;">&#128451;</div>
+      <div style="font-size: 12px; color: #38bdf8; font-weight: 600;">Subgraph</div>
+      <div style="font-size: 11px; color: #64748b;">模块化复用</div>
+    </div>
+  </div>
+  <div class="deck-footer"><span>LangGraph 渐进式教程</span><span>LG-05</span></div>
+  <div class="notes">开场引入：写研报需要同时查财报、新闻、竞品、专家观点。串行执行总时间是 4 个之和，并行执行只是最慢的那个。今天让图学会分工合作。</div>
+</section>
+
+<!-- Slide 2: 目录 -->
+<section class="slide" data-title="目录">
+  <div class="kicker">CONTENTS</div>
+  <h2 class="h2">本节课内容</h2>
+  <div class="grid g2 mt-l">
+    <div class="card">
+      <h4>01. Fan-out / Fan-in</h4>
+      <p>并行分发与汇聚等待的基本模式</p>
+    </div>
+    <div class="card">
+      <h4>02. Reducer 机制</h4>
+      <p>并行节点修改同一字段时的合并策略</p>
+    </div>
+    <div class="card">
+      <h4>03. Send 动态 Map-Reduce</h4>
+      <p>运行时动态分发子任务到子图</p>
+    </div>
+    <div class="card">
+      <h4>04. Subgraph 构建</h4>
+      <p>子图定义、嵌入父图、状态隔离</p>
+    </div>
+    <div class="card">
+      <h4>05. 状态映射与通信</h4>
+      <p>input/output 映射、公共字段、跨子图通信</p>
+    </div>
+    <div class="card">
+      <h4>06. 实战：ResearchForge</h4>
+      <p>并行研究系统的完整实现与最佳实践</p>
+    </div>
+  </div>
+  <div class="deck-footer"><span>LangGraph 渐进式教程</span><span>LG-05</span></div>
+  <div class="notes">六个主题，从 Fan-out/Fan-in 基础模式，到 Reducer 合并策略，Send 动态分发，Subgraph 模块化，状态映射，最后实战 ResearchForge。</div>
+</section>
+
+<!-- Slide 3: Fan-out / Fan-in -->
+<section class="slide" data-title="Fan-out / Fan-in">
+  <div class="kicker">PARALLEL EXECUTION</div>
+  <h2 class="h2">Fan-out / Fan-in：并行分发与汇聚</h2>
+  <div class="mt-m" style="display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap;">
+    <div class="flow-box" style="min-width: 90px;">主题输入</div>
+    <div class="flow-arrow">→</div>
+    <div style="display: flex; flex-direction: column; gap: 8px;">
+      <div class="flow-box" style="background: rgba(56,189,248,0.2); border: 1px solid #38bdf8;">查财报</div>
+      <div class="flow-box" style="background: rgba(56,189,248,0.2); border: 1px solid #38bdf8;">查新闻</div>
+      <div class="flow-box" style="background: rgba(56,189,248,0.2); border: 1px solid #38bdf8;">查竞品</div>
+      <div class="flow-box" style="background: rgba(56,189,248,0.2); border: 1px solid #38bdf8;">查专家</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box" style="min-width: 90px; background: rgba(167,139,250,0.2); border: 1px solid #a78bfa;">汇总报告</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box" style="min-width: 60px;">END</div>
+  </div>
+  <div class="grid g2 mt-l">
+    <div class="card">
+      <h4>Fan-out（并行分发）</h4>
+      <p>一个节点同时触发多个下游节点</p>
+      <p style="margin-top: 6px;">类比：项目经理同时给 4 个人发邮件分配任务</p>
+      <div class="code-block" style="margin-top: 8px;">
+builder.add_edge("parse", "finance")<br>
+builder.add_edge("parse", "news")<br>
+builder.add_edge("parse", "competitor")<br>
+builder.add_edge("parse", "expert")
+      </div>
+    </div>
+    <div class="card">
+      <h4>Fan-in（自动汇聚）</h4>
+      <p>多个节点都完成后，才触发下一个节点</p>
+      <p style="margin-top: 6px;">类比：Excel 条件格式——等 4 个人都回复了，这行才变绿</p>
+      <div class="code-block" style="margin-top: 8px;">
+builder.add_edge("finance", "compile")<br>
+builder.add_edge("news", "compile")<br>
+builder.add_edge("competitor", "compile")<br>
+builder.add_edge("expert", "compile")
+      </div>
+      <p style="margin-top: 6px; font-size: 11px; color: #34d399;">✓ LangGraph 自动处理 Fan-in，无需额外配置</p>
+    </div>
+  </div>
+  <div class="deck-footer"><span>LangGraph 渐进式教程</span><span>LG-05</span></div>
+  <div class="notes">Fan-out 是并行分发，Fan-in 是汇聚等待。LangGraph 的自动 Fan-in：多个上游边指向同一个节点即自动汇聚。这是并行执行的基础模式。</div>
+</section>
+
+<!-- Slide 4: Reducer 机制 -->
+<section class="slide" data-title="Reducer 机制">
+  <div class="kicker">REDUCER</div>
+  <h2 class="h2">Reducer：并行的「和平协议」</h2>
+  <div class="grid g2 mt-m">
+    <div>
+      <div class="card" style="margin-bottom: 10px; background: rgba(248,113,113,0.1); border-color: rgba(248,113,113,0.3);">
+        <h4 style="color: #f87171;">问题：没有 Reducer 会怎样？</h4>
+        <p>4 个并行节点都往 <code>findings</code> 里写数据，没有 Reducer → <strong>写覆盖</strong></p>
+        <p style="margin-top: 4px;">最后一个完成的节点把前面节点的数据全盖掉了</p>
+      </div>
+      <div class="card">
+        <h4>内置 Reducer：operator.add</h4>
+        <div class="code-block" style="margin-top: 8px;">
+from operator import add<br><br>
+class AgentState(TypedDict):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="highlight">findings: Annotated[list, add]</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #64748b;"># 多个并行节点的结果自动合并为一个列表</span>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="card" style="margin-bottom: 10px;">
+        <h4>自定义 Reducer</h4>
+        <div class="code-block" style="margin-top: 8px;">
+<span class="highlight"># 保留最近 10 条</span><br>
+logs: Annotated[list, lambda x, y: (x + y)[-10:]]<br><br>
+<span class="highlight"># 去重合并</span><br>
+unique: Annotated[list, lambda x, y: list(dict.fromkeys(x + y))]<br><br>
+<span class="highlight"># 数值累加</span><br>
+count: Annotated[int, lambda x, y: x + y]
+        </div>
+      </div>
+      <div class="card">
+        <h4>关键话术</h4>
+        <p style="font-size: 13px; line-height: 1.7; color: #cbd5e1;">"Reducer 是并行的和平协议——规定大家怎么合并结果。没有它，并行节点就是竞态条件。"</p>
+      </div>
+    </div>
+  </div>
+  <div class="deck-footer"><span>LangGraph 渐进式教程</span><span>LG-05</span></div>
+  <div class="notes">Reducer 是并行执行的核心机制。多个节点同时修改同一个 State 字段时，Reducer 定义合并策略。operator.add 是最常用的列表累加 Reducer。</div>
+</section>
+
+<!-- Slide 5: Send 动态 Map-Reduce -->
+<section class="slide" data-title="Send 动态 Map-Reduce">
+  <div class="kicker">DYNAMIC DISPATCH</div>
+  <h2 class="h2">Send：动态 Map-Reduce</h2>
+  <div class="grid g2 mt-m">
+    <div>
+      <div class="card" style="margin-bottom: 10px;">
+        <h4>Map-Reduce 流程</h4>
+        <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 8px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div class="flow-box" style="flex: 1;">输入 companies=[腾讯,阿里,字节]</div>
+          </div>
+          <div style="text-align: center; color: #38bdf8; font-size: 14px;">↓ dispatch 节点</div>
+          <div style="display: flex; gap: 6px; justify-content: center;">
+            <div class="flow-box" style="background: rgba(56,189,248,0.15); font-size: 11px; padding: 6px 10px;">子图:腾讯</div>
+            <div class="flow-box" style="background: rgba(56,189,248,0.15); font-size: 11px; padding: 6px 10px;">子图:阿里</div>
+            <div class="flow-box" style="background: rgba(56,189,248,0.15); font-size: 11px; padding: 6px 10px;">子图:字节</div>
+          </div>
+          <div style="text-align: center; color: #a78bfa; font-size: 14px;">↓ Fan-in 汇聚</div>
+          <div class="flow-box" style="background: rgba(167,139,250,0.15); border-color: #a78bfa;">collect 节点 → reports=[...]</div>
+        </div>
+      </div>
+      <div class="card">
+        <h4>关键点</h4>
+        <ul>
+          <li>Send 的第二个参数是<strong>子图的初始 State</strong></li>
+          <li>子图 State 独立于父图</li>
+          <li>所有子图完成后自动触发 Fan-in</li>
+        </ul>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <h4>Send API 代码</h4>
+        <div class="code-block" style="margin-top: 8px;">
+from langgraph.types import Send<br><br>
+def dispatch(state: ParentState):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;return [<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Send("analyze_company", {"company": c})<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for c in state["companies"]<br>
+&nbsp;&nbsp;&nbsp;&nbsp;]<br><br>
+<span class="highlight"># 条件边：dispatch 返回 Send 列表</span><br>
+parent_builder.add_conditional_edges(<br>
+&nbsp;&nbsp;&nbsp;&nbsp;START, dispatch, ["analyze_company"]<br>
+)
+        </div>
+        <div class="pitfall">
+          <p>⚠️ Send 分发太多子任务会耗尽内存/连接池，需做上限控制</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="deck-footer"><span>LangGraph 渐进式教程</span><span>LG-05</span></div>
+  <div class="notes">Send 实现动态 Map-Reduce：运行时决定分发多少子任务。每个 Send 触发一次子图执行，子图独立运行，结果通过 Reducer 合并。注意子图初始 State 是 Send 的参数，不是父图 State。</div>
+</section>
+
+<!-- Slide 6: Subgraph 构建 -->
+<section class="slide" data-title="Subgraph 构建">
+  <div class="kicker">SUBGRAPH</div>
+  <h2 class="h2">Subgraph：模块化复用</h2>
+  <div class="grid g2 mt-m">
+    <div>
+      <div class="card" style="margin-bottom: 10px;">
+        <h4>为什么需要子图？</h4>
+        <ul>
+          <li><strong>模块化</strong>：复杂系统拆分为独立模块</li>
+          <li><strong>复用</strong>：同一子图嵌入多个父图</li>
+          <li><strong>隔离复杂度</strong>：内部细节对外隐藏</li>
+          <li><strong>可测试</strong>：子图可独立运行调试</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>子图定义与嵌入</h4>
+        <div class="code-block" style="margin-top: 8px;">
+<span class="highlight"># 1. 定义子图</span><br>
+child_builder = StateGraph(ChildState)<br>
+child_builder.add_node("fetch", fetch_data)<br>
+child_builder.add_node("summarize", summarize)<br>
+child_builder.add_edge(START, "fetch")<br>
+child_builder.add_edge("fetch", "summarize")<br>
+child_graph = child_builder.compile()<br><br>
+<span class="highlight"># 2. 嵌入父图</span><br>
+parent_builder.add_node("research", <span class="highlight">child_graph</span>)
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="card" style="margin-bottom: 10px;">
+        <h4>子图核心要点</h4>
+        <ul>
+          <li>子图是独立的 <code>StateGraph</code>，有完整的 State/Node/Edge</li>
+          <li>必须先 <code>.compile()</code>，再传给父图 <code>add_node</code></li>
+          <li>子图可单独测试：<code>child_graph.invoke({...})</code></li>
+          <li>子图默认<strong>继承父图的 checkpointer</strong></li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>子图最佳实践 Checklist</h4>
+        <ul>
+          <li>先独立测试子图，确保自身逻辑正确</li>
+          <li>再嵌入父图，先不加映射，确认能跑通</li>
+          <li>配置 input/output，处理字段名不一致</li>
+          <li>优先用公共字段，减少映射函数</li>
+          <li>子图 State 要最小化，不复制整个父图</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="deck-footer"><span>LangGraph 渐进式教程</span><span>LG-05</span></div>
+  <div class="notes">子图是独立的 StateGraph，编译后作为节点嵌入父图。核心优势是模块化、复用和状态隔离。最佳实践：先独立测试，再嵌入，逐步加映射。</div>
+</section>
+
+<!-- Slide 7: 状态映射与通信 -->
+<section class="slide" data-title="状态映射与通信">
+  <div class="kicker">STATE MAPPING</div>
+  <h2 class="h2">父子图状态隔离与映射</h2>
+  <div class="grid g2 mt-m">
+    <div>
+      <div class="card" style="margin-bottom: 10px;">
+        <h4>默认行为：状态隔离</h4>
+        <div style="display: flex; gap: 16px; margin-top: 8px;">
+          <div style="flex: 1; text-align: center;">
+            <div style="font-size: 11px; color: #94a3b8; margin-bottom: 4px;">父图 State</div>
+            <div class="code-block" style="font-size: 10px;">{topic, findings}</div>
+          </div>
+          <div style="display: flex; align-items: center; color: #64748b; font-size: 18px;">↔</div>
+          <div style="flex: 1; text-align: center;">
+            <div style="font-size: 11px; color: #94a3b8; margin-bottom: 4px;">子图 State</div>
+            <div class="code-block" style="font-size: 10px;">{query, raw_data, summary}</div>
+          </div>
+        </div>
+        <p style="margin-top: 8px; font-size: 11px; color: #34d399;">✓ 封装性、可复用性、可测试性</p>
+      </div>
+      <div class="card">
+        <h4>input / output 映射</h4>
+        <div class="code-block" style="margin-top: 8px;">
+parent_builder.add_node(<br>
+&nbsp;&nbsp;&nbsp;&nbsp;"research",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;child_graph,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;input=lambda s: {"query": s["topic"]},<br>
+&nbsp;&nbsp;&nbsp;&nbsp;output=lambda s: {"findings": s["results"]},<br>
+)
+        </div>
+        <p style="margin-top: 6px; font-size: 11px; color: #94a3b8;">input = 翻译器（父图→子图），output = 翻译器（子图→父图）</p>
+      </div>
+    </div>
+    <div>
+      <div class="card" style="margin-bottom: 10px;">
+        <h4>公共字段模式</h4>
+        <div class="code-block" style="margin-top: 8px;">
+class SharedState(TypedDict):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;messages: list<br>
+&nbsp;&nbsp;&nbsp;&nbsp;user_id: str<br><br>
+<span style="color: #64748b;"># 同名字段自动透传，无需映射</span>
+        </div>
+        <p style="margin-top: 6px; font-size: 11px; color: #fbbf24;">⚠️ 风险：子图可能意外修改父图字段 → 建议只添加/追加，不删除</p>
+      </div>
+      <div class="card">
+        <h4>跨子图通信三种方式</h4>
+        <table style="margin-top: 8px;">
+          <tr><th>方式</th><th>场景</th></tr>
+          <tr><td>公共字段</td><td>父子图有相同字段名</td></tr>
+          <tr><td>input/output 映射</td><td>字段名不同，需格式转换</td></tr>
+          <tr><td>Store（长期记忆）</td><td>多个子图共享数据</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="deck-footer"><span>LangGraph 渐进式教程</span><span>LG-05</span></div>
+  <div class="notes">子图默认状态隔离。父子图字段名不一致时，通过 input/output 映射配置传递规则。公共字段模式简单但有修改风险。Store 是最解耦的跨子图通信方式。</div>
+</section>
+
+<!-- Slide 8: 实战 ResearchForge -->
+<section class="slide" data-title="实战 ResearchForge">
+  <div class="kicker">CASE STUDY</div>
+  <h2 class="h2">ResearchForge：并行研究系统</h2>
+  <div class="grid g2 mt-m">
+    <div>
+      <div class="card" style="margin-bottom: 10px;">
+        <h4>概念对应</h4>
+        <table style="margin-top: 8px; font-size: 11px;">
+          <tr><th>概念</th><th>ResearchForge 体现</th></tr>
+          <tr><td>Fan-out</td><td>主题输入后并行分发给 4 个数据源</td></tr>
+          <tr><td>Fan-in</td><td>4 个数据源完成后进入汇总</td></tr>
+          <tr><td>Reducer</td><td>findings 用 add 合并</td></tr>
+          <tr><td>Send</td><td>动态分发子查询到搜索节点</td></tr>
+          <tr><td>Subgraph</td><td>每个数据源是独立子图</td></tr>
+          <tr><td>input/output</td><td>topic → query, results → findings</td></tr>
+        </table>
+      </div>
+      <div class="card">
+        <h4>关键转折点</h4>
+        <ul>
+          <li>不用 Reducer → 4 个并行节点互相覆盖</li>
+          <li>4 个并行节点中 1 个失败 → Fan-in 默认等待所有节点</li>
+          <li>子图 vs 普通节点 → 模块化、复用、状态隔离</li>
+        </ul>
+      </div>
+    </div>
+    <div>
+      <div class="card" style="margin-bottom: 10px;">
+        <h4>常见误区</h4>
+        <ul>
+          <li>并行节点修改同一非 Reducer 字段 → 竞态条件</li>
+          <li>Fan-in 前置有循环 → 可能永远等不到</li>
+          <li>子图 State 与父图不兼容 → 字段映射错误</li>
+          <li>Send 分发太多 → 内存/连接池耗尽</li>
+          <li>递归限制不当 → 并行+循环触发上限</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>调试技巧</h4>
+        <ul>
+          <li>先串行跑通每个节点，再改并行</li>
+          <li>打印合并前后的 State，确认无数据丢失</li>
+          <li>每个子图作为独立图先跑通，再嵌入</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="deck-footer"><span>LangGraph 渐进式教程</span><span>LG-05</span></div>
+  <div class="notes">ResearchForge 是并行研究系统的完整实战。4 个数据源并行查询，Reducer 合并结果，Fan-in 等待汇总。每个数据源可以是独立子图，通过 input/output 映射与父图通信。</div>
+</section>
+
+<!-- Slide 9: 总结 -->
+<section class="slide" data-title="总结">
+  <div class="kicker">SUMMARY</div>
+  <h2 class="h2">核心要点回顾</h2>
+  <div class="grid g2 mt-m">
+    <div class="card">
+      <h4>并行执行模式</h4>
+      <ul>
+        <li><strong>Fan-out</strong>：一个节点触发多个下游同时执行</li>
+        <li><strong>Fan-in</strong>：多个节点完成后才触发下一个</li>
+        <li><strong>Reducer</strong>：定义并行修改同一字段的合并策略</li>
+        <li><strong>Send</strong>：运行时动态分发子任务</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>子图模块化</h4>
+      <ul>
+        <li>子图是独立的 StateGraph，编译后嵌入父图</li>
+        <li>状态默认隔离，通过 input/output 映射通信</li>
+        <li>公共字段自动透传，Store 跨子图共享</li>
+        <li>子图继承父图 checkpointer</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>记忆口诀</h4>
+      <p style="font-size: 13px; line-height: 1.7; color: #cbd5e1; margin: 0;">
+        "Fan-out 是群发，Fan-in 是等齐人；Reducer 是合并器，Send 是动态派活，Subgraph 是模块包。"
+      </p>
+    </div>
+    <div class="card">
+      <h4>与下一章衔接</h4>
+      <p>并行执行让单图学会分工合作。下节课 LG-06 学习预构建 Agent —— create_react_agent、create_supervisor、create_swarm 三种开箱即用的多 Agent 模式。</p>
+    </div>
+  </div>
+  <div class="deck-footer"><span>LangGraph 渐进式教程</span><span>LG-05</span></div>
+  <div class="notes">总结并行执行的四个核心概念和子图的模块化优势。记忆口诀帮助学员快速回忆。预告下节课预构建 Agent 的三种模式。</div>
+</section>
+
+</div>
+<script src="/Users/galaxyxieyu/.claude/skills/html-ppt-skill/assets/runtime.js"></script>
+</body></html>

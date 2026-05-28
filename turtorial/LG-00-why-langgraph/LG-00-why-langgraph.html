@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LG-00：为什么选择 LangGraph？</title>
+<link rel="stylesheet" href="/Users/galaxyxieyu/.claude/skills/html-ppt-skill/assets/fonts.css">
+<link rel="stylesheet" href="/Users/galaxyxieyu/.claude/skills/html-ppt-skill/assets/base.css">
+<link rel="stylesheet" id="theme-link" href="/Users/galaxyxieyu/.claude/skills/html-ppt-skill/assets/themes/tokyo-night.css">
+<link rel="stylesheet" href="/Users/galaxyxieyu/.claude/skills/html-ppt-skill/assets/animations/animations.css">
+<style>
+body { width: 720pt; height: 405pt; margin: 0; padding: 0; overflow: hidden; font-family: 'Inter','Noto Sans SC',sans-serif; background: #0f172a; color: #e2e8f0; }
+.slide { width: 720pt; height: 405pt; padding: 36px 48px; box-sizing: border-box; display: none; position: relative; }
+.slide.is-active { display: flex; flex-direction: column; }
+.kicker { font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; color: #94a3b8; margin-bottom: 8px; }
+.h1 { font-size: 42px; font-weight: 800; line-height: 1.2; margin: 0 0 16px 0; color: #f8fafc; }
+.h2 { font-size: 28px; font-weight: 700; line-height: 1.3; margin: 0 0 12px 0; color: #f1f5f9; }
+.lede { font-size: 16px; line-height: 1.6; color: #cbd5e1; margin: 0; }
+.card { background: rgba(30,41,59,0.8); border: 1px solid rgba(148,163,184,0.2); border-radius: 8px; padding: 16px; }
+.card h4 { font-size: 14px; font-weight: 600; margin: 0 0 8px 0; color: #38bdf8; }
+.card p { font-size: 12px; line-height: 1.5; color: #94a3b8; margin: 0; }
+.grid { display: grid; gap: 12px; }
+.g2 { grid-template-columns: 1fr 1fr; }
+.g3 { grid-template-columns: 1fr 1fr 1fr; }
+.mt-l { margin-top: 24px; }
+.mt-m { margin-top: 16px; }
+.tc { text-align: center; align-items: center; justify-content: center; }
+.center { display: flex; align-items: center; justify-content: center; }
+.deck-footer { position: absolute; bottom: 16px; left: 48px; right: 48px; display: flex; justify-content: space-between; font-size: 11px; color: #64748b; }
+.notes { display: none; }
+ul { margin: 0; padding-left: 20px; }
+li { font-size: 13px; line-height: 1.7; color: #cbd5e1; margin-bottom: 4px; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 12px; }
+th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid rgba(148,163,184,0.2); }
+th { color: #38bdf8; font-weight: 600; background: rgba(30,41,59,0.6); }
+td { color: #cbd5e1; }
+.quote { font-size: 18px; font-style: italic; color: #94a3b8; border-left: 3px solid #38bdf8; padding-left: 16px; margin: 16px 0; }
+.tag { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 4px; background: rgba(56,189,248,0.15); color: #38bdf8; margin-right: 6px; }
+.highlight { color: #38bdf8; font-weight: 600; }
+
+@media print {
+  .slide { display: flex !important; page-break-after: always; break-after: page; }
+  .slide:last-child { page-break-after: auto; }
+  body { width: 100%; height: 100%; background: #0f172a; }
+}
+</style>
+</head>
+<body>
+<div class="deck">
+
+<!-- Slide 1: 封面 -->
+<section class="slide tc" data-title="封面">
+  <div class="kicker">LangGraph 系列课程 · LG-00</div>
+  <div class="h1" style="font-size:48px;margin-bottom:20px;">为什么选择 LangGraph？</div>
+  <div class="lede" style="font-size:20px;color:#94a3b8;">AI Agent 框架全景对比与企业级选型</div>
+  <div style="margin-top:32px;font-size:13px;color:#64748b;">目标学员：有 Python 基础，想将 AI 落地到企业的新手</div>
+  <div class="deck-footer">
+    <span>LangGraph 教程</span>
+    <span>1 / 9</span>
+  </div>
+  <div class="notes">
+    开场引入：这两年 AI Agent 框架井喷，但真正落地到企业时面临诸多问题。这节课不讲代码，先帮你建立选型认知。
+  </div>
+</section>
+
+<!-- Slide 2: 目录 -->
+<section class="slide" data-title="目录">
+  <div class="kicker">Contents</div>
+  <div class="h2">本节课要讲什么</div>
+  <div class="grid g2 mt-l">
+    <div class="card">
+      <h4>01 企业级核心需求</h4>
+      <p>为什么 Demo 能跑，生产却崩？三层问题逐层拆解</p>
+    </div>
+    <div class="card">
+      <h4>02 框架全景扫描</h4>
+      <p>LangGraph、CrewAI、Agno、AutoGen 等框架一句话定位</p>
+    </div>
+    <div class="card">
+      <h4>03 能力诚实对比</h4>
+      <p>9 项企业级必备能力的横向对比表格</p>
+    </div>
+    <div class="card">
+      <h4>04 LangGraph 不可替代的原因</h4>
+      <p>图级原生深度 + 传统业务零改动接入</p>
+    </div>
+    <div class="card">
+      <h4>05 实战演示</h4>
+      <p>同一需求，if-else vs LangGraph 的写法对比</p>
+    </div>
+    <div class="card">
+      <h4>06 选型建议</h4>
+      <p>LangGraph 不是银弹，给新手的务实策略</p>
+    </div>
+  </div>
+  <div class="deck-footer">
+    <span>LangGraph 教程</span>
+    <span>2 / 9</span>
+  </div>
+  <div class="notes">
+    本节课定位是导论，不跑 Demo，先建立选型认知。共 6 个主题，从企业需求出发，对比各框架，最终给出务实建议。
+  </div>
+</section>
+
+<!-- Slide 3: Demo vs 生产 -->
+<section class="slide" data-title="Demo 很美好，生产很残酷">
+  <div class="kicker">The Gap</div>
+  <div class="h2">Demo 很美好，生产很残酷</div>
+  <div class="quote mt-m">"Demo 要证明 AI 能做，企业级要确保 AI 能一直可靠地做。"</div>
+  <div class="grid g3 mt-m">
+    <div class="card">
+      <h4>第一层：业务流程不是一次性的</h4>
+      <ul>
+        <li>用户填到一半的表单明天再打开 —— 状态必须能中断和恢复</li>
+        <li>审批不通过要打回重走 —— 流程不能写死成线性步骤</li>
+        <li>涉及金额、合规、安全的决策 —— 必须有人工审核</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>第二层：系统不会永远稳定</h4>
+      <ul>
+        <li>进程重启、容器漂移 —— 状态必须持久化到数据库</li>
+        <li>一个 Agent 不可能精通所有领域 —— 必须多 Agent 协作</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>第三层：出了问题不能靠猜</h4>
+      <ul>
+        <li>AI 黑盒推理无从复现 —— 必须全链路追踪、可视化调试</li>
+        <li>任务跑 30 秒没反馈 —— 必须流式输出实时进度</li>
+      </ul>
+    </div>
+  </div>
+  <div class="deck-footer">
+    <span>LangGraph 教程</span>
+    <span>3 / 9</span>
+  </div>
+  <div class="notes">
+    把 AI 塞进真实业务流程，三层问题会逐个找上门。企业级买的不是 AI 的能力，而是 AI 的可靠性、可控性和可维护性。
+  </div>
+</section>
+
+<!-- Slide 4: 框架全景 -->
+<section class="slide" data-title="框架全景扫描">
+  <div class="kicker">Framework Landscape</div>
+  <div class="h2">主流 Agent 框架一句话定位</div>
+  <div class="grid g2 mt-l">
+    <div class="card">
+      <h4>LangGraph <span class="tag">本课主角</span></h4>
+      <p>基于有向图的 Agent 工作流编排。状态驱动，传统业务与 AI 代码平等编排。需要精确控制流程、状态透明时选它。</p>
+    </div>
+    <div class="card">
+      <h4>CrewAI</h4>
+      <p>角色扮演驱动的多 Agent 协作。角色抽象自然，但流程控制以角色为核心，持久化和图级状态管理薄弱。</p>
+    </div>
+    <div class="card">
+      <h4>Agno（原 Phidata）</h4>
+      <p>轻量级 Agent 构建工具包，带 AgentOS 运行时。极致速度和低内存，但 checkpoint 基于 session 而非流程级。</p>
+    </div>
+    <div class="card">
+      <h4>AutoGen（Microsoft）</h4>
+      <p>对话驱动的多 Agent 框架。Agent 之间通过对话协作，多 Agent 聊天场景是强项，但对话模型强耦合。</p>
+    </div>
+    <div class="card">
+      <h4>Pydantic AI</h4>
+      <p>类型安全的 Agent 框架。Pydantic 重度用户适用，但生态较新，企业级能力还在发展。</p>
+    </div>
+    <div class="card">
+      <h4>LlamaIndex Workflows</h4>
+      <p>LlamaIndex 生态的工作流编排。与 LlamaIndex 强绑定，通用性不如 LangGraph。</p>
+    </div>
+  </div>
+  <div class="deck-footer">
+    <span>LangGraph 教程</span>
+    <span>4 / 9</span>
+  </div>
+  <div class="notes">
+    不拉踩，只说事实。每个框架一句话说清楚它是干嘛的、适合什么、短板在哪。没有最好的框架，只有最合适的框架。
+  </div>
+</section>
+
+<!-- Slide 5: 能力对比表 -->
+<section class="slide" data-title="企业级能力诚实对比">
+  <div class="kicker">Capability Comparison</div>
+  <div class="h2">企业级必备能力对比</div>
+  <table class="mt-m">
+    <tr>
+      <th>能力</th>
+      <th>LangGraph</th>
+      <th>Agno</th>
+      <th>CrewAI / AutoGen / PydanticAI</th>
+    </tr>
+    <tr>
+      <td>显式状态管理</td>
+      <td><span class="highlight">TypedDict 原生定义</span></td>
+      <td>session_state，非图级传递</td>
+      <td>状态隐式或基础</td>
+    </tr>
+    <tr>
+      <td>持久化</td>
+      <td><span class="highlight">PostgreSQL/Redis 原生 checkpoint</span></td>
+      <td>SQLite/PostgreSQL session 持久化</td>
+      <td>无原生 checkpoint</td>
+    </tr>
+    <tr>
+      <td>人机协作</td>
+      <td><span class="highlight">任意节点精确 interrupt</span></td>
+      <td>工具式 HITL</td>
+      <td>粒度粗或回调式</td>
+    </tr>
+    <tr>
+      <td>循环/条件控制</td>
+      <td><span class="highlight">条件边/循环边是一等公民</span></td>
+      <td>Workflow 支持但非原生图结构</td>
+      <td>任务依赖链或路由逻辑</td>
+    </tr>
+    <tr>
+      <td>传统业务接入</td>
+      <td><span class="highlight">任何 Python 函数直接作为节点</span></td>
+      <td>需包装为工具/回调</td>
+      <td>需包装为工具/回调</td>
+    </tr>
+  </table>
+  <div class="deck-footer">
+    <span>LangGraph 教程</span>
+    <span>5 / 9</span>
+  </div>
+  <div class="notes">
+    注意"传统业务接入"这一行，这是 LangGraph 和其他框架的本质区别。LangGraph 是编排层，不是封闭的 Agent 黑盒。
+  </div>
+</section>
+
+<!-- Slide 6: 不可替代原因一 -->
+<section class="slide" data-title="原因一：图级别的原生深度">
+  <div class="kicker">Reason 1</div>
+  <div class="h2">图级别的原生深度</div>
+  <div class="lede mt-m">其他框架在单点上并不弱，但企业级需要的是一整套能力的系统性、原生深度集成。</div>
+  <div class="grid g2 mt-l">
+    <div class="card">
+      <h4>状态在节点间显式传递</h4>
+      <p>每个节点知道完整上下文，不是隐式传递或黑盒内部状态。</p>
+    </div>
+    <div class="card">
+      <h4>Checkpoint 精确到任意节点</h4>
+      <p>服务重启后可以从任意位置恢复，不是 session 级别粗粒度存档。</p>
+    </div>
+    <div class="card">
+      <h4>循环和条件是图结构本身</h4>
+      <p>可视化、可维护、防死循环，不是嵌套在函数里的控制流。</p>
+    </div>
+    <div class="card">
+      <h4>7 项能力彼此连贯</h4>
+      <p>全部内建在图的核心层，不是插件拼凑的松散组合。</p>
+    </div>
+  </div>
+  <div class="deck-footer">
+    <span>LangGraph 教程</span>
+    <span>6 / 9</span>
+  </div>
+  <div class="notes">
+    状态、持久化、人机协作、循环控制、可视化、多 Agent、流式输出——7 项能力在 LangGraph 里是一体化的，彼此连贯。
+  </div>
+</section>
+
+<!-- Slide 7: 不可替代原因二 -->
+<section class="slide" data-title="原因二：编排层 vs 黑盒">
+  <div class="kicker">Reason 2</div>
+  <div class="h2">LangGraph 是编排层，不是封闭的 Agent 黑盒</div>
+  <div class="lede mt-m">企业级项目从来不是纯 AI 的。你的系统里已有几百万行跑了多年的业务代码。</div>
+  <div class="grid g2 mt-l">
+    <div class="card">
+      <h4>LangGraph：以图为核心</h4>
+      <ul>
+        <li>节点可以是任何 Python 函数</li>
+        <li>传统业务代码一行不改，直接放进去就是节点</li>
+        <li>传统代码和 AI 代码是平等的一等公民</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>其他框架：以 Agent 为中心</h4>
+      <ul>
+        <li>传统业务代码只能作为工具或回调硬塞进去</li>
+        <li>AI 步骤要定义成 Agent</li>
+        <li>流程可见性和可控性大打折扣</li>
+      </ul>
+    </div>
+  </div>
+  <div class="mt-m" style="font-size:13px;color:#94a3b8;background:rgba(30,41,59,0.6);padding:12px;border-radius:6px;">
+    <strong style="color:#38bdf8;">电商订单示例：</strong>用户下单 → 查询库存（传统 SQL）→ AI 评估风险 → 调用支付（传统 API）→ 高风险时人工审核 → 发送通知（传统短信接口）。在 LangGraph 里，这 6 个步骤在一张图里平铺直叙。
+  </div>
+  <div class="deck-footer">
+    <span>LangGraph 教程</span>
+    <span>7 / 9</span>
+  </div>
+  <div class="notes">
+    这意味着三件事：代码复用率极高，开发效率高（传统开发和 AI 开发可以并行），维护成本低（业务逻辑和 AI 逻辑在一张图里清晰可见）。
+  </div>
+</section>
+
+<!-- Slide 8: 选型建议 -->
+<section class="slide" data-title="LangGraph 不是银弹">
+  <div class="kicker">When Not to Use</div>
+  <div class="h2">LangGraph 不是银弹</div>
+  <table class="mt-m">
+    <tr>
+      <th>场景</th>
+      <th>推荐框架</th>
+      <th>理由</th>
+    </tr>
+    <tr>
+      <td>5 分钟搭个 Demo</td>
+      <td>Agno</td>
+      <td>最快上手，代码最少</td>
+    </tr>
+    <tr>
+      <td>纯角色扮演协作</td>
+      <td>CrewAI</td>
+      <td>角色抽象最自然</td>
+    </tr>
+    <tr>
+      <td>Java 技术栈</td>
+      <td>Spring AI</td>
+      <td>生态一致</td>
+    </tr>
+    <tr>
+      <td>多 Agent 聊天实验</td>
+      <td>AutoGen</td>
+      <td>对话模型成熟</td>
+    </tr>
+    <tr>
+      <td>极致性能/低内存</td>
+      <td>Agno</td>
+      <td>官方宣称 5000x 更快启动</td>
+    </tr>
+  </table>
+  <div class="quote mt-m">"对于 99% 的公司来说，框架性能不是瓶颈。能不能快速上手、能不能找到解决方案、团队能不能协同开发，这些才是瓶颈。"</div>
+  <div class="deck-footer">
+    <span>LangGraph 教程</span>
+    <span>8 / 9</span>
+  </div>
+  <div class="notes">
+    给新手的务实建议：先用 LangGraph 把系统搭起来跑通业务，等真有性能瓶颈时再考虑优化。迁移成本远小于"因为选了个冷门框架，团队卡住半年上不了线"的成本。
+  </div>
+</section>
+
+<!-- Slide 9: 总结 -->
+<section class="slide" data-title="总结">
+  <div class="kicker">Summary</div>
+  <div class="h2">阶段小结</div>
+  <div class="grid g2 mt-l">
+    <div class="card">
+      <h4>核心认知</h4>
+      <ul>
+        <li>框架选型看场景：没有最好的，只有最合适的</li>
+        <li>LangGraph 核心优势：图级原生深度 + 传统业务零改动 + 最成熟生态</li>
+        <li>适用场景：复杂工作流、精确控制、生产级部署、已有系统升级</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>务实策略</h4>
+      <ul>
+        <li>先选生态最成熟的框架把系统跑起来</li>
+        <li>等真有性能瓶颈时再考虑优化</li>
+        <li>纠结"哪个更快"不如纠结"哪个能让我这周上线"</li>
+      </ul>
+    </div>
+  </div>
+  <div class="mt-l" style="text-align:center;font-size:15px;color:#94a3b8;font-style:italic;">
+    "链太线，图更全；要可控，LangGraph 行；<br>
+    状态明，循环轻；人机能，生产顶；<br>
+    老代码，直接进；编排层，最省心。"
+  </div>
+  <div class="deck-footer">
+    <span>LangGraph 教程</span>
+    <span>9 / 9</span>
+  </div>
+  <div class="notes">
+    记忆口诀帮助学员记住 LangGraph 的核心优势。下一节课 LG-01，从最基本的图开始——什么是 State、Node、Edge，以及怎么把它们拼成一个能跑的 Agent。
+  </div>
+</section>
+
+</div>
+<script src="/Users/galaxyxieyu/.claude/skills/html-ppt-skill/assets/runtime.js"></script>
+</body></html>

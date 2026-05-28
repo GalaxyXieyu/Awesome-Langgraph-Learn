@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LG-03：人机协作与 Hooks</title>
+<link rel="stylesheet" href="/Users/galaxyxieyu/.claude/skills/html-ppt-skill/assets/fonts.css">
+<link rel="stylesheet" href="/Users/galaxyxieyu/.claude/skills/html-ppt-skill/assets/base.css">
+<link rel="stylesheet" id="theme-link" href="/Users/galaxyxieyu/.claude/skills/html-ppt-skill/assets/themes/tokyo-night.css">
+<link rel="stylesheet" href="/Users/galaxyxieyu/.claude/skills/html-ppt-skill/assets/animations/animations.css">
+<style>
+body { width: 720pt; height: 405pt; margin: 0; padding: 0; overflow: hidden; font-family: 'Inter','Noto Sans SC',sans-serif; background: #0f172a; color: #e2e8f0; }
+.slide { width: 720pt; height: 405pt; padding: 36px 48px; box-sizing: border-box; display: none; position: relative; }
+.slide.is-active { display: flex; flex-direction: column; }
+.kicker { font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; color: #94a3b8; margin-bottom: 8px; }
+.h1 { font-size: 42px; font-weight: 800; line-height: 1.2; margin: 0 0 16px 0; color: #f8fafc; }
+.h2 { font-size: 28px; font-weight: 700; line-height: 1.3; margin: 0 0 12px 0; color: #f1f5f9; }
+.lede { font-size: 16px; line-height: 1.6; color: #cbd5e1; margin: 0; }
+.card { background: rgba(30,41,59,0.8); border: 1px solid rgba(148,163,184,0.2); border-radius: 8px; padding: 16px; }
+.card h4 { font-size: 14px; font-weight: 600; margin: 0 0 8px 0; color: #38bdf8; }
+.card p { font-size: 12px; line-height: 1.5; color: #94a3b8; margin: 0; }
+.grid { display: grid; gap: 12px; }
+.g2 { grid-template-columns: 1fr 1fr; }
+.g3 { grid-template-columns: 1fr 1fr 1fr; }
+.mt-l { margin-top: 24px; }
+.mt-m { margin-top: 16px; }
+.tc { text-align: center; align-items: center; justify-content: center; }
+.center { display: flex; align-items: center; justify-content: center; }
+.deck-footer { position: absolute; bottom: 16px; left: 48px; right: 48px; display: flex; justify-content: space-between; font-size: 11px; color: #64748b; }
+.notes { display: none; }
+ul { margin: 0; padding-left: 20px; }
+li { font-size: 13px; line-height: 1.7; color: #cbd5e1; margin-bottom: 4px; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 12px; }
+th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid rgba(148,163,184,0.2); }
+th { color: #38bdf8; font-weight: 600; background: rgba(30,41,59,0.6); }
+td { color: #cbd5e1; }
+.code-block { background: rgba(15,23,42,0.9); border: 1px solid rgba(148,163,184,0.15); border-radius: 6px; padding: 10px 14px; font-family: 'Fira Code', monospace; font-size: 11px; line-height: 1.5; color: #a5b4fc; overflow-x: auto; }
+.highlight { color: #f472b6; }
+.accent { color: #34d399; }
+.warn { color: #fbbf24; }
+.danger { color: #f87171; }
+.tag { display: inline-block; background: rgba(56,189,248,0.15); color: #38bdf8; font-size: 10px; padding: 2px 8px; border-radius: 4px; margin-right: 4px; }
+
+@media print {
+  .slide { display: flex !important; page-break-after: always; break-after: page; }
+  .slide:last-child { page-break-after: auto; }
+  body { width: 100%; height: 100%; background: #0f172a; }
+}
+</style>
+</head>
+<body>
+<div class="deck">
+
+<!-- Slide 1: 封面 -->
+<section class="slide tc" data-title="封面">
+  <div class="kicker">LANGGRAPH TUTORIAL</div>
+  <div class="h1" style="font-size:48px;margin-bottom:20px;">LG-03：人机协作与 Hooks</div>
+  <div class="lede" style="font-size:18px;color:#94a3b8;">让图学会「停下来问人」——在关键节点引入人类审批</div>
+  <div style="margin-top:32px;display:flex;gap:16px;justify-content:center;">
+    <span class="tag">interrupt_before/after</span>
+    <span class="tag">interrupt() 原语</span>
+    <span class="tag">重执行陷阱</span>
+    <span class="tag">生产级封装</span>
+  </div>
+  <div class="deck-footer">
+    <span>LangGraph 渐进式教程</span>
+    <span>LG-03</span>
+  </div>
+  <div class="notes">
+    开场白：假设你是一家电商公司的运营。AI 生成了文案，直接自动发到官方微博——然后 AI 把「五一促销」写成了「五一大促，全场免费送」。等你看手机时，已经 10 万转发。这就是完全自动化的风险。今天的主题：让图学会「停下来问人」。
+  </div>
+</section>
+
+<!-- Slide 2: 目录 -->
+<section class="slide" data-title="目录">
+  <div class="kicker">CONTENTS</div>
+  <div class="h2">本章节内容</div>
+  <div class="grid g2 mt-m">
+    <div class="card">
+      <h4>01. HITL 三层架构</h4>
+      <p>编译时配置 → 预构建 Agent → 节点内动态中断，粒度递增</p>
+    </div>
+    <div class="card">
+      <h4>02. interrupt_before / interrupt_after</h4>
+      <p>声明式中断：执行前拦截 vs 执行后审查</p>
+    </div>
+    <div class="card">
+      <h4>03. interrupt() 原语与重执行陷阱</h4>
+      <p>动态中断的工作机制，以及最大的坑——resume 时节点重跑</p>
+    </div>
+    <div class="card">
+      <h4>04. create_react_agent 的 HITL 配置</h4>
+      <p>工具调用前审批、LLM 输出后审查、post_model_hook</p>
+    </div>
+    <div class="card">
+      <h4>05. 生产级 HITL 封装模式</h4>
+      <p>ToolInteractionEnvelope、RenderSchema、Resume 协议</p>
+    </div>
+    <div class="card">
+      <h4>06. 常见误区与调试技巧</h4>
+      <p>忘记 checkpointer、工具里用 interrupt、resume 格式不对</p>
+    </div>
+  </div>
+  <div class="deck-footer">
+    <span>LangGraph 渐进式教程</span>
+    <span>LG-03</span>
+  </div>
+  <div class="notes">
+    本节课覆盖六大主题：三层架构、编译时中断、interrupt 原语与重执行陷阱、预构建 Agent 配置、生产级封装模式、常见误区。
+  </div>
+</section>
+
+<!-- Slide 3: HITL 三层架构 -->
+<section class="slide" data-title="HITL 三层架构">
+  <div class="kicker">THREE-LAYER ARCHITECTURE</div>
+  <div class="h2">HITL 三层架构：组件关系全景图</div>
+  <div class="lede">粒度递增，风险递增——选择正确的层级解决问题</div>
+  <div class="grid g3 mt-m">
+    <div class="card" style="border-top:3px solid #38bdf8;">
+      <h4>Layer 1：编译时配置</h4>
+      <ul style="font-size:11px;">
+        <li>interrupt_before=["node_a"]</li>
+        <li>interrupt_after=["node_c"]</li>
+        <li>无需改节点代码</li>
+      </ul>
+      <p style="margin-top:6px;font-size:11px;color:#34d399;">适用：固定审批点</p>
+    </div>
+    <div class="card" style="border-top:3px solid #818cf8;">
+      <h4>Layer 2：预构建 Agent</h4>
+      <ul style="font-size:11px;">
+        <li>create_react_agent(..., interrupt_before=["tools"])</li>
+        <li>节点名固定："agent" / "tools"</li>
+        <li>透传给 compile()</li>
+      </ul>
+      <p style="margin-top:6px;font-size:11px;color:#34d399;">适用：ReAct Agent 工具审批</p>
+    </div>
+    <div class="card" style="border-top:3px solid #f472b6;">
+      <h4>Layer 3：节点内动态中断</h4>
+      <ul style="font-size:11px;">
+        <li>interrupt({"question": "确认吗？"})</li>
+        <li>最灵活但风险最大</li>
+        <li>resume 时节点重执行</li>
+      </ul>
+      <p style="margin-top:6px;font-size:11px;color:#fbbf24;">⚠ 必须配合拆分模式</p>
+    </div>
+  </div>
+  <table class="mt-m">
+    <tr><th>层级</th><th>控制粒度</th><th>改节点代码</th><th>动态条件</th><th>重执行风险</th></tr>
+    <tr><td>Layer 1</td><td>节点级</td><td>否</td><td>否</td><td>无</td></tr>
+    <tr><td>Layer 2</td><td>Agent 内节点级</td><td>否</td><td>否</td><td>无</td></tr>
+    <tr><td>Layer 3</td><td>节点内任意位置</td><td>是</td><td>是</td><td class="danger">有</td></tr>
+  </table>
+  <div class="deck-footer">
+    <span>LangGraph 渐进式教程</span>
+    <span>LG-03 / 10</span>
+  </div>
+  <div class="notes">
+    先讲整体架构，再看细节。三层不是独立的，而是有明确的调用关系和适用范围。Layer 1 和 2 是声明式的，Layer 3 是动态的。决策树：是否需要运行时数据决定中断？是 → Layer 3（但注意拆分）；否 → 用预构建 Agent？是 → Layer 2；否 → Layer 1。
+  </div>
+</section>
+
+<!-- Slide 4: interrupt_before vs interrupt_after -->
+<section class="slide" data-title="编译时中断">
+  <div class="kicker">COMPILE-TIME INTERRUPT</div>
+  <div class="h2">interrupt_before vs interrupt_after</div>
+  <div class="lede">声明式中断：一个执行前拦截，一个执行后审查</div>
+  <div class="grid g2 mt-m">
+    <div class="card">
+      <h4>interrupt_before：执行前拦截</h4>
+      <ul>
+        <li>节点代码<strong class="danger">完全不执行</strong></li>
+        <li>resume 后节点<strong class="accent">第一次执行</strong></li>
+        <li>state 没有节点输出</li>
+      </ul>
+      <div class="code-block" style="font-size:10px;margin-top:8px;">
+graph = builder.compile(
+    checkpointer=InMemorySaver(),
+    <span class="highlight">interrupt_before=["publish"]</span>,  # 执行前暂停
+)
+      </div>
+      <p style="margin-top:6px;font-size:11px;color:#94a3b8;">适用：审批输入、高风险操作前置确认</p>
+    </div>
+    <div class="card">
+      <h4>interrupt_after：执行后审查</h4>
+      <ul>
+        <li>节点代码<strong class="accent">完整执行</strong></li>
+        <li>writes 已保存到 state</li>
+        <li>resume 后直接流转到下一节点</li>
+      </ul>
+      <div class="code-block" style="font-size:10px;margin-top:8px;">
+graph = builder.compile(
+    checkpointer=InMemorySaver(),
+    <span class="highlight">interrupt_after=["generate"]</span>,  # 执行完暂停
+)
+      </div>
+      <p style="margin-top:6px;font-size:11px;color:#94a3b8;">适用：AI 生成后确认、工具执行后审查</p>
+    </div>
+  </div>
+  <div style="margin-top:12px;padding:10px 14px;background:rgba(251,191,36,0.1);border-radius:6px;border-left:3px solid #fbbf24;">
+    <p style="margin:0;font-size:12px;color:#e2e8f0;"><strong class="warn">易混淆点：</strong>interrupt_before=["publish"] + resume 后，publish <strong>第一次执行</strong>。interrupt_after=["generate"] + resume 后，generate <strong>不会再次执行</strong>。</p>
+  </div>
+  <div class="deck-footer">
+    <span>LangGraph 渐进式教程</span>
+    <span>LG-03 / 10</span>
+  </div>
+  <div class="notes">
+    这是最容易混淆的两个概念。interrupt_before 是执行前暂停，节点还没跑；interrupt_after 是执行完暂停，节点已经跑完了。resume 后的行为完全不同——before 是第一次执行，after 是继续往下走。
+  </div>
+</section>
+
+<!-- Slide 5: interrupt() 原语与重执行陷阱 -->
+<section class="slide" data-title="重执行陷阱">
+  <div class="kicker">THE RE-EXECUTION PITFALL</div>
+  <div class="h2">interrupt() 的最大坑：重执行陷阱</div>
+  <div class="lede">节点恢复时从头重新执行，interrupt() 前的代码会重跑</div>
+  <div class="grid g2 mt-m">
+    <div class="card" style="border-left:3px solid #f87171;">
+      <h4 class="danger">错误写法（计算 + 中断混在一起）</h4>
+      <div class="code-block" style="font-size:10px;">
+def bad_node(state):
+    result = expensive_compute(state)  # ← resume 时重跑！
+    user_input = interrupt({"data": result})
+    return {"output": process(user_input)}
+      </div>
+      <p style="margin-top:6px;font-size:11px;color:#f87171;">用户点通过，又卡 3 秒——生产环境不可接受</p>
+    </div>
+    <div class="card" style="border-left:3px solid #34d399;">
+      <h4 class="accent">正确写法（拆分节点）</h4>
+      <div class="code-block" style="font-size:10px;">
+def compute_node(state):
+    result = expensive_compute(state)
+    return {"analysis_result": result}  # 写入 state
+
+def confirm_node(state):
+    result = state["analysis_result"]   # 从 state 读取
+    decision = interrupt({"content": result})
+    return {"confirmed": decision == "approve"}
+      </div>
+      <p style="margin-top:6px;font-size:11px;color:#34d399;">resume 时秒过，无重计算</p>
+    </div>
+  </div>
+  <div style="margin-top:12px;padding:10px 14px;background:rgba(52,211,153,0.1);border-radius:6px;">
+    <p style="margin:0;font-size:12px;color:#e2e8f0;"><strong class="accent">拆分模式设计原则：</strong>计算节点不抛 interrupt；中断节点只读 state、不做耗时操作；通过 state 传递数据。</p>
+  </div>
+  <div class="deck-footer">
+    <span>LangGraph 渐进式教程</span>
+    <span>LG-03 / 10</span>
+  </div>
+  <div class="notes">
+    这是本节课最重要的一个坑。interrupt() 恢复时，整个节点从头重新执行。如果节点里有 API 调用、数据库查询、LLM 调用——全部重来。解决方案只有一个：拆成「计算节点 → 中断节点」。计算结果写入 state，中断节点只读 state。
+  </div>
+</section>
+
+<!-- Slide 6: create_react_agent 的 HITL -->
+<section class="slide" data-title="预构建 Agent HITL">
+  <div class="kicker">PREBUILT AGENT HITL</div>
+  <div class="h2">create_react_agent 的 HITL 配置</div>
+  <div class="lede">透传 interrupt_before/after 到 compile，节点名固定</div>
+  <div class="grid g2 mt-m">
+    <div class="card">
+      <h4>场景 1：工具调用前审批</h4>
+      <div class="code-block" style="font-size:10px;">
+agent = create_react_agent(
+    "openai:gpt-4",
+    tools=[check_weather, send_email],
+    <span class="highlight">interrupt_before=["tools"]</span>,
+    checkpointer=InMemorySaver(),
+)
+      </div>
+      <p style="margin-top:6px;font-size:11px;">LLM 决定调用工具后 → 暂停 → 用户确认 → 执行工具</p>
+    </div>
+    <div class="card">
+      <h4>场景 2：LLM 输出后审查</h4>
+      <div class="code-block" style="font-size:10px;">
+agent = create_react_agent(
+    "openai:gpt-4",
+    tools=[check_weather, send_email],
+    <span class="highlight">interrupt_after=["agent"]</span>,
+    checkpointer=InMemorySaver(),
+)
+      </div>
+      <p style="margin-top:6px;font-size:11px;">LLM 每次输出后暂停 → 用户审查/修改 → 继续</p>
+    </div>
+  </div>
+  <div style="margin-top:12px;display:flex;gap:12px;">
+    <div class="card" style="flex:1;">
+      <h4>组合使用</h4>
+      <div class="code-block" style="font-size:10px;">
+interrupt_before=["tools"],   # 工具执行前确认
+interrupt_after=["agent"]     # LLM 输出后审查
+      </div>
+    </div>
+    <div class="card" style="flex:1;">
+      <h4>post_model_hook：自动审查</h4>
+      <div class="code-block" style="font-size:10px;">
+def guardrail_hook(state):
+    if "免费送" in last_message.content:
+        return {"messages": [{"role": "assistant", "content": "[系统拦截]"}]}
+    return {}
+      </div>
+    </div>
+  </div>
+  <div class="deck-footer">
+    <span>LangGraph 渐进式教程</span>
+    <span>LG-03 / 10</span>
+  </div>
+  <div class="notes">
+    create_react_agent 的 interrupt_before/after 直接透传给 workflow.compile()，本身不做额外处理，只是限制可用节点名为 "agent" 和 "tools"。post_model_hook 是自动化审查，不需要人工介入，和 interrupt_after 的区别要搞清楚。
+  </div>
+</section>
+
+<!-- Slide 7: Command(resume) 恢复机制 -->
+<section class="slide" data-title="Resume 恢复机制">
+  <div class="kicker">RESUME MECHANISM</div>
+  <div class="h2">Command(resume=...) 恢复机制</div>
+  <div class="lede">三种 resume 值类型，匹配 interrupt() 的调用顺序</div>
+  <div class="grid g3 mt-m">
+    <div class="card">
+      <h4>单值</h4>
+      <div class="code-block" style="font-size:10px;">
+Command(resume="approve")
+      </div>
+      <p style="margin-top:6px;font-size:11px;">最简单场景：通过 / 拒绝</p>
+    </div>
+    <div class="card">
+      <h4>列表</h4>
+      <div class="code-block" style="font-size:10px;">
+Command(resume=["Alice", 30, "Beijing"])
+      </div>
+      <p style="margin-top:6px;font-size:11px;">节点内多个 interrupt() 按顺序匹配</p>
+    </div>
+    <div class="card">
+      <h4>字典（ID 映射）</h4>
+      <div class="code-block" style="font-size:10px;">
+Command(resume={
+    "hash_a": "approve",
+    "hash_b": "reject",
+})
+      </div>
+      <p style="margin-top:6px;font-size:11px;">并行子图批量恢复</p>
+    </div>
+  </div>
+  <table class="mt-m">
+    <tr><th>中断类型</th><th>resume 值给谁</th><th>节点是否重新执行</th></tr>
+    <tr><td>interrupt_before</td><td>被中断的节点本身</td><td class="warn">是（第一次执行）</td></tr>
+    <tr><td>interrupt_after</td><td>下一个接收流转的节点</td><td>否（原节点已完成）</td></tr>
+    <tr><td>interrupt() in node</td><td>节点内部的 interrupt() 调用</td><td class="danger">是（整个节点重执行）</td></tr>
+  </table>
+  <div class="deck-footer">
+    <span>LangGraph 渐进式教程</span>
+    <span>LG-03 / 10</span>
+  </div>
+  <div class="notes">
+    多 interrupt 意味着节点会被重新执行多次。结合重执行陷阱，如果节点内有昂贵操作 + 多 interrupt，性能会极差。这就是为什么拆分模式对多中断场景更加重要。
+  </div>
+</section>
+
+<!-- Slide 8: 生产级 HITL 封装 -->
+<section class="slide" data-title="生产级封装">
+  <div class="kicker">PRODUCTION ENCAPSULATION</div>
+  <div class="h2">生产级 HITL 封装模式</div>
+  <div class="lede">从「代码里的魔法值」到「结构化的协议」</div>
+  <div class="grid g2 mt-m">
+    <div class="card">
+      <h4>ToolInteractionEnvelope</h4>
+      <p style="margin-bottom:6px;font-size:11px;">工具返回信封而非直接中断，让上层决定要不要中断</p>
+      <div class="code-block" style="font-size:9px;">
+{
+  "status": "needs_confirmation",
+  "summary": "确认预约 A阅览室？",
+  "action_request": {"action": "library_booking", "risk": "write"},
+  "render_schema": {...}  # 前端渲染契约
+}
+      </div>
+    </div>
+    <div class="card">
+      <h4>RenderSchema：中断即 UI</h4>
+      <p style="margin-bottom:6px;font-size:11px;">标准字段类型驱动前端渲染</p>
+      <div class="code-block" style="font-size:9px;">
+"fields": [
+  {"id": "date", "kind": "date_input", "label": "日期"},
+  {"id": "room", "kind": "single_select_card", ...},
+  {"id": "file", "kind": "file_upload", ...}
+]
+      </div>
+    </div>
+  </div>
+  <div style="margin-top:10px;display:flex;gap:10px;">
+    <div class="card" style="flex:1;padding:10px;">
+      <h4 style="font-size:12px;">Resume 协议</h4>
+      <p style="font-size:10px;">normalize + build 统一接口，支持 submit / continue / revise / regenerate / retry</p>
+    </div>
+    <div class="card" style="flex:1;padding:10px;">
+      <h4 style="font-size:12px;">工具包装器</h4>
+      <p style="font-size:10px;">Copilot 模式（自动执行）vs Interactive 模式（需要确认），state.auto 动态切换</p>
+    </div>
+  </div>
+  <div class="deck-footer">
+    <span>LangGraph 渐进式教程</span>
+    <span>LG-03 / 10</span>
+  </div>
+  <div class="notes">
+    生产环境直接写 interrupt() 太原始。封装的目标：把中断从「代码里的魔法值」变成「结构化的协议」。工具声明需要什么，前端知道怎么渲染，用户操作后能统一恢复。这是从「能跑」到「能上线」的关键一步。
+  </div>
+</section>
+
+<!-- Slide 9: 常见误区 -->
+<section class="slide" data-title="常见误区">
+  <div class="kicker">PITFALLS</div>
+  <div class="h2">这些坑，踩一个就炸</div>
+  <div class="lede">从真实项目提炼的避坑指南</div>
+  <table class="mt-m">
+    <tr><th style="width:8%">#</th><th style="width:22%">坑</th><th style="width:35%">现象</th><th style="width:35%">正确做法</th></tr>
+    <tr>
+      <td class="danger">01</td>
+      <td>忘记 checkpointer</td>
+      <td>interrupt 后无法恢复，State 丢失</td>
+      <td>HITL <strong>必须</strong>配 checkpointer</td>
+    </tr>
+    <tr>
+      <td class="danger">02</td>
+      <td>在工具里用 interrupt()</td>
+      <td>工具异常，图不暂停</td>
+      <td>用 interrupt_before=["tools"] 代替</td>
+    </tr>
+    <tr>
+      <td class="danger">03</td>
+      <td>interrupt 和异常混用</td>
+      <td>raise Exception 终止执行</td>
+      <td>HITL 必须用 interrupt() 原语</td>
+    </tr>
+    <tr>
+      <td class="danger">04</td>
+      <td>节点内 interrupt 前有副作用</td>
+      <td>resume 时 API 重调、数据库重写</td>
+      <td>拆成「计算节点 → 中断节点」</td>
+    </tr>
+    <tr>
+      <td class="danger">05</td>
+      <td>Hooks 里直接改 State</td>
+      <td>Pre-hook 改了 messages 影响后续</td>
+      <td>用 llm_input_messages 临时注入</td>
+    </tr>
+  </table>
+  <div class="deck-footer">
+    <span>LangGraph 渐进式教程</span>
+    <span>LG-03 / 10</span>
+  </div>
+  <div class="notes">
+    五个最常见的坑。第一个最致命：没有 checkpointer，HITL 完全无法工作。第二个很多人踩：在 tool 函数里用 interrupt()，结果异常被 ToolNode 吞掉。第三个：用 raise 代替 interrupt，整个图终止而不是暂停。第四个：重执行陷阱。第五个：hooks 的副作用。
+  </div>
+</section>
+
+<!-- Slide 10: 总结 -->
+<section class="slide" data-title="总结">
+  <div class="kicker">SUMMARY</div>
+  <div class="h2">核心要点回顾</div>
+  <div class="grid g2 mt-m">
+    <div class="card">
+      <h4>三层架构</h4>
+      <ul>
+        <li>Layer 1 compile：声明式，不动代码就生效</li>
+        <li>Layer 2 prebuilt：透传，限制节点名</li>
+        <li>Layer 3 in-node：最灵活，但必须拆分防重跑</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>中断机制</h4>
+      <ul>
+        <li>interrupt_before：节点不执行，resume 后第一次执行</li>
+        <li>interrupt_after：节点已执行完，resume 后流转下一节点</li>
+        <li>interrupt()：节点恢复时从头重新执行</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>生产级封装</h4>
+      <ul>
+        <li>ToolInteractionEnvelope：工具返回信封，上层决策</li>
+        <li>RenderSchema：中断即 UI，声明式驱动前端</li>
+        <li>Resume 协议：统一恢复接口，支持 edit/revise</li>
+        <li>Copilot/Interactive 双模式：state.auto 动态切换</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>下节课预告</h4>
+      <ul>
+        <li>LG-04：<strong>持久化与记忆系统</strong></li>
+        <li>Checkpoint、MemorySaver、PostgresSaver</li>
+        <li>长期记忆（Store）vs 短期记忆（Checkpoint）</li>
+      </ul>
+    </div>
+  </div>
+  <div style="margin-top:14px;padding:12px 16px;background:rgba(56,189,248,0.1);border-radius:8px;text-align:center;">
+    <p style="margin:0;font-size:13px;color:#f8fafc;font-weight:600;">"compile 配 before/after，不动代码就生效；节点内写 interrupt，千万要拆分防重跑；Agent 工具要审批，tools 节点暂停好；resume 是 playback，state 已在 checkpoint 存好。"</p>
+  </div>
+  <div class="deck-footer">
+    <span>LangGraph 渐进式教程</span>
+    <span>LG-03 / 10</span>
+  </div>
+  <div class="notes">
+    记忆口诀帮助学员记住核心要点。下节课 LG-04 深入持久化与记忆系统——Checkpoint、MemorySaver、PostgresSaver、RedisSaver，以及 Store API。这是 HITL 的底层基础设施，不懂它，HITL 就是空中楼阁。
+  </div>
+</section>
+
+</div>
+<script src="/Users/galaxyxieyu/.claude/skills/html-ppt-skill/assets/runtime.js"></script>
+</body></html>

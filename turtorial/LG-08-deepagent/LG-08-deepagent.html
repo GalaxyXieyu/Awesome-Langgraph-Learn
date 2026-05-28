@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-themes="tokyo-night,dracula,catppuccin-mocha,nord">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LG-08 DeepAgents — 生产级深度研究智能体</title>
+<link rel="stylesheet" href="/Users/galaxyxieyu/.claude/skills/html-ppt-skill/assets/fonts.css">
+<link rel="stylesheet" href="/Users/galaxyxieyu/.claude/skills/html-ppt-skill/assets/base.css">
+<link rel="stylesheet" id="theme-link" href="/Users/galaxyxieyu/.claude/skills/html-ppt-skill/assets/themes/tokyo-night.css">
+<link rel="stylesheet" href="/Users/galaxyxieyu/.claude/skills/html-ppt-skill/assets/animations/animations.css">
+<style>
+/* tpl-lg08-deepagent · scoped styles */
+.tpl-lg08-deepagent {
+  --text-2: #c8d0f0;
+  --text-3: #94a0d0;
+}
+.tpl-lg08-deepagent .slide { padding: 64px 88px; }
+.tpl-lg08-deepagent .kicker {
+  font-family: var(--font-mono, monospace);
+  font-size: 13px;
+  color: var(--text-3);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin: 0 0 16px 0;
+}
+.tpl-lg08-deepagent .h1 {
+  font-size: clamp(40px, 5vw, 68px);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  margin: 0 0 20px 0;
+}
+.tpl-lg08-deepagent .h2 {
+  font-size: clamp(28px, 3.2vw, 44px);
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  margin: 0 0 24px 0;
+}
+.tpl-lg08-deepagent .lede {
+  font-size: 18px;
+  line-height: 1.6;
+  color: var(--text-2);
+}
+.tpl-lg08-deepagent .mono {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.9em;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.08);
+  color: var(--accent, #58a6ff);
+}
+.tpl-lg08-deepagent .accent { color: var(--accent, #f0883e); font-weight: 700; }
+.tpl-lg08-deepagent .dim { color: var(--text-2); font-size: 14px; line-height: 1.6; margin: 0; }
+
+/* Cards */
+.tpl-lg08-deepagent .card {
+  background: var(--surface, rgba(255,255,255,0.03));
+  border: 1px solid var(--border, rgba(255,255,255,0.1));
+  border-radius: 12px;
+  padding: 20px 22px;
+}
+.tpl-lg08-deepagent .card-accent { border-top: 3px solid var(--accent, #58a6ff); }
+.tpl-lg08-deepagent .card h4 { margin: 0 0 8px 0; font-size: 16px; color: var(--text-1); }
+
+/* Agenda rows */
+.tpl-lg08-deepagent .agenda-row {
+  display: grid;
+  grid-template-columns: 44px 1fr auto;
+  gap: 14px;
+  align-items: center;
+  padding: 12px 16px;
+  border: 1px solid var(--border, rgba(255,255,255,0.1));
+  border-radius: 10px;
+  margin-bottom: 8px;
+  background: var(--surface, rgba(255,255,255,0.03));
+}
+.tpl-lg08-deepagent .agenda-row .num {
+  font-family: var(--font-mono, monospace);
+  font-size: 13px;
+  color: var(--accent, #58a6ff);
+  font-weight: 700;
+}
+.tpl-lg08-deepagent .agenda-row .t { font-size: 16px; font-weight: 500; color: var(--text-1); }
+.tpl-lg08-deepagent .agenda-row .d { font-family: var(--font-mono, monospace); font-size: 12px; color: var(--text-3); }
+
+/* Feature rows */
+.tpl-lg08-deepagent .feature-row {
+  display: flex;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border, rgba(255,255,255,0.08));
+}
+.tpl-lg08-deepagent .feature-row:last-child { border-bottom: none; }
+.tpl-lg08-deepagent .feature-row .num {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.tpl-lg08-deepagent .feature-row b { display: block; font-size: 16px; margin-bottom: 3px; color: var(--text-1); }
+.tpl-lg08-deepagent .feature-row .dim { font-size: 13px; color: var(--text-2); line-height: 1.5; margin: 0; }
+.tpl-lg08-deepagent .blue { color: #58a6ff; }
+.tpl-lg08-deepagent .green { color: #3fb950; }
+.tpl-lg08-deepagent .orange { color: #f0883e; }
+.tpl-lg08-deepagent .purple { color: #bc8cff; }
+.tpl-lg08-deepagent .red { color: #f85149; }
+
+/* Code block */
+.tpl-lg08-deepagent .code-block {
+  background: #0d1117;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px;
+  padding: 16px 20px;
+  font-family: var(--font-mono, "SF Mono", monospace);
+  font-size: 13px;
+  line-height: 1.7;
+  color: #e6edf3;
+  white-space: pre-wrap;
+  text-align: left;
+  overflow-x: auto;
+}
+.tpl-lg08-deepagent .code-block .comment { color: #8b949e; }
+.tpl-lg08-deepagent .code-block .cmd { color: #3fb950; font-weight: 600; }
+.tpl-lg08-deepagent .code-block .flag { color: #f0883e; }
+.tpl-lg08-deepagent .code-block .kw { color: #ff7b72; }
+.tpl-lg08-deepagent .code-block .str { color: #a5d6ff; }
+
+/* Table */
+.tpl-lg08-deepagent .data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.tpl-lg08-deepagent .data-table th,
+.tpl-lg08-deepagent .data-table td {
+  padding: 10px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--border, rgba(255,255,255,0.1));
+}
+.tpl-lg08-deepagent .data-table th {
+  font-weight: 600;
+  color: var(--text-1);
+  background: var(--surface, rgba(255,255,255,0.03));
+}
+.tpl-lg08-deepagent .data-table td { color: var(--text-2); }
+
+/* Pill */
+.tpl-lg08-deepagent .pill {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 500;
+  background: var(--accent, rgba(88,166,255,0.15));
+  color: var(--accent, #58a6ff);
+}
+
+/* Grid helpers */
+.tpl-lg08-deepagent .grid { display: grid; gap: 16px; }
+.tpl-lg08-deepagent .grid.g2 { grid-template-columns: 1fr 1fr; }
+.tpl-lg08-deepagent .grid.g3 { grid-template-columns: repeat(3, 1fr); }
+.tpl-lg08-deepagent .grid.g4 { grid-template-columns: repeat(4, 1fr); }
+.tpl-lg08-deepagent .mt-m { margin-top: 16px; }
+.tpl-lg08-deepagent .mt-l { margin-top: 28px; }
+.tpl-lg08-deepagent .mt-s { margin-top: 8px; }
+.tpl-lg08-deepagent .tc { text-align: center; }
+
+/* Comparison table */
+.tpl-lg08-deepagent .compare-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.tpl-lg08-deepagent .compare-table th,
+.tpl-lg08-deepagent .compare-table td {
+  padding: 8px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border, rgba(255,255,255,0.08));
+}
+.tpl-lg08-deepagent .compare-table th { font-weight: 600; color: var(--text-1); background: var(--surface, rgba(255,255,255,0.03)); }
+.tpl-lg08-deepagent .compare-table td { color: var(--text-2); }
+
+@media print {
+  .slide { display: flex !important; page-break-after: always; break-after: page; }
+  .slide:last-child { page-break-after: auto; }
+  body { width: 100%; height: 100%; background: #0f172a; }
+}
+</style>
+</head>
+<body class="tpl-lg08-deepagent">
+<div class="deck">
+
+  <!-- ============ 1. COVER ============ -->
+  <section class="slide is-active" data-title="Cover">
+    <p class="kicker">LG-08 · DeepAgents</p>
+    <h1 class="h1 anim-fade-up" data-anim="fade-up">DeepAgents 让 Agent<br>从<span class="accent">简单问答</span>跨越到<span class="accent">深度研究</span></h1>
+    <p class="lede mt-m">LangChain 官方 2025 年推出的 Agent Harness，基于 LangGraph 构建，支持 Planning、Filesystem、Sub-agent、Skills 四大支柱</p>
+    <div class="deck-footer">
+      <span class="mono">LangGraph 教程 · 第 8 课</span>
+      <span class="slide-number" data-current="1" data-total="12"></span>
+    </div>
+    <aside class="notes">
+      <p>大家好，欢迎来到 LangGraph 教程的第 8 课。前面七节课，我们学了 StateGraph、Tool、Memory、Human-in-the-loop、Subgraphs、Streaming、Langfuse 监控。每一节课都是一个<strong>零件</strong>。</p>
+      <p>今天这节课，我们要把这些零件组装成一台<strong>发动机</strong>——一个能自主规划、深度研究、持久化工作的生产级 Agent。我们要解析的案例是 <strong>DeepAgents</strong>，LangChain 官方 2025 年推出的 Agent Harness。</p>
+      <p>它的核心能力有四个：Planning 任务规划、Filesystem 文件系统、Sub-agent 子智能体委派、Skills 领域知识按需加载。这是从「简单问答 Agent」到「深度研究助手」的跨越。</p>
+    </aside>
+  </section>
+
+  <!-- ============ 2. AGENDA ============ -->
+  <section class="slide" data-title="Agenda">
+    <p class="kicker">agenda</p>
+    <h2 class="h2">今天我们要讲的 6 件事</h2>
+    <div class="stack mt-l">
+      <div class="agenda-row anim-stagger-list" data-anim="fade-up"><span class="num">01</span><span class="t">DeepAgents 架构概述与四大支柱</span><span class="d">~8min</span></div>
+      <div class="agenda-row anim-stagger-list" data-anim="fade-up"><span class="num">02</span><span class="t">Planning：TodoList 让 Agent 自主规划任务</span><span class="d">~8min</span></div>
+      <div class="agenda-row anim-stagger-list" data-anim="fade-up"><span class="num">03</span><span class="t">Filesystem：工作空间持久化突破上下文限制</span><span class="d">~8min</span></div>
+      <div class="agenda-row anim-stagger-list" data-anim="fade-up"><span class="num">04</span><span class="t">Sub-agent：同步与异步实现并行深度研究</span><span class="d">~10min</span></div>
+      <div class="agenda-row anim-stagger-list" data-anim="fade-up"><span class="num">05</span><span class="t">Skills：渐进式领域知识披露节省上下文</span><span class="d">~8min</span></div>
+      <div class="agenda-row anim-stagger-list" data-anim="fade-up"><span class="num">06</span><span class="t">Middleware 栈与生产级实战建议</span><span class="d">~8min</span></div>
+    </div>
+    <aside class="notes">
+      <p>先过一下今天的议程，一共 6 个部分。</p>
+      <p>第一部分介绍 DeepAgents 的整体架构和四大支柱，理解它跟 LangGraph 的关系。第二部分讲 Planning，也就是 TodoList 任务规划，让 Agent 能自主拆解复杂任务。第三部分讲 Filesystem 文件系统，解决上下文窗口装不下全部信息的问题。</p>
+      <p>第四部分是 Sub-agent，包括同步和异步两种子智能体委派模式。第五部分讲 Skills，也就是渐进式领域知识披露。最后第六部分总结 10 层 Middleware 栈和生产级建议。整个课程大约 50 分钟。</p>
+    </aside>
+  </section>
+
+  <!-- ============ 3. ARCHITECTURE ============ -->
+  <section class="slide" data-title="Architecture">
+    <p class="kicker">// part 01 · architecture</p>
+    <h2 class="h2">DeepAgents 是 LangGraph 之上的<br><span class="accent">更高层抽象</span></h2>
+    <div class="grid g3 mt-l">
+      <div class="card card-accent anim-fade-up" data-anim="fade-up">
+        <h4>Planning 任务规划</h4>
+        <p class="dim">write_todos / read_todos 自动注入，Agent 自主拆解复杂任务为有序执行列表</p>
+      </div>
+      <div class="card card-accent anim-fade-up" data-anim="fade-up" style="border-top-color:#3fb950">
+        <h4>Filesystem 文件系统</h4>
+        <p class="dim">ls / read_file / write_file / edit_file / glob / grep，持久化工作空间突破上下文限制</p>
+      </div>
+      <div class="card card-accent anim-fade-up" data-anim="fade-up" style="border-top-color:#bc8cff">
+        <h4>Sub-agent 子智能体</h4>
+        <p class="dim">同步 SubAgent + 异步 AsyncSubAgent，实现串行和并行深度研究</p>
+      </div>
+    </div>
+    <div class="grid g3 mt-m">
+      <div class="card card-accent anim-fade-up" data-anim="fade-up" style="border-top-color:#f0883e">
+        <h4>Skills 领域知识</h4>
+        <p class="dim">SKILL.md 三层架构，按需加载领域知识，不浪费上下文窗口</p>
+      </div>
+      <div class="card card-accent anim-fade-up" data-anim="fade-up" style="border-top-color:#f85149">
+        <h4>Middleware 中间件栈</h4>
+        <p class="dim">10 层默认 Middleware 自动组装，可扩展可排除，洋葱模型执行</p>
+      </div>
+      <div class="card card-accent anim-fade-up" data-anim="fade-up" style="border-top-color:#58a6ff">
+        <h4>Backend 后端系统</h4>
+        <p class="dim">State / Store / Filesystem / Composite / Sandbox 多种持久化策略</p>
+      </div>
+    </div>
+    <aside class="notes">
+      <p>DeepAgents 不是替代 LangGraph，而是<strong>基于 LangGraph 的更高层抽象</strong>。它帮你把常见模式封装成可复用的组件。</p>
+      <p>核心洞察是：简单 Agent 等于 LLM 加 Tools 加循环调用，而 Deep Agent 等于 LLM 加 Tools 加 Planning 加 Filesystem 加 Sub-agents 加 Skills。<strong>差异不在 LLM，而在架构 surrounding the loop</strong>。</p>
+      <p>这六个模块协同工作：Planning 负责拆解任务，Filesystem 负责持久化，Sub-agent 负责并行协作，Skills 负责知识管理，Middleware 负责可组合扩展，Backend 负责数据生命周期。</p>
+    </aside>
+  </section>
+
+  <!-- ============ 4. QUICK START ============ -->
+  <section class="slide" data-title="Quick Start">
+    <p class="kicker">// quick start</p>
+    <h2 class="h2"><span class="accent">create_deep_agent</span> 一键创建生产级 Agent</h2>
+    <div class="grid g2 mt-l">
+      <div>
+        <div class="code-block anim-fade-up" data-anim="fade-up">
+<span class="kw">from</span> deepagents <span class="kw">import</span> create_deep_agent
+<span class="kw">from</span> langgraph.checkpoint.memory <span class="kw">import</span> InMemorySaver
+
+agent = create_deep_agent(
+    model=<span class="str">"openai:gpt-4o"</span>,
+    tools=[search_tool, calc_tool],
+    checkpointer=InMemorySaver(),
+)
+
+result = agent.invoke({
+    <span class="str">"messages"</span>: [{<span class="str">"role"</span>: <span class="str">"user"</span>,
+                 <span class="str">"content"</span>: <span class="str">"研究量子计算最新进展"</span>}]
+})</div>
+        <p class="dim mt-s">推荐使用 <span class="mono">"provider:model"</span> 字符串格式</p>
+      </div>
+      <div class="anim-fade-up" data-anim="fade-up">
+        <div class="feature-row"><span class="num blue">①</span><div><b>模型解析</b><p class="dim">resolve_model() 自动初始化对应 BaseChatModel</p></div></div>
+        <div class="feature-row"><span class="num green">②</span><div><b>子代理处理</b><p class="dim">自动构建子代理中间件栈，继承父代理工具</p></div></div>
+        <div class="feature-row"><span class="num orange">③</span><div><b>自动添加通用子代理</b><p class="dim">未提供时自动创建 general-purpose 子代理</p></div></div>
+        <div class="feature-row"><span class="num purple">④</span><div><b>组装中间件栈</b><p class="dim">10 层默认 Middleware 按序组装</p></div></div>
+        <div class="feature-row"><span class="num red">⑤</span><div><b>创建最终 Agent</b><p class="dim">DeltaChannel 优化，O(N) checkpoint</p></div></div>
+      </div>
+    </div>
+    <aside class="notes">
+      <p>DeepAgents 的入口非常简单，就是 <strong>create_deep_agent</strong> 这一个函数。但内部有 7 步组装流程。</p>
+      <p>第一步模型解析，支持 provider:model 字符串格式。第二步处理子代理规格，自动构建子代理的中间件栈。第三步自动添加通用子代理。第四步组装主代理中间件栈。第五步组装系统提示。第六步应用 Harness Profile。第七步创建最终 Agent。</p>
+      <p>一个关键优化是 <strong>DeltaChannel</strong>，把 checkpoint 增长从 O(N²) 降到 O(N)。在长对话中，普通列表每次 checkpoint 都要保存完整消息历史，而 DeltaChannel 只保存增量变化。</p>
+    </aside>
+  </section>
+
+  <!-- ============ 5. PLANNING ============ -->
+  <section class="slide" data-title="Planning">
+    <p class="kicker">// part 02 · planning</p>
+    <h2 class="h2">Planning 让 Agent <span class="accent">不再迷失</span>在复杂任务中</h2>
+    <div class="grid g2 mt-l">
+      <div class="anim-fade-up" data-anim="fade-up">
+        <h4 style="color:#f85149;margin-bottom:12px">没有 Planning 的 Agent</h4>
+        <div class="code-block" style="font-size:12px">
+用户："分析 2024 年新能源汽车行业"
+
+搜索 → 看到结果 → 不知道下一步
+→ 随机调用工具 → 零散回答</div>
+        <p class="dim mt-s">没有大纲，做到一半忘记下一步该做什么</p>
+      </div>
+      <div class="anim-fade-up" data-anim="fade-up">
+        <h4 style="color:#3fb950;margin-bottom:12px">有 Planning 的 Agent</h4>
+        <div class="code-block" style="font-size:12px">
+用户："分析 2024 年新能源汽车行业"
+
+write_todos([
+  "1. 收集市场规模数据",
+  "2. 分析主要厂商份额",
+  "3. 梳理技术趋势",
+  "4. 分析政策影响",
+  "5. 撰写综合报告"
+])
+→ 按大纲执行 → 每完成一项勾选
+→ 全部完成后总结</div>
+        <p class="dim mt-s">TodoList 自动注入，Agent 自主规划有序执行</p>
+      </div>
+    </div>
+    <div class="mt-m" style="display:flex;gap:16px">
+      <div class="card" style="flex:1;text-align:center">
+        <div class="mono" style="font-size:24px;color:var(--accent)">write_todos()</div>
+        <p class="dim">创建或更新待办事项列表</p>
+      </div>
+      <div class="card" style="flex:1;text-align:center">
+        <div class="mono" style="font-size:24px;color:var(--accent)">read_todos()</div>
+        <p class="dim">读取当前待办事项及完成状态</p>
+      </div>
+    </div>
+    <aside class="notes">
+      <p>Planning 解决的是 Agent 遇到复杂任务时<strong>"迷失"</strong>的问题。没有 Planning 的 Agent，搜索看到结果后不知道下一步干什么，随机调用工具，给出零散回答。</p>
+      <p>有 Planning 的 Agent 会先调用 write_todos 创建任务列表，然后循环执行：read_todos 查看当前任务，选择第一个 pending 任务执行，完成后更新状态，继续下一个。直到所有任务 completed，再生成最终回答。</p>
+      <p>这两个工具是 <strong>TodoListMiddleware 自动注入</strong>的，开发者无需手动配置。这是 DeepAgents 最基础也最强大的能力之一。</p>
+    </aside>
+  </section>
+
+  <!-- ============ 6. FILESYSTEM ============ -->
+  <section class="slide" data-title="Filesystem">
+    <p class="kicker">// part 03 · filesystem</p>
+    <h2 class="h2">Filesystem 让 Agent 拥有<span class="accent">持久化工作空间</span></h2>
+    <div class="grid g2 mt-l">
+      <div class="anim-fade-up" data-anim="fade-up">
+        <h4 style="margin-bottom:12px">自动注入的文件操作工具</h4>
+        <table class="data-table">
+          <tr><th>工具</th><th>功能</th></tr>
+          <tr><td><span class="mono">ls</span></td><td>列出目录内容</td></tr>
+          <tr><td><span class="mono">read_file</span></td><td>读取文件（支持行范围）</td></tr>
+          <tr><td><span class="mono">write_file</span></td><td>写入新文件</td></tr>
+          <tr><td><span class="mono">edit_file</span></td><td>原地编辑文件</td></tr>
+          <tr><td><span class="mono">glob</span></td><td>按模式查找文件</td></tr>
+          <tr><td><span class="mono">grep</span></td><td>在文件中搜索</td></tr>
+        </table>
+      </div>
+      <div class="anim-fade-up" data-anim="fade-up">
+        <h4 style="margin-bottom:12px">Backend 选型指南</h4>
+        <table class="data-table">
+          <tr><th>后端</th><th>生命周期</th><th>场景</th></tr>
+          <tr><td><span class="mono">StateBackend</span></td><td>会话结束消失</td><td>临时工作文件</td></tr>
+          <tr><td><span class="mono">StoreBackend</span></td><td>持久化</td><td>长期记忆、偏好</td></tr>
+          <tr><td><span class="mono">FilesystemBackend</span></td><td>真实磁盘</td><td>外部访问文件</td></tr>
+          <tr><td><span class="mono">CompositeBackend</span></td><td>混合</td><td>复杂场景路由</td></tr>
+        </table>
+        <div class="code-block mt-m" style="font-size:11px">
+backend = CompositeBackend(
+    default=StateBackend(),
+    routes={
+        <span class="str">"/memories/"</span>: StoreBackend(store=store),
+        <span class="str">"/preferences/"</span>: StoreBackend(store=store),
+    },
+)</div>
+      </div>
+    </div>
+    <aside class="notes">
+      <p>Filesystem 解决的是 LLM 上下文窗口有限的问题。通常 128K 到 200K tokens，复杂研究任务产生的中间数据很容易超出这个限制。</p>
+      <p>没有 Filesystem 时，搜索收集了 50 页资料全部塞进 messages，Token 暴涨费用飙升。有 Filesystem 时，资料写入 /workspace/research/raw_data.md，messages 只保留摘要，需要时 read_file 读取，上下文始终可控。</p>
+      <p>DeepAgents 提供多种后端控制数据持久化方式。<strong>CompositeBackend</strong> 最灵活，不同路径用不同后端，比如 /workspace 用 StateBackend 临时存储，/memories 用 StoreBackend 持久化。</p>
+    </aside>
+  </section>
+
+  <!-- ============ 7. SUB-AGENT ============ -->
+  <section class="slide" data-title="Sub-agent">
+    <p class="kicker">// part 04 · sub-agent</p>
+    <h2 class="h2">Sub-agent 实现<span class="accent">团队协作式</span>并行深度研究</h2>
+    <div class="grid g2 mt-l">
+      <div class="anim-fade-up" data-anim="fade-up">
+        <h4 style="margin-bottom:12px">三种子智能体类型</h4>
+        <div class="card card-accent" style="margin-bottom:10px">
+          <h4>SubAgent <span class="pill">同步</span></h4>
+          <p class="dim">声明式同步子智能体，最常见，阻塞式委派</p>
+        </div>
+        <div class="card card-accent" style="margin-bottom:10px;border-top-color:#bc8cff">
+          <h4>CompiledSubAgent <span class="pill">复用</span></h4>
+          <p class="dim">复用现有 LangGraph，挂载预构建复杂 Agent</p>
+        </div>
+        <div class="card card-accent" style="border-top-color:#f0883e">
+          <h4>AsyncSubAgent <span class="pill">异步</span></h4>
+          <p class="dim">非阻塞后台执行，支持长时间运行任务</p>
+        </div>
+      </div>
+      <div class="anim-fade-up" data-anim="fade-up">
+        <h4 style="margin-bottom:12px">AsyncSubAgent 5 个管理工具</h4>
+        <table class="data-table">
+          <tr><th>工具</th><th>功能</th></tr>
+          <tr><td><span class="mono">start_async_task</span></td><td>启动后台任务，返回任务 ID</td></tr>
+          <tr><td><span class="mono">check_async_task</span></td><td>轮询状态并获取结果</td></tr>
+          <tr><td><span class="mono">update_async_task</span></td><td>向运行中任务发送指令</td></tr>
+          <tr><td><span class="mono">cancel_async_task</span></td><td>停止运行中的任务</td></tr>
+          <tr><td><span class="mono">list_async_tasks</span></td><td>列出所有任务及状态</td></tr>
+        </table>
+        <p class="dim mt-s"><strong>关键设计</strong>：Supervisor 用强模型（推理），Sub-agent 用便宜模型（执行），可节省 60-80% 成本。</p>
+      </div>
+    </div>
+    <aside class="notes">
+      <p>Sub-agent 解决的是复杂任务包含多个相对独立子任务时的并行处理问题。比如分析新能源汽车行业，可以拆成市场数据、竞品分析、技术趋势三个子任务，三人并行工作。</p>
+      <p>DeepAgents 支持三种子智能体。SubAgent 是声明式同步的，最常用。CompiledSubAgent 可以复用已有的 LangGraph。AsyncSubAgent 是 v0.5 引入的，支持非阻塞后台执行。</p>
+      <p>AsyncSubAgent 暴露 5 个管理工具，典型生命周期是：start_async_task 启动任务返回 task_id，Supervisor 继续做其他事，然后 check_async_task 查询结果。一个关键的成本优化策略是<strong>Supervisor 用强模型做推理决策，Sub-agent 用便宜模型做执行</strong>。</p>
+    </aside>
+  </section>
+
+  <!-- ============ 8. SKILLS ============ -->
+  <section class="slide" data-title="Skills">
+    <p class="kicker">// part 05 · skills</p>
+    <h2 class="h2">Skills 实现<span class="accent">按需加载</span>领域知识，节省 90% 上下文</h2>
+    <div class="grid g2 mt-l">
+      <div class="anim-fade-up" data-anim="fade-up">
+        <h4 style="margin-bottom:12px">三层渐进式披露架构</h4>
+        <div class="card card-accent" style="margin-bottom:10px">
+          <h4>Layer 1: Discovery <span class="pill">始终存在</span></h4>
+          <p class="dim">轻量级元数据：name + description，始终存在于 System Prompt 中</p>
+        </div>
+        <div class="card card-accent" style="margin-bottom:10px;border-top-color:#3fb950">
+          <h4>Layer 2: Activation <span class="pill">使用时加载</span></h4>
+          <p class="dim">完整 SKILL.md：instructions + rules，Agent 决定使用时加载</p>
+        </div>
+        <div class="card card-accent" style="border-top-color:#bc8cff">
+          <h4>Layer 3: Deep Context <span class="pill">执行时加载</span></h4>
+          <p class="dim">参考资料、脚本、模板、示例，执行时按需加载</p>
+        </div>
+      </div>
+      <div class="anim-fade-up" data-anim="fade-up">
+        <h4 style="margin-bottom:12px">SKILL.md 格式示例</h4>
+        <div class="code-block" style="font-size:11px">
+---
+name: web-research
+description: Structured approach to
+             conducting thorough web research
+license: MIT
+---
+
+<span class="comment"># Web Research Skill</span>
+
+<span class="comment">## When to Use</span>
+- User asks you to research a topic
+- Need to gather information from sources
+
+<span class="comment">## Steps</span>
+1. Formulate search queries
+2. Execute searches
+3. Synthesize findings
+4. Cite sources</div>
+        <p class="dim mt-s">启动时扫描 skills 目录，解析 YAML frontmatter，将 name + description 注入 System Prompt</p>
+      </div>
+    </div>
+    <aside class="notes">
+      <p>Skills 解决的是领域知识太多不能全塞进 prompt 的问题。想象 Agent 需要处理财务分析、法律咨询、医疗诊断、代码审查多个领域。如果全部塞进 System Prompt，上下文会爆炸到 3 万 tokens。</p>
+      <p>Skills 采用<strong>三层渐进式披露</strong>架构。第一层 Discovery 只保留 name 和 description 在 System Prompt 中，几百 tokens。第二层 Activation 在 Agent 决定使用时加载完整 SKILL.md。第三层 Deep Context 在执行时按需加载参考资料和模板。</p>
+      <p>SKILL.md 使用 YAML frontmatter 格式，包含 name、description、license 等字段。启动时自动扫描目录，解析 frontmatter，完成 Skill 自动发现流程。</p>
+    </aside>
+  </section>
+
+  <!-- ============ 9. MIDDLEWARE ============ -->
+  <section class="slide" data-title="Middleware">
+    <p class="kicker">// part 06 · middleware</p>
+    <h2 class="h2">10 层 Middleware 栈按<span class="accent">洋葱模型</span>顺序执行</h2>
+    <div class="mt-l">
+      <table class="data-table anim-fade-up" data-anim="fade-up">
+        <tr><th style="width:40px">#</th><th>Middleware</th><th>功能</th><th>条件</th></tr>
+        <tr><td><span class="num blue">1</span></td><td>TodoListMiddleware</td><td>任务规划（write_todos / read_todos）</td><td>默认</td></tr>
+        <tr><td><span class="num green">2</span></td><td>SkillsMiddleware</td><td>Skills 加载</td><td>提供 skills 时</td></tr>
+        <tr><td><span class="num orange">3</span></td><td>FilesystemMiddleware</td><td>文件操作（必需，不可排除）</td><td>默认</td></tr>
+        <tr><td><span class="num purple">4</span></td><td>SubAgentMiddleware</td><td>子智能体委派（必需，不可排除）</td><td>默认</td></tr>
+        <tr><td><span class="num red">5</span></td><td>SummarizationMiddleware</td><td>自动摘要</td><td>默认</td></tr>
+        <tr><td>6</td><td>PatchToolCallsMiddleware</td><td>修复不完整工具调用</td><td>默认</td></tr>
+        <tr><td>7</td><td>用户自定义 Middleware</td><td>自定义扩展</td><td>用户提供</td></tr>
+        <tr><td>8</td><td>AnthropicPromptCachingMiddleware</td><td>提示词缓存</td><td>默认</td></tr>
+        <tr><td>9</td><td>MemoryMiddleware</td><td>长期记忆注入</td><td>提供 memory 时</td></tr>
+        <tr><td>10</td><td>HumanInTheLoopMiddleware</td><td>人工审批</td><td>提供 interrupt_on 时</td></tr>
+      </table>
+    </div>
+    <p class="dim mt-m">顺序设计精妙：提示缓存放在 Memory 之前（避免缓存失效），HITL 放在最外层（确保所有工具调用经人工审批）</p>
+    <aside class="notes">
+      <p>create_deep_agent 自动按特定顺序组装 10 层 Middleware。这个顺序不是随意的，而是经过精心设计的。</p>
+      <p>FilesystemMiddleware 和 SubAgentMiddleware 是<strong>不可排除的脚手架中间件</strong>，如果用户尝试排除它们会抛出 ValueError。提示缓存放在 Memory 之前，是因为 MemoryMiddleware 会修改系统提示，如果在缓存之后修改会导致缓存失效。HITL 放在最外层，确保所有工具调用都经过人工审批后再真正执行。</p>
+      <p>SummarizationMiddleware 放在 PatchToolCallsMiddleware 之前，先压缩历史再修复工具调用格式。用户自定义中间件插入在第 6 层之后，Harness Profile 额外中间件紧随其后。</p>
+    </aside>
+  </section>
+
+  <!-- ============ 10. COMPARISON ============ -->
+  <section class="slide" data-title="Comparison">
+    <p class="kicker">// comparison</p>
+    <h2 class="h2">Deep Agent 相比简单 ReAct Agent <span class="accent">全面升级</span></h2>
+    <div class="mt-l">
+      <table class="compare-table anim-fade-up" data-anim="fade-up">
+        <tr><th>维度</th><th>简单 ReAct Agent</th><th>Deep Agent</th></tr>
+        <tr><td>任务规划</td><td>无，随机调用工具</td><td><strong>Todo 列表，有序执行</strong></td></tr>
+        <tr><td>工作空间</td><td>无，全靠上下文</td><td><strong>文件系统持久化</strong></td></tr>
+        <tr><td>并行处理</td><td>无，单线程</td><td><strong>AsyncSubAgent 并行</strong></td></tr>
+        <tr><td>领域知识</td><td>全部塞进 prompt</td><td><strong>Skills 渐进加载</strong></td></tr>
+        <tr><td>上下文管理</td><td>手动清理</td><td><strong>SummarizationMiddleware 自动摘要</strong></td></tr>
+        <tr><td>人工审批</td><td>无</td><td><strong>HumanInTheLoopMiddleware</strong></td></tr>
+        <tr><td>任务复杂度</td><td>简单问答</td><td><strong>深度研究、报告撰写</strong></td></tr>
+        <tr><td>可观测性</td><td>基本</td><td><strong>完整的任务跟踪</strong></td></tr>
+      </table>
+    </div>
+    <aside class="notes">
+      <p>这张对比表总结了 Deep Agent 相比简单 ReAct Agent 的全方位升级。从任务规划到工作空间，从并行处理到领域知识管理，从上下文管理到人工审批，每一项都有质的提升。</p>
+      <p>最核心的差异是<strong>架构 surrounding the loop</strong>。简单 Agent 和 Deep Agent 用的可能是同一个 LLM，但 Deep Agent 多了 Planning、Filesystem、Sub-agents、Skills 这些架构层面的能力。这些不是 LLM 本身的能力，而是围绕 LLM 调用循环构建的基础设施。</p>
+    </aside>
+  </section>
+
+  <!-- ============ 11. PRODUCTION TIPS ============ -->
+  <section class="slide" data-title="Production Tips">
+    <p class="kicker">// production</p>
+    <h2 class="h2">生产级部署的 <span class="accent">3 条核心建议</span></h2>
+    <div class="stack mt-l">
+      <div class="card card-accent anim-fade-up" data-anim="fade-up" style="display:flex;gap:20px;align-items:flex-start">
+        <span class="num blue" style="font-size:32px;font-weight:800;flex-shrink:0">01</span>
+        <div>
+          <b style="font-size:18px;display:block;margin-bottom:6px">模型异构策略：规划用强模型，执行用便宜模型</b>
+          <p class="dim">Supervisor 推荐 Claude Sonnet / GPT-4o（强推理），Sub-agent 推荐 GPT-4o-mini / Claude Haiku（低成本并行），Summarization 用 GPT-4o-mini。可节省 60-80% 成本。</p>
+        </div>
+      </div>
+      <div class="card card-accent anim-fade-up" data-anim="fade-up" style="display:flex;gap:20px;align-items:flex-start;border-top-color:#3fb950">
+        <span class="num green" style="font-size:32px;font-weight:800;flex-shrink:0">02</span>
+        <div>
+          <b style="font-size:18px;display:block;margin-bottom:6px">Backend 分层：临时数据 State，长期记忆 Store</b>
+          <p class="dim">开发环境用 StateBackend，生产环境用 CompositeBackend 路由：/workspace/ 用 StateBackend（临时工作文件），/memories/ 用 StoreBackend（跨会话持久化）。</p>
+        </div>
+      </div>
+      <div class="card card-accent anim-fade-up" data-anim="fade-up" style="display:flex;gap:20px;align-items:flex-start;border-top-color:#f0883e">
+        <span class="num orange" style="font-size:32px;font-weight:800;flex-shrink:0">03</span>
+        <div>
+          <b style="font-size:18px;display:block;margin-bottom:6px">避免 8 个常见坑：从 Planning 过细到忘记 checkpointer</b>
+          <p class="dim">Planning 过于详细 → 限制 todo 数量；Filesystem 文件混乱 → 约定目录结构；Sub-agent 过多 → 限制 max_concurrent；Skills 冲突 → 明确适用范围；上下文膨胀 → 启用 SummarizationMiddleware；忘记 checkpointer → Skills 不工作。</p>
+        </div>
+      </div>
+    </div>
+    <aside class="notes">
+      <p>三条生产级核心建议。第一条是模型异构策略，这是成本优化的关键。Supervisor 做决策需要强推理能力，用 Claude Sonnet 或 GPT-4o。Sub-agent 做执行不需要强推理，用 GPT-4o-mini 或 Claude Haiku 并行处理，成本大幅降低。</p>
+      <p>第二条是 Backend 分层。不要把所有数据都持久化，也不要都不持久化。工作文件用 StateBackend 会话结束自动清理，长期记忆和用户偏好用 StoreBackend 持久化存储。</p>
+      <p>第三条是避免常见坑。Planning 不要太细，5 到 10 个 todo 项足够。文件要有命名规范。Sub-agent 数量要限制。最重要的是<strong>checkpointer 是使用 Skills 的必需条件</strong>，很多人忘了配导致 Skills 不工作。</p>
+    </aside>
+  </section>
+
+  <!-- ============ 12. SUMMARY ============ -->
+  <section class="slide" data-title="Summary">
+    <p class="kicker">// summary</p>
+    <h2 class="h2">记忆口诀：<span class="accent">Planning 列大纲，Filesystem 存文件</span></h2>
+    <div class="grid g2 mt-l">
+      <div class="anim-fade-up" data-anim="fade-up">
+        <div class="code-block" style="font-size:14px;line-height:2">
+Planning 列大纲，Filesystem 存文件，
+Sub-agent 派任务，Skills 按需加载。
+Middleware 像乐高，组装出 Deep Agent。
+Supervisor 用强模型，Worker 用便宜货。</div>
+      </div>
+      <div class="anim-fade-up" data-anim="fade-up">
+        <h4 style="margin-bottom:12px">核心要点回顾</h4>
+        <div class="feature-row"><span class="num blue">1</span><div><b>DeepAgents 是 LangGraph 之上的 Harness</b><p class="dim">pip install deepagents，不是替代 LangGraph</p></div></div>
+        <div class="feature-row"><span class="num green">2</span><div><b>四大支柱</b><p class="dim">Planning + Filesystem + Sub-agent + Skills</p></div></div>
+        <div class="feature-row"><span class="num orange">3</span><div><b>create_deep_agent()</b><p class="dim">一键创建，10 层默认 Middleware 自动组装</p></div></div>
+        <div class="feature-row"><span class="num purple">4</span><div><b>DeltaChannel 优化</b><p class="dim">checkpoint 从 O(N²) 降到 O(N)</p></div></div>
+      </div>
+    </div>
+    <div class="deck-footer">
+      <span class="mono">LG-08 · DeepAgents 深度研究智能体</span>
+      <span class="slide-number" data-current="12" data-total="12"></span>
+    </div>
+    <aside class="notes">
+      <p>来总结一下今天的核心内容。记住这个口诀：<strong>Planning 列大纲，Filesystem 存文件，Sub-agent 派任务，Skills 按需加载。Middleware 像乐高，组装出 Deep Agent。Supervisor 用强模型，Worker 用便宜货。</strong></p>
+      <p>四个核心要点：第一，DeepAgents 是 LangGraph 之上的 Harness，不是替代。第二，四大支柱是 Planning、Filesystem、Sub-agent、Skills。第三，create_deep_agent 一键创建，10 层默认 Middleware 自动组装。第四，DeltaChannel 把 checkpoint 从 O(N²) 优化到 O(N)。</p>
+      <p>下一节课 LG-09，我们将学习生产部署、可观测性与 Langfuse 监控，让 Deep Agent 从「能跑」到「能上线」。谢谢大家！</p>
+    </aside>
+  </section>
+
+</div>
+<script src="/Users/galaxyxieyu/.claude/skills/html-ppt-skill/assets/runtime.js"></script>
+</body>
+</html>

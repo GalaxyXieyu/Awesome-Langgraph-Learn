@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>Layer Stack Focus</title>
+<link rel="stylesheet" href="../../assets/fonts.css">
+<link rel="stylesheet" href="../../assets/base.css">
+<link rel="stylesheet" id="theme-link" href="../../assets/themes/blueprint.css">
+<link rel="stylesheet" href="../../assets/animations/animations.css">
+<style>
+.ls-wrap{display:grid;grid-template-columns:.95fr 1.05fr;gap:26px;align-items:stretch;margin-top:20px}
+.ls-stack{display:flex;flex-direction:column;gap:14px}
+.ls-layer{position:relative;padding:22px 22px 18px;border:1px solid var(--border);border-radius:18px;background:var(--surface);box-shadow:var(--shadow);min-height:110px}
+.ls-layer .tagx{display:inline-flex;padding:4px 10px;border-radius:999px;font-size:11px;font-family:var(--font-mono);color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent);border:1px solid color-mix(in srgb,var(--accent) 24%,transparent)}
+.ls-layer h4{font-size:22px;margin:14px 0 8px}
+.ls-layer p{font-size:13px;color:var(--text-2);line-height:1.6;margin:0}
+.ls-layer.active{transform:translateX(12px);border-color:color-mix(in srgb,var(--accent) 44%,transparent);box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 16%,transparent),0 24px 52px rgba(0,0,0,.16)}
+.ls-layer.active::before{content:"CURRENT LAYER";position:absolute;top:12px;right:14px;font-size:10px;font-family:var(--font-mono);letter-spacing:.08em;color:var(--accent)}
+.ls-detail{display:grid;grid-template-rows:auto auto;gap:18px}
+.ls-panel{border:1px solid var(--border);border-radius:22px;background:var(--surface);padding:24px 26px;box-shadow:var(--shadow)}
+.ls-panel h3{font-size:30px;margin:10px 0 10px}
+.ls-panel p{margin:0;color:var(--text-2);line-height:1.7}
+.ls-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:18px}
+.ls-item{padding:14px 14px 12px;border-radius:14px;background:var(--surface-2);border:1px solid var(--border)}
+.ls-item b{display:block;font-size:14px;margin-bottom:4px}
+.ls-item span{font-size:12px;color:var(--text-3);line-height:1.55}
+.ls-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.ls-metric{padding:16px 16px 14px;border-radius:14px;background:var(--surface-2);border:1px solid var(--border)}
+.ls-metric .n{display:block;font-size:32px;line-height:1;font-weight:800;letter-spacing:-.04em}
+.ls-metric .t{display:block;font-size:12px;color:var(--text-3);margin-top:6px}
+</style>
+</head><body class="single">
+<div class="deck"><section class="slide is-active" data-title="Layer Stack Focus">
+  <p class="kicker">Layers · 分层聚焦</p>
+  <h2 class="h2">把系统看成一层一层搭起来，而不是一张平面图</h2>
+  <div class="ls-wrap">
+    <div class="ls-stack anim-stagger-list" data-anim-target>
+      <div class="ls-layer"><span class="tagx">L1</span><h4>Experience Layer</h4><p>用户界面、交互工作台、展示和输入行为。</p></div>
+      <div class="ls-layer active"><span class="tagx">L2</span><h4>Control Layer</h4><p>API、任务调度、权限、状态流转和执行控制面。</p></div>
+      <div class="ls-layer"><span class="tagx">L3</span><h4>Runtime Layer</h4><p>图编排、工具、Writer、Prompt 和上下文运行时。</p></div>
+      <div class="ls-layer"><span class="tagx">L4</span><h4>State Layer</h4><p>持久化、缓存、向量索引、观测和记忆语义。</p></div>
+    </div>
+    <div class="ls-detail">
+      <div class="ls-panel anim-fade-up" data-anim="fade-up">
+        <span class="tagx">Focused explanation</span>
+        <h3>为什么 Control Layer 通常是平台系统最容易被低估的一层？</h3>
+        <p>因为很多项目只强调“前端”和“Agent”，但真正决定系统可运营性的，往往是控制层：它负责请求承接、任务生命周期、权限约束、状态恢复和对前端的反馈协议。</p>
+        <div class="ls-grid">
+          <div class="ls-item"><b>Task lifecycle</b><span>创建、排队、执行、失败、恢复、完成。</span></div>
+          <div class="ls-item"><b>Policy gate</b><span>权限、确认点、执行边界和风险控制。</span></div>
+          <div class="ls-item"><b>Streaming bridge</b><span>把中间步骤和最终结果持续送回 UI。</span></div>
+          <div class="ls-item"><b>Operational clarity</b><span>给日志、状态、观测和调试提供锚点。</span></div>
+        </div>
+      </div>
+      <div class="ls-metrics anim-fade-right" data-anim="fade-right">
+        <div class="ls-metric"><span class="n">4</span><span class="t">recommended layers max</span></div>
+        <div class="ls-metric"><span class="n">1</span><span class="t">focused layer per beat</span></div>
+        <div class="ls-metric"><span class="n">2-4</span><span class="t">detail cards per layer</span></div>
+      </div>
+    </div>
+  </div>
+</section></div>
+<script src="../../assets/runtime.js"></script>
+</body></html>

@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LG-02：Tools 深度掌握</title>
+<link rel="stylesheet" href="/Users/galaxyxieyu/.claude/skills/html-ppt-skill/assets/fonts.css">
+<link rel="stylesheet" href="/Users/galaxyxieyu/.claude/skills/html-ppt-skill/assets/base.css">
+<link rel="stylesheet" id="theme-link" href="/Users/galaxyxieyu/.claude/skills/html-ppt-skill/assets/themes/tokyo-night.css">
+<link rel="stylesheet" href="/Users/galaxyxieyu/.claude/skills/html-ppt-skill/assets/animations/animations.css">
+<style>
+body { width: 720pt; height: 405pt; margin: 0; padding: 0; overflow: hidden; font-family: 'Inter','Noto Sans SC',sans-serif; background: #0f172a; color: #e2e8f0; }
+.slide { width: 720pt; height: 405pt; padding: 36px 48px; box-sizing: border-box; display: none; position: relative; }
+.slide.is-active { display: flex; flex-direction: column; }
+.kicker { font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; color: #94a3b8; margin-bottom: 8px; }
+.h1 { font-size: 42px; font-weight: 800; line-height: 1.2; margin: 0 0 16px 0; color: #f8fafc; }
+.h2 { font-size: 28px; font-weight: 700; line-height: 1.3; margin: 0 0 12px 0; color: #f1f5f9; }
+.lede { font-size: 16px; line-height: 1.6; color: #cbd5e1; margin: 0; }
+.card { background: rgba(30,41,59,0.8); border: 1px solid rgba(148,163,184,0.2); border-radius: 8px; padding: 16px; }
+.card h4 { font-size: 14px; font-weight: 600; margin: 0 0 8px 0; color: #38bdf8; }
+.card p { font-size: 12px; line-height: 1.5; color: #94a3b8; margin: 0; }
+.grid { display: grid; gap: 12px; }
+.g2 { grid-template-columns: 1fr 1fr; }
+.g3 { grid-template-columns: 1fr 1fr 1fr; }
+.mt-l { margin-top: 24px; }
+.mt-m { margin-top: 16px; }
+.tc { text-align: center; align-items: center; justify-content: center; }
+.center { display: flex; align-items: center; justify-content: center; }
+.deck-footer { position: absolute; bottom: 16px; left: 48px; right: 48px; display: flex; justify-content: space-between; font-size: 11px; color: #64748b; }
+.notes { display: none; }
+ul { margin: 0; padding-left: 20px; }
+li { font-size: 13px; line-height: 1.7; color: #cbd5e1; margin-bottom: 4px; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 12px; }
+th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid rgba(148,163,184,0.2); }
+th { color: #38bdf8; font-weight: 600; background: rgba(30,41,59,0.6); }
+td { color: #cbd5e1; }
+.code-block { background: rgba(15,23,42,0.9); border: 1px solid rgba(148,163,184,0.15); border-radius: 6px; padding: 10px 14px; font-family: 'Fira Code', monospace; font-size: 11px; line-height: 1.5; color: #a5b4fc; overflow-x: auto; }
+.highlight { color: #f472b6; }
+.accent { color: #34d399; }
+.tag { display: inline-block; background: rgba(56,189,248,0.15); color: #38bdf8; font-size: 10px; padding: 2px 8px; border-radius: 4px; margin-right: 4px; }
+
+@media print {
+  .slide { display: flex !important; page-break-after: always; break-after: page; }
+  .slide:last-child { page-break-after: auto; }
+  body { width: 100%; height: 100%; background: #0f172a; }
+}
+</style>
+</head>
+<body>
+<div class="deck">
+
+<!-- Slide 1: 封面 -->
+<section class="slide tc" data-title="封面">
+  <div class="kicker">LANGGRAPH TUTORIAL</div>
+  <div class="h1" style="font-size:52px;margin-bottom:20px;">LG-02：Tools 深度掌握</div>
+  <div class="lede" style="font-size:18px;color:#94a3b8;">让图具备"调用外部能力"——从快速原型到生产级 Tool 设计</div>
+  <div style="margin-top:32px;display:flex;gap:16px;justify-content:center;">
+    <span class="tag">@tool 装饰器</span>
+    <span class="tag">ToolNode</span>
+    <span class="tag">上下文管理</span>
+    <span class="tag">MCP 协议</span>
+  </div>
+  <div class="deck-footer">
+    <span>LangGraph 渐进式教程</span>
+    <span>LG-02</span>
+  </div>
+  <div class="notes">
+    开场白：上节课我们画了一张静态的图——WeatherBot。但真实世界里，用户要查天气、查订单、做计算，图必须能调用外部能力。今天聚焦核心问题：图怎么调用外部能力（Tool）。更重要的是，Tool 本身就是 LangGraph 的一等公民，可以直接当节点用。
+  </div>
+</section>
+
+<!-- Slide 2: 目录 -->
+<section class="slide" data-title="目录">
+  <div class="kicker">CONTENTS</div>
+  <div class="h2">本章节内容</div>
+  <div class="grid g2 mt-m">
+    <div class="card">
+      <h4>01. Tool 的五种定义方式</h4>
+      <p>从 @tool 装饰器到 InjectedState/InjectedStore 运行时注入</p>
+    </div>
+    <div class="card">
+      <h4>02. return_direct 控制结果流向</h4>
+      <p>结果回到 LLM 继续推理，还是直出给用户</p>
+    </div>
+    <div class="card">
+      <h4>03. 生产级 Tool 五层设计</h4>
+      <p>输入校验 → 执行 → 容错 → 输出格式化 → 状态透传</p>
+    </div>
+    <div class="card">
+      <h4>04. Tool 缓存机制</h4>
+      <p>lru_cache、BaseStore、LLM 调用缓存的选型</p>
+    </div>
+    <div class="card">
+      <h4>05. Tool 直接作为 Node</h4>
+      <p>定义一次、到处复用；ToolNode 与 tools_condition</p>
+    </div>
+    <div class="card">
+      <h4>06. 上下文管理</h4>
+      <p>防止 Tool 结果撑爆窗口的五种策略</p>
+    </div>
+    <div class="card">
+      <h4>07. MCP 标准化工具协议</h4>
+      <p>MultiServerMCPClient 连接任意 MCP Server</p>
+    </div>
+    <div class="card">
+      <h4>08. Prompt 与 Skills 管理</h4>
+      <p>LangSmith Hub、动态切换、Skills 注册表</p>
+    </div>
+  </div>
+  <div class="deck-footer">
+    <span>LangGraph 渐进式教程</span>
+    <span>LG-02</span>
+  </div>
+  <div class="notes">
+    本节课覆盖八大主题：Tool 定义方式、return_direct、生产级五层设计、缓存、Tool 当 Node、上下文管理、MCP 协议、Prompt 与 Skills 管理。
+  </div>
+</section>
+
+<!-- Slide 3: Tool 五种定义方式 -->
+<section class="slide" data-title="Tool 五种定义方式">
+  <div class="kicker">TOOL DEFINITION</div>
+  <div class="h2">Tool 的五种定义方式</div>
+  <div class="lede">从快速原型到生产级运行时注入，按场景选型</div>
+  <table class="mt-m">
+    <tr>
+      <th style="width:22%">方式</th>
+      <th style="width:38%">适用场景</th>
+      <th style="width:20%">复杂度</th>
+      <th style="width:20%">推荐度</th>
+    </tr>
+    <tr>
+      <td><code>@tool</code></td>
+      <td>参数少、快速验证</td>
+      <td>低</td>
+      <td>原型阶段</td>
+    </tr>
+    <tr>
+      <td><code>@tool</code> + <code>args_schema</code></td>
+      <td>参数多、需要校验、生产环境</td>
+      <td>中</td>
+      <td class="accent">生产推荐</td>
+    </tr>
+    <tr>
+      <td><code>StructuredTool.from_function()</code></td>
+      <td>动态生成、配置化</td>
+      <td>中</td>
+      <td>动态场景</td>
+    </tr>
+    <tr>
+      <td>继承 <code>BaseTool</code></td>
+      <td>自定义元数据、权限、状态</td>
+      <td>高</td>
+      <td>深度定制</td>
+    </tr>
+    <tr>
+      <td><code>InjectedState</code> / <code>InjectedStore</code></td>
+      <td>预构建 Agent，需访问 state/store</td>
+      <td>中</td>
+      <td class="accent">LangGraph 推荐</td>
+    </tr>
+  </table>
+  <div class="code-block mt-m">
+<span class="highlight"># 核心原则：docstring = LLM 看到的工具说明书</span>
+@tool(args_schema=WeatherInput)
+def query_weather(city: str, date: str | None = None) -> str:
+    """查询指定城市的实时天气，可选返回空气质量。"""
+    ...
+  </div>
+  <div class="deck-footer">
+    <span>LangGraph 渐进式教程</span>
+    <span>LG-02 / 10</span>
+  </div>
+  <div class="notes">
+    强调 docstring 的重要性：LLM 看到的就是 docstring + args_schema 的描述。写不清楚，LLM 就不会用。InjectedState/InjectedStore 是 LangGraph 1.x 的新能力，替代 Factory 闭包，代码更干净。
+  </div>
+</section>
+
+<!-- Slide 4: return_direct -->
+<section class="slide" data-title="return_direct">
+  <div class="kicker">RESULT FLOW CONTROL</div>
+  <div class="h2">return_direct：控制结果流向</div>
+  <div class="lede">决定 tool 输出是回到 LLM 继续推理，还是直接返回给用户</div>
+  <div class="grid g2 mt-m">
+    <div class="card">
+      <h4>return_direct=False（默认）</h4>
+      <p style="margin-bottom:8px;">结果回到 LLM，可继续思考、调用其他工具</p>
+      <div class="code-block" style="font-size:10px;">
+@tool
+def query_weather(city: str) -> str:
+    """查询天气。结果需要 LLM 进一步整理回复。"""
+    return query_weather_api(city)
+      </div>
+      <p style="margin-top:8px;font-size:11px;color:#34d399;">适用：查询天气后需 LLM 整理、订单状态需判断下一步</p>
+    </div>
+    <div class="card">
+      <h4>return_direct=True</h4>
+      <p style="margin-bottom:8px;">结果直出，不再经过 LLM 加工</p>
+      <div class="code-block" style="font-size:10px;">
+@tool(return_direct=True)
+def get_time() -> str:
+    """获取当前时间。结果直接展示给用户。"""
+    return f"现在是 {datetime.now().strftime('%H:%M')}"
+      </div>
+      <p style="margin-top:8px;font-size:11px;color:#34d399;">适用：计算器数值、固定格式卡片/图片</p>
+    </div>
+  </div>
+  <div class="deck-footer">
+    <span>LangGraph 渐进式教程</span>
+    <span>LG-02 / 10</span>
+  </div>
+  <div class="notes">
+    return_direct 是一个容易被忽略但很重要的参数。默认 False 适合需要 LLM 二次加工的场景；True 适合工具本身已给出最终答案的场景，减少一次 LLM 调用，省钱。
+  </div>
+</section>
+
+<!-- Slide 5: 生产级 Tool 五层设计 -->
+<section class="slide" data-title="生产级 Tool 设计">
+  <div class="kicker">PRODUCTION-READY PATTERN</div>
+  <div class="h2">生产级 Tool 五层兜底设计</div>
+  <div class="lede">从输入到透传，每一层都有明确的职责边界</div>
+  <div class="grid g3 mt-m">
+    <div class="card" style="border-left:3px solid #38bdf8;">
+      <h4>① 输入层</h4>
+      <ul>
+        <li>Pydantic 校验</li>
+        <li>缺失参数检查</li>
+        <li>参数归一化</li>
+      </ul>
+    </div>
+    <div class="card" style="border-left:3px solid #818cf8;">
+      <h4>② 执行层</h4>
+      <ul>
+        <li>业务逻辑</li>
+        <li>外部 API 调用</li>
+      </ul>
+    </div>
+    <div class="card" style="border-left:3px solid #f472b6;">
+      <h4>③ 容错层</h4>
+      <ul>
+        <li>异常捕获</li>
+        <li>候选模糊匹配</li>
+        <li>可恢复重试</li>
+      </ul>
+    </div>
+    <div class="card" style="border-left:3px solid #34d399;">
+      <h4>④ 输出层</h4>
+      <ul>
+        <li>LLM 摘要</li>
+        <li>结构化错误返回</li>
+      </ul>
+    </div>
+    <div class="card" style="border-left:3px solid #fbbf24;">
+      <h4>⑤ 透传层</h4>
+      <ul>
+        <li>State 写入</li>
+        <li>格式化文本返回</li>
+        <li>日志记录</li>
+      </ul>
+    </div>
+    <div class="card" style="display:flex;align-items:center;justify-content:center;">
+      <p style="text-align:center;font-size:13px;color:#f8fafc;"><strong>核心原则</strong><br><span style="color:#94a3b8;">return 纯文本给 LLM<br>原始数据写入 state<br>下游节点直接读取</span></p>
+    </div>
+  </div>
+  <div class="deck-footer">
+    <span>LangGraph 渐进式教程</span>
+    <span>LG-02 / 10</span>
+  </div>
+  <div class="notes">
+    五层设计是骨架，真实项目还需要参数归一化、多层嵌套 state 查找、模糊匹配、结构化错误返回等兜底机制。关键是：Tool 应该返回错误信息（字符串）而非抛异常，抛异常会打断整个图。
+  </div>
+</section>
+
+<!-- Slide 6: Tool 缓存机制 -->
+<section class="slide" data-title="Tool 缓存">
+  <div class="kicker">CACHING STRATEGIES</div>
+  <div class="h2">Tool 缓存机制：省钱利器</div>
+  <div class="lede">三种缓存对象、五种机制，按场景选型</div>
+  <table class="mt-m">
+    <tr>
+      <th>机制</th>
+      <th>缓存对象</th>
+      <th>适用场景</th>
+      <th>持久化</th>
+    </tr>
+    <tr>
+      <td><code>InMemoryCache()</code></td>
+      <td>LLM 调用</td>
+      <td>相同 prompt 重复查询（开发）</td>
+      <td>否</td>
+    </tr>
+    <tr>
+      <td><code>RedisCache()</code></td>
+      <td>LLM 调用</td>
+      <td>生产环境多实例共享</td>
+      <td>是</td>
+    </tr>
+    <tr>
+      <td><code>@lru_cache</code></td>
+      <td>Tool 结果</td>
+      <td>单进程内重复 tool 调用</td>
+      <td>否</td>
+    </tr>
+    <tr>
+      <td><code>BaseStore</code> + <code>InjectedStore()</code></td>
+      <td>状态/记忆</td>
+      <td>跨会话持久化、历史检索</td>
+      <td>是</td>
+    </tr>
+    <tr>
+      <td>自定义 Redis wrapper</td>
+      <td>Tool 结果</td>
+      <td>跨会话共享 tool 结果</td>
+      <td>是</td>
+    </tr>
+  </table>
+  <div class="code-block mt-m" style="font-size:10px;">
+<span class="highlight"># 进程内 Tool 缓存（最简单）</span>
+from functools import lru_cache
+@tool
+@lru_cache(maxsize=128)
+def query_weather(city: str, date: str | None = None) -> str:
+    """查询天气（单进程内缓存 128 条）。"""
+    return query_weather_api(city, date)
+  </div>
+  <div class="deck-footer">
+    <span>LangGraph 渐进式教程</span>
+    <span>LG-02 / 10</span>
+  </div>
+  <div class="notes">
+    所有缓存必须有 TTL，根据业务新鲜度设置。天气 10 分钟，汇率 1 分钟。LangChain 官方提供的是 LLM 调用缓存，不是 Tool 结果缓存，后者需要自行实现。
+  </div>
+</section>
+
+<!-- Slide 7: Tool 直接作为 Node -->
+<section class="slide" data-title="Tool 作为 Node">
+  <div class="kicker">TOOL AS FIRST-CLASS NODE</div>
+  <div class="h2">Tool 直接作为 Node：定义一次，到处复用</div>
+  <div class="lede">Tool 实现 Runnable 接口，可直接 add_node，也可包装成 ToolNode</div>
+  <div class="grid g2 mt-m">
+    <div class="card">
+      <h4>方式 A：Tool 直接 add_node</h4>
+      <p style="margin-bottom:8px;font-size:11px;">精确控制 tool 何时执行，适合固定业务流程</p>
+      <div class="code-block" style="font-size:10px;">
+builder.add_node("query_order", query_order)
+builder.add_edge("verify_user", "query_order")
+builder.add_edge("query_order", "generate_reply")
+      </div>
+      <p style="margin-top:8px;font-size:11px;color:#34d399;">控制权：开发者精确控制</p>
+    </div>
+    <div class="card">
+      <h4>方式 B：ToolNode + tools_condition</h4>
+      <p style="margin-bottom:8px;font-size:11px;">LLM 自主决定调哪个 tool，适合开放域</p>
+      <div class="code-block" style="font-size:10px;">
+tools = [query_order, cancel_order]
+tool_node = ToolNode(tools)
+builder.add_node("tools", tool_node)
+builder.add_conditional_edges("llm", tools_condition)
+      </div>
+      <p style="margin-top:8px;font-size:11px;color:#34d399;">控制权：LLM 自主决策</p>
+    </div>
+  </div>
+  <div style="margin-top:16px;padding:12px 16px;background:rgba(56,189,248,0.1);border-radius:8px;border-left:3px solid #38bdf8;">
+    <p style="margin:0;font-size:13px;color:#e2e8f0;"><strong>核心洞察：</strong>同一个 query_order Tool 可在客服图、售后图、报表图、管理后台图中复用——统一权限校验、统一错误处理、统一缓存策略。</p>
+  </div>
+  <div class="deck-footer">
+    <span>LangGraph 渐进式教程</span>
+    <span>LG-02 / 10</span>
+  </div>
+  <div class="notes">
+    ToolNode 本质上就是 LangGraph 帮你写好的"自动路由节点"——检查 LLM 的 tool_calls，自动分发到对应 tool。Tool 直接 add_node 是手动编排流程。常见坑：ToolNode 必须跟在 LLM 节点后面。
+  </div>
+</section>
+
+<!-- Slide 8: 上下文管理 -->
+<section class="slide" data-title="上下文管理">
+  <div class="kicker">CONTEXT MANAGEMENT</div>
+  <div class="h2">防止 Tool 结果撑爆上下文窗口</div>
+  <div class="lede">五种策略，从简单粗暴到智能优雅</div>
+  <table class="mt-m">
+    <tr>
+      <th>策略</th>
+      <th>实现难度</th>
+      <th>信息损失</th>
+      <th>适用场景</th>
+    </tr>
+    <tr>
+      <td>Truncate（截断）</td>
+      <td>低</td>
+      <td>高（后半截丢了）</td>
+      <td>网页抓取、文档阅读</td>
+    </tr>
+    <tr>
+      <td>选择性传递</td>
+      <td>中</td>
+      <td>低（按需提取）</td>
+      <td>API 返回结构化数据</td>
+    </tr>
+    <tr>
+      <td>Message Trimming</td>
+      <td>低</td>
+      <td>中（早期消息丢了）</td>
+      <td>长对话场景</td>
+    </tr>
+    <tr>
+      <td>Summarization</td>
+      <td>高</td>
+      <td>可控（LLM 智能压缩）</td>
+      <td>需保留上下文的复杂对话</td>
+    </tr>
+    <tr>
+      <td class="accent">格式化文本 + State 写入</td>
+      <td>中</td>
+      <td>无</td>
+      <td class="accent">大结果量 + 下游需原始数据</td>
+    </tr>
+  </table>
+  <div class="code-block mt-m" style="font-size:10px;">
+<span class="highlight"># 标准机制：return 纯文本摘要，原始数据写入 state</span>
+@tool
+async def query_weather(city: str) -> str:
+    raw_data = await weather_api(city)
+    state["weather_raw"] = raw_data          <span class="accent"># 原始数据 → state（下游可用，不占 LLM 上下文）</span>
+    return f"{city}今天晴，气温{raw_data['temp']}°C。"  <span class="accent"># 纯文本 → LLM</span>
+  </div>
+  <div class="deck-footer">
+    <span>LangGraph 渐进式教程</span>
+    <span>LG-02 / 10</span>
+  </div>
+  <div class="notes">
+    核心原则：不要把原始 JSON 直接 return 给 LLM。return 永远放自然语言摘要；原始数据通过 state 旁路传递。这是 LangGraph 官方推荐的标准做法。
+  </div>
+</section>
+
+<!-- Slide 9: MCP 协议 -->
+<section class="slide" data-title="MCP 协议">
+  <div class="kicker">MODEL CONTEXT PROTOCOL</div>
+  <div class="h2">MCP：标准化工具协议</div>
+  <div class="lede">Anthropic 推出的开放协议，统一大模型与外部工具的集成方式</div>
+  <div class="grid g2 mt-m">
+    <div class="card">
+      <h4>传统方式：每个工具写适配器</h4>
+      <div class="code-block" style="font-size:10px;color:#f472b6;">
+天气 API → weather_adapter
+股票 API → stock_adapter
+数据库  → db_adapter
+每个工具都要写不同代码...
+      </div>
+    </div>
+    <div class="card">
+      <h4>MCP 方式：统一协议</h4>
+      <div class="code-block" style="font-size:10px;color:#34d399;">
+所有工具统一暴露为 MCP Server
+           ↓
+LangGraph 通过 MCP Client 连接
+           ↓
+自动获得 LangChain-compatible tools
+      </div>
+    </div>
+  </div>
+  <div style="margin-top:12px;display:flex;gap:12px;">
+    <div class="card" style="flex:1;">
+      <h4>三种 Transport</h4>
+      <ul style="font-size:11px;">
+        <li><strong>stdio</strong>：本地脚本、开发调试</li>
+        <li><strong>SSE</strong>：远程服务、微服务架构</li>
+        <li><strong>streamable_http</strong>：生产环境、高并发</li>
+      </ul>
+    </div>
+    <div class="card" style="flex:1;">
+      <h4>核心代码</h4>
+      <div class="code-block" style="font-size:10px;">
+from langchain_mcp_adapters import MultiServerMCPClient
+async with MultiServerMCPClient({...}) as client:
+    tools = await client.get_tools()
+    agent = create_react_agent(model, tools)
+      </div>
+    </div>
+  </div>
+  <div class="deck-footer">
+    <span>LangGraph 渐进式教程</span>
+    <span>LG-02 / 10</span>
+  </div>
+  <div class="notes">
+    MCP 的核心思想：工具的实现细节留在 MCP Server 里，LangGraph 只关心有哪些工具、参数是什么。支持多语言写 Server，Python/Node/Go 都可以。选型建议：项目早期用传统 @tool，多团队协作用 MCP。
+  </div>
+</section>
+
+<!-- Slide 10: Prompt 与 Skills 管理 -->
+<section class="slide" data-title="Prompt 与 Skills">
+  <div class="kicker">PROMPT & SKILLS MANAGEMENT</div>
+  <div class="h2">Prompt 集中管理 + Skills 动态加载</div>
+  <div class="lede">从散落在代码各处到版本可控、配置化启用</div>
+  <div class="grid g2 mt-m">
+    <div class="card">
+      <h4>LangSmith Hub：Push / Pull</h4>
+      <div class="code-block" style="font-size:10px;">
+from langsmith import Client
+client = Client()
+
+<span class="highlight"># 推送</span>
+url = client.push_prompt("my-prompts/cs", object=prompt)
+
+<span class="highlight"># 拉取</span>
+prompt = client.pull_prompt("my-prompts/cs")
+      </div>
+      <ul style="margin-top:8px;font-size:11px;">
+        <li>版本控制：语义化版本号</li>
+        <li>A/B 测试：多版本并行</li>
+        <li>回退：远程失败用本地 fallback</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>Skills 注册表：按需组合</h4>
+      <div class="code-block" style="font-size:10px;">
+SKILL_REGISTRY = {
+    "weather": lambda: build_weather_tool(...),
+    "stock": lambda: build_stock_tool(...),
+    "calculator": lambda: build_calculator_tool(),
+}
+tools = [SKILL_REGISTRY[name]() for name in enabled_skills]
+agent = create_react_agent(model, tools)
+      </div>
+      <ul style="margin-top:8px;font-size:11px;">
+        <li>普通用户：weather + calculator</li>
+        <li>VIP 用户：全部 skills</li>
+        <li>从 YAML 配置动态加载</li>
+      </ul>
+    </div>
+  </div>
+  <div style="margin-top:12px;padding:10px 14px;background:rgba(52,211,153,0.1);border-radius:6px;">
+    <p style="margin:0;font-size:12px;color:#e2e8f0;"><strong>ConfigurableField / ConfigurableAlternatives：</strong>运行时切换模型、参数、prompt，不用改代码</p>
+  </div>
+  <div class="deck-footer">
+    <span>LangGraph 渐进式教程</span>
+    <span>LG-02 / 10</span>
+  </div>
+  <div class="notes">
+    Prompt 不要散落在代码各处，集中到 Hub 或配置文件管理。Skills 本质是 Tools 的集合，用注册表模式按需组合。运行时动态切换用 ConfigurableField/Alternatives。
+  </div>
+</section>
+
+<!-- Slide 11: 总结 -->
+<section class="slide" data-title="总结">
+  <div class="kicker">SUMMARY</div>
+  <div class="h2">核心要点回顾</div>
+  <div class="grid g2 mt-m">
+    <div class="card">
+      <h4>Tool 定义与使用</h4>
+      <ul>
+        <li>docstring = LLM 的说明书，写不清楚就不会用</li>
+        <li>五种定义方式，按场景选型</li>
+        <li>return_direct 控制结果流向</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>生产级设计</h4>
+      <ul>
+        <li>五层兜底：输入 → 执行 → 容错 → 输出 → 透传</li>
+        <li>return 纯文本给 LLM，原始数据写入 state</li>
+        <li>缓存必须设 TTL</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>复用与编排</h4>
+      <ul>
+        <li>Tool 直接当 Node：add_node('x', tool)</li>
+        <li>ToolNode：LLM 自主决策调哪个 tool</li>
+        <li>上下文管理五种策略，防止 token 爆炸</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>生态集成</h4>
+      <ul>
+        <li>MCP 标准化协议：MultiServerMCPClient</li>
+        <li>Prompt 上 Hub：版本控制、A/B 测试</li>
+        <li>Skills 注册表：配置化动态加载</li>
+      </ul>
+    </div>
+  </div>
+  <div style="margin-top:16px;padding:12px 16px;background:rgba(56,189,248,0.1);border-radius:8px;text-align:center;">
+    <p style="margin:0;font-size:14px;color:#f8fafc;font-weight:600;">"docstring 是说明书，注入替闭包。Tool 当节点能复用，五层兜底要记牢。MCP 标准化，Prompt 上 Hub，Skills 注册表，配置动态切。"</p>
+  </div>
+  <div class="deck-footer">
+    <span>LangGraph 渐进式教程</span>
+    <span>LG-02 / 10</span>
+  </div>
+  <div class="notes">
+    记忆口诀帮助学员记住核心要点。下节课 LG-03 讲人机协作（HITL）——让图学会停下来问人，在关键节点引入人类审批。
+  </div>
+</section>
+
+</div>
+<script src="/Users/galaxyxieyu/.claude/skills/html-ppt-skill/assets/runtime.js"></script>
+</body></html>

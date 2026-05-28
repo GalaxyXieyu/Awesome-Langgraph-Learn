@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LG-06：预构建 Agent</title>
+<link rel="stylesheet" href="/Users/galaxyxieyu/.claude/skills/html-ppt-skill/assets/fonts.css">
+<link rel="stylesheet" href="/Users/galaxyxieyu/.claude/skills/html-ppt-skill/assets/base.css">
+<link rel="stylesheet" id="theme-link" href="/Users/galaxyxieyu/.claude/skills/html-ppt-skill/assets/themes/tokyo-night.css">
+<link rel="stylesheet" href="/Users/galaxyxieyu/.claude/skills/html-ppt-skill/assets/animations/animations.css">
+<style>
+body { width: 720pt; height: 405pt; margin: 0; padding: 0; overflow: hidden; font-family: 'Inter','Noto Sans SC',sans-serif; background: #0f172a; color: #e2e8f0; }
+.slide { width: 720pt; height: 405pt; padding: 36px 48px; box-sizing: border-box; display: none; position: relative; }
+.slide.is-active { display: flex; flex-direction: column; }
+.kicker { font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; color: #94a3b8; margin-bottom: 8px; }
+.h1 { font-size: 42px; font-weight: 800; line-height: 1.2; margin: 0 0 16px 0; color: #f8fafc; }
+.h2 { font-size: 28px; font-weight: 700; line-height: 1.3; margin: 0 0 12px 0; color: #f1f5f9; }
+.lede { font-size: 16px; line-height: 1.6; color: #cbd5e1; margin: 0; }
+.card { background: rgba(30,41,59,0.8); border: 1px solid rgba(148,163,184,0.2); border-radius: 8px; padding: 16px; }
+.card h4 { font-size: 14px; font-weight: 600; margin: 0 0 8px 0; color: #38bdf8; }
+.card p { font-size: 12px; line-height: 1.5; color: #94a3b8; margin: 0; }
+.grid { display: grid; gap: 12px; }
+.g2 { grid-template-columns: 1fr 1fr; }
+.g3 { grid-template-columns: 1fr 1fr 1fr; }
+.mt-l { margin-top: 24px; }
+.mt-m { margin-top: 16px; }
+.tc { text-align: center; align-items: center; justify-content: center; }
+.center { display: flex; align-items: center; justify-content: center; }
+.deck-footer { position: absolute; bottom: 16px; left: 48px; right: 48px; display: flex; justify-content: space-between; font-size: 11px; color: #64748b; }
+.notes { display: none; }
+ul { margin: 0; padding-left: 20px; }
+li { font-size: 13px; line-height: 1.7; color: #cbd5e1; margin-bottom: 4px; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 12px; }
+th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid rgba(148,163,184,0.2); }
+th { color: #38bdf8; font-weight: 600; background: rgba(30,41,59,0.6); }
+td { color: #cbd5e1; }
+.code-block { background: rgba(15,23,42,0.9); border: 1px solid rgba(148,163,184,0.15); border-radius: 6px; padding: 12px 16px; font-family: 'JetBrains Mono','Fira Code',monospace; font-size: 11px; line-height: 1.6; color: #a5b4fc; overflow-x: auto; }
+.code-block .kw { color: #c084fc; }
+.code-block .fn { color: #60a5fa; }
+.code-block .str { color: #86efac; }
+.code-block .comment { color: #64748b; }
+.arrow-flow { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #94a3b8; }
+.arrow-flow .box { background: rgba(56,189,248,0.15); border: 1px solid rgba(56,189,248,0.3); border-radius: 4px; padding: 6px 12px; color: #38bdf8; font-weight: 600; }
+.arrow-flow .arrow { color: #64748b; }
+.tag { display: inline-block; background: rgba(56,189,248,0.15); border: 1px solid rgba(56,189,248,0.3); border-radius: 4px; padding: 2px 8px; font-size: 11px; color: #38bdf8; }
+.tag-warn { background: rgba(251,191,36,0.15); border-color: rgba(251,191,36,0.3); color: #fbbf24; }
+.tag-ok { background: rgba(74,222,128,0.15); border-color: rgba(74,222,128,0.3); color: #4ade80; }
+
+@media print {
+  .slide { display: flex !important; page-break-after: always; break-after: page; }
+  .slide:last-child { page-break-after: auto; }
+  body { width: 100%; height: 100%; background: #0f172a; }
+}
+</style>
+</head>
+<body>
+<div class="deck">
+
+<!-- Slide 1: 封面 -->
+<section class="slide tc" data-title="封面">
+  <div class="kicker">LangGraph 教程 · LG-06</div>
+  <div class="h1" style="font-size:48px;">预构建 Agent</div>
+  <p class="lede" style="margin-top:12px;">3 行代码搭建 Agent，理解黑盒机制与选型决策</p>
+  <div style="margin-top:32px; display:flex; gap:16px; justify-content:center;">
+    <span class="tag">create_react_agent</span>
+    <span class="tag">create_supervisor</span>
+    <span class="tag">create_swarm</span>
+  </div>
+  <div class="deck-footer">
+    <span>LangGraph 渐进式教程</span>
+    <span>LG-06 / 11</span>
+  </div>
+  <div class="notes">
+    开场白：上节课学了 Tool，但要让 LLM 调用 Tool 需要自己搭一整张图。如果需求就是标准的 ReAct 循环，从零写图太繁琐。LangGraph 提供了预构建 Agent：create_react_agent，3 行代码搞定。但天下没有免费的午餐——它快，但是黑盒。今天搞清楚它到底做了什么、什么时候用、什么时候千万别用。
+  </div>
+</section>
+
+<!-- Slide 2: 目录 -->
+<section class="slide" data-title="目录">
+  <div class="kicker">Contents</div>
+  <div class="h2">本章节内容</div>
+  <div class="grid g2 mt-m">
+    <div class="card">
+      <h4>01 create_react_agent 详解</h4>
+      <p>快速上手、内部机制白盒化、State 结构、局限性</p>
+    </div>
+    <div class="card">
+      <h4>02 扩展参数与多 Agent 模式</h4>
+      <p>pre_model_hook、create_supervisor、create_swarm</p>
+    </div>
+    <div class="card">
+      <h4>03 预构建 vs 自定义：决策框架</h4>
+      <p>对比矩阵、决策树、选型原则</p>
+    </div>
+    <div class="card">
+      <h4>04 上下文管理</h4>
+      <p>防止 messages 撑爆窗口的三种策略</p>
+    </div>
+    <div class="card">
+      <h4>05 OpsBot 对比实战</h4>
+      <p>预构建与自定义 StateGraph 的对比演示</p>
+    </div>
+    <div class="card">
+      <h4>06 常见误区与总结</h4>
+      <p>避坑指南、调试技巧、记忆口诀</p>
+    </div>
+  </div>
+  <div class="deck-footer">
+    <span>LangGraph 渐进式教程</span>
+    <span>LG-06 / 11</span>
+  </div>
+  <div class="notes">
+    本节课围绕预构建 Agent 展开，从 create_react_agent 的核心机制，到多 Agent 协作模式，再到预构建与自定义的选型决策，最后通过 OpsBot 实战对比两种方案的差异。
+  </div>
+</section>
+
+<!-- Slide 3: create_react_agent 快速上手 -->
+<section class="slide" data-title="create_react_agent 快速上手">
+  <div class="kicker">create_react_agent</div>
+  <div class="h2">3 行代码搭一个 Agent</div>
+  <div class="code-block mt-m">
+<span class="kw">from</span> langgraph.prebuilt <span class="kw">import</span> <span class="fn">create_react_agent</span>
+<span class="kw">from</span> langchain_openai <span class="kw">import</span> ChatOpenAI
+
+llm = ChatOpenAI(model=<span class="str">"gpt-4o"</span>)
+tools = [query_weather, calculator]
+
+agent = <span class="fn">create_react_agent</span>(llm, tools)   <span class="comment"># 3 行代码搞定</span>
+result = agent.invoke({<span class="str">"messages"</span>: [HumanMessage(<span class="str">"北京天气？23 的平方根？"</span>)]})
+  </div>
+  <div class="mt-m arrow-flow" style="justify-content:center;">
+    <span class="box">用户提问</span>
+    <span class="arrow">→</span>
+    <span class="box">LLM 思考</span>
+    <span class="arrow">→</span>
+    <span class="box">输出 tool_calls</span>
+    <span class="arrow">→</span>
+    <span class="box">ToolNode 执行</span>
+    <span class="arrow">→</span>
+    <span class="box">LLM 整合回复</span>
+  </div>
+  <div class="deck-footer">
+    <span>LangGraph 渐进式教程</span>
+    <span>LG-06 / 11</span>
+  </div>
+  <div class="notes">
+    create_react_agent 是 LangGraph 1.x 唯一官方推荐的预构建 Agent。它内部调用 LLM 的原生 tool_calling API，覆盖所有主流模型。3 行代码就能搭一个带工具调用能力的 Agent。输出过程：用户提问 → LLM 思考需要查天气+算平方根 → 输出 tool_calls → ToolNode 并行执行 → ToolMessage 返回 → LLM 再次思考整合 → 回复用户。
+  </div>
+</section>
+
+<!-- Slide 4: 内部机制白盒化 -->
+<section class="slide" data-title="内部机制白盒化">
+  <div class="kicker">Source Code Deep Dive</div>
+  <div class="h2">循环终止的判据：tool_calls 是否为空</div>
+  <div class="grid g2 mt-m">
+    <div class="card">
+      <h4>should_continue 路由逻辑</h4>
+      <div class="code-block" style="margin-top:8px; font-size:10px;">
+<span class="kw">def</span> <span class="fn">should_continue</span>(state):
+    last = state[<span class="str">"messages"</span>][-1]
+    <span class="kw">if not</span> <span class="fn">isinstance</span>(last, AIMessage) \
+       <span class="kw">or not</span> last.tool_calls:
+        <span class="kw">return</span> END      <span class="comment"># 循环终止</span>
+    <span class="kw">return</span> <span class="str">"tools"</span>    <span class="comment"># 继续执行工具</span>
+      </div>
+      <p style="margin-top:8px;">不是 LLM "说" 要结束，而是程序检查输出格式</p>
+    </div>
+    <div class="card">
+      <h4>步数限制：防止无限循环</h4>
+      <div class="code-block" style="margin-top:8px; font-size:10px;">
+<span class="kw">class</span> <span class="fn">AgentState</span>(TypedDict):
+    messages: Annotated[Sequence, add_messages]
+    is_last_step: IsLastStep
+    remaining_steps: RemainingSteps
+      </div>
+      <p style="margin-top:8px;">remaining_steps &lt; 2 且还有 tool_calls → 强制替换为 "Sorry, need more steps..."</p>
+    </div>
+  </div>
+  <div class="mt-m arrow-flow" style="justify-content:center;">
+    <span class="box">agent (LLM)</span>
+    <span class="arrow">→</span>
+    <span class="box">should_continue</span>
+    <span class="arrow">→</span>
+    <span class="box">tools / END</span>
+    <span class="arrow">→</span>
+    <span class="box">tools → agent (循环)</span>
+  </div>
+  <div class="deck-footer">
+    <span>LangGraph 渐进式教程</span>
+    <span>LG-06 / 11</span>
+  </div>
+  <div class="notes">
+    核心路由函数 should_continue 检查最后一条消息是否是 AIMessage 且包含 tool_calls。如果没有 tool_calls 就结束循环。这是 LangGraph 的安全机制：即使 LLM 无限想调工具，也会被 remaining_steps 或 is_last_step 强制截断。预构建自动帮你搭了 agent 节点、tools 节点、条件边、循环边和 AgentState。
+  </div>
+</section>
+
+<!-- Slide 5: State 限制与扩展参数 -->
+<section class="slide" data-title="State 限制与扩展参数">
+  <div class="kicker">Limitations & Extensions</div>
+  <div class="h2">预构建 Agent 的局限</div>
+  <table class="mt-m">
+    <tr><th>局限</th><th>说明</th><th>影响</th></tr>
+    <tr><td>State 不可扩展</td><td>只有 messages 一个字段</td><td>无法存业务状态</td></tr>
+    <tr><td>路由不可定制</td><td>固定 LLM → Tool → LLM 循环</td><td>无法按业务状态分支</td></tr>
+    <tr><td>中间过程不可见</td><td>invoke() 只给最终结果</td><td>无法监控每步在做什么</td></tr>
+    <tr><td>循环控制受限</td><td>由内部逻辑决定循环次数</td><td>无法自定义重试策略</td></tr>
+    <tr><td>HITL 支持弱</td><td>没有原生断点能力</td><td>无法人工审批中间步骤</td></tr>
+  </table>
+  <div class="grid g2 mt-m">
+    <div class="card">
+      <h4>传 System Prompt</h4>
+      <div class="code-block" style="margin-top:8px; font-size:10px;">
+agent = <span class="fn">create_react_agent</span>(
+    llm, tools,
+    state_modifier=SystemMessage(<span class="str">"你是专业天气助手"</span>)
+)
+      </div>
+    </div>
+    <div class="card">
+      <h4>pre_model_hook：消息裁剪</h4>
+      <div class="code-block" style="margin-top:8px; font-size:10px;">
+<span class="kw">def</span> <span class="fn">trimming_hook</span>(state):
+    msgs = state[<span class="str">"messages"</span>]
+    <span class="kw">if</span> <span class="fn">len</span>(msgs) &gt; 20:
+        to_remove = msgs[:-10]
+        <span class="kw">return</span> {<span class="str">"messages"</span>: [RemoveMessage(id=m.id) <span class="kw">for</span> m <span class="kw">in</span> to_remove]}
+    <span class="kw">return</span> {}
+      </div>
+    </div>
+  </div>
+  <div class="deck-footer">
+    <span>LangGraph 渐进式教程</span>
+    <span>LG-06 / 11</span>
+  </div>
+  <div class="notes">
+    create_react_agent 的 State 等价于只有一个 messages 字段的 TypedDict。这意味着你无法自定义其他状态字段如 retry_count、user_role、session_id。但可以通过 state_modifier 传 system prompt，通过 pre_model_hook 在调用 LLM 前执行自定义逻辑如消息裁剪。
+  </div>
+</section>
+
+<!-- Slide 6: 多 Agent 模式 -->
+<section class="slide" data-title="多 Agent 模式">
+  <div class="kicker">Multi-Agent Patterns</div>
+  <div class="h2">三种预构建多 Agent 模式</div>
+  <table class="mt-m">
+    <tr><th>模式</th><th>核心函数</th><th>来源包</th><th>适用场景</th></tr>
+    <tr><td>单 Agent</td><td>create_react_agent</td><td>langgraph</td><td>一个 LLM + 多个工具</td></tr>
+    <tr><td>监督者</td><td>create_supervisor</td><td>langgraph-supervisor</td><td>一个主管调度多个专员</td></tr>
+    <tr><td>群体协作</td><td>create_swarm</td><td>langgraph-swarm</td><td>多个专员平级交接</td></tr>
+  </table>
+  <div class="grid g2 mt-m">
+    <div class="card">
+      <h4>create_supervisor：层级调度</h4>
+      <p>Supervisor 本身就是一个 create_react_agent，tools 里包含所有 sub-agent 的 handoff_tools。handoff tool 返回 Command(goto=agent_name) 跳转。</p>
+      <div class="code-block" style="margin-top:8px; font-size:10px;">
+workflow = <span class="fn">create_supervisor</span>(
+    [weather_agent, order_agent],
+    model=llm,
+    prompt=<span class="str">"你是调度主管"</span>
+)
+      </div>
+    </div>
+    <div class="card">
+      <h4>create_swarm：平级交接</h4>
+      <p>没有中心调度器。State 多了 active_agent 字段。每次从 START 重新进入，根据 active_agent 路由。handoff 时更新 active_agent 状态。</p>
+      <div class="code-block" style="margin-top:8px; font-size:10px;">
+workflow = <span class="fn">create_swarm</span>(
+    [alice, bob],
+    default_active_agent=<span class="str">"Alice"</span>
+)
+      </div>
+    </div>
+  </div>
+  <div class="deck-footer">
+    <span>LangGraph 渐进式教程</span>
+    <span>LG-06 / 11</span>
+  </div>
+  <div class="notes">
+    create_supervisor 和 create_swarm 不在核心 langgraph 包中，需要额外安装。Supervisor 适合层级化管理，Swarm 适合平级 Agent 动态交接。两者的核心区别：Supervisor 有中心调度器，sub-agent 执行完自动回到 supervisor；Swarm 没有中心调度器，handoff 后更新 active_agent，下次用户输入从 START 重新路由。
+  </div>
+</section>
+
+<!-- Slide 7: 预构建 vs 自定义决策框架 -->
+<section class="slide" data-title="预构建 vs 自定义决策框架">
+  <div class="kicker">Decision Framework</div>
+  <div class="h2">什么时候用预构建，什么时候自定义？</div>
+  <table class="mt-m">
+    <tr><th>维度</th><th>预构建 Agent</th><th>自定义 StateGraph</th></tr>
+    <tr><td>开发速度</td><td><span class="tag-ok">快（3 行代码）</span></td><td>中等</td></tr>
+    <tr><td>可控性</td><td>黑盒</td><td><span class="tag-ok">白盒，每步可控</span></td></tr>
+    <tr><td>可观测性</td><td>只能看输入输出</td><td><span class="tag-ok">每节点状态可见</span></td></tr>
+    <tr><td>复杂路由</td><td><span class="tag-warn">不支持</span></td><td><span class="tag-ok">任意图结构</span></td></tr>
+    <tr><td>HITL 支持</td><td><span class="tag-warn">弱</span></td><td><span class="tag-ok">强</span></td></tr>
+    <tr><td>自定义 State</td><td><span class="tag-warn">只有 messages</span></td><td><span class="tag-ok">任意字段</span></td></tr>
+  </table>
+  <div class="mt-m card">
+    <h4>决策树</h4>
+    <ul style="margin-top:8px;">
+      <li>标准 ReAct 循环 + 不需要监控 + 不需要自定义 State → <span class="tag-ok">create_react_agent</span></li>
+      <li>需要监控每一步 State / 需要复杂路由 / 需要人工审批 / 需要自定义 State → <span class="tag-ok">自定义 StateGraph</span></li>
+    </ul>
+  </div>
+  <div class="deck-footer">
+    <span>LangGraph 渐进式教程</span>
+    <span>LG-06 / 11</span>
+  </div>
+  <div class="notes">
+    预构建 Agent 的"快"是有代价的——你放弃了对中间过程的可见性和控制力。只要出现"需要看内部状态"或"需要干预执行"的需求，就必须切换到自定义 StateGraph。建议先用预构建验证需求，确认后再迁移到自定义 StateGraph 生产。
+  </div>
+</section>
+
+<!-- Slide 8: 上下文管理策略 -->
+<section class="slide" data-title="上下文管理策略">
+  <div class="kicker">Context Management</div>
+  <div class="h2">防止 Agent 撑爆上下文窗口</div>
+  <div class="grid g3 mt-m">
+    <div class="card">
+      <h4>策略 1：Trimming</h4>
+      <p>裁剪历史，只保留最近 N 条或 N 个 token</p>
+      <div class="code-block" style="margin-top:8px; font-size:9px;">
+trimmed = <span class="fn">trim_messages</span>(
+    messages,
+    max_tokens=4000,
+    strategy=<span class="str">"last"</span>,
+    token_counter=llm
+)
+      </div>
+      <p style="margin-top:8px;"><span class="tag">难度：低</span> <span class="tag-warn">信息损失：中</span></p>
+    </div>
+    <div class="card">
+      <h4>策略 2：Summarization</h4>
+      <p>当消息太长时，总结早期内容</p>
+      <div class="code-block" style="margin-top:8px; font-size:9px;">
+<span class="kw">if</span> <span class="fn">count_tokens</span>(msgs) &gt; 6000:
+    to_sum = msgs[:-4]
+    recent = msgs[-4:]
+    summary = llm.invoke([...])
+    <span class="kw">return</span> {<span class="str">"messages"</span>: [summary]+recent}
+      </div>
+      <p style="margin-top:8px;"><span class="tag">难度：中</span> <span class="tag-ok">信息损失：低</span></p>
+    </div>
+    <div class="card">
+      <h4>策略 3：Tool 精简</h4>
+      <p>在 tool 定义阶段就控制输出长度</p>
+      <div class="code-block" style="margin-top:8px; font-size:9px;">
+<span class="kw">def</span> <span class="fn">query_weather</span>(city):
+    raw = <span class="fn">query_api</span>(city)
+    <span class="kw">return</span> <span class="str">f"{city}：{raw['weather'][0]['description']}，{raw['main']['temp']}°C"</span>
+      </div>
+      <p style="margin-top:8px;"><span class="tag">难度：低</span> <span class="tag-ok">信息损失：可控</span></p>
+    </div>
+  </div>
+  <div class="deck-footer">
+    <span>LangGraph 渐进式教程</span>
+    <span>LG-06 / 11</span>
+  </div>
+  <div class="notes">
+    预构建 Agent 的 State 只有 messages，每次 tool 调用都会把结果追加到 messages。一个 session 循环 10 次，messages 可能有 30+ 条，Token 轻松过万。三种策略：Trimming 实现简单但会丢掉早期消息；Summarization 智能压缩信息损失小；Tool 精简从源头控制，应该在定义 tool 时就做。
+  </div>
+</section>
+
+<!-- Slide 9: OpsBot 对比实战 -->
+<section class="slide" data-title="OpsBot 对比实战">
+  <div class="kicker">Case Study: OpsBot</div>
+  <div class="h2">预构建 vs 自定义：同一个运维助手</div>
+  <div class="grid g2 mt-m">
+    <div class="card">
+      <h4>版本 A：create_react_agent（3 行）</h4>
+      <div class="code-block" style="margin-top:8px; font-size:10px;">
+tools = [check_cpu, check_memory,
+         check_disk, restart_service,
+         query_logs]
+agent = <span class="fn">create_react_agent</span>(llm, tools)
+      </div>
+      <ul style="margin-top:8px;">
+        <li>简单查询：查 CPU → 直接调用，3 行搞定</li>
+        <li>敏感操作：重启服务 → <span class="tag-warn">直接执行，无阻拦</span></li>
+        <li>长日志：1000 条 → <span class="tag-warn">直接塞进 history</span></li>
+        <li>过程可见性 → <span class="tag-warn">黑盒</span></li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>版本 B：自定义 StateGraph（完整可控）</h4>
+      <div class="code-block" style="margin-top:8px; font-size:10px;">
+<span class="kw">class</span> <span class="fn">OpsState</span>(TypedDict):
+    messages: Annotated[<span class="fn">list</span>, add_messages]
+    user_role: <span class="fn">str</span>
+    pending_approval: <span class="fn">bool</span>
+    execution_log: <span class="fn">list</span>
+      </div>
+      <ul style="margin-top:8px;">
+        <li>简单查询：查 CPU → 同样正确</li>
+        <li>敏感操作：检查 user_role → <span class="tag-ok">普通用户需审批</span></li>
+        <li>长日志：截断返回前 50 条 + 统计</li>
+        <li>过程可见性 → <span class="tag-ok">stream() 逐节点输出</span></li>
+      </ul>
+    </div>
+  </div>
+  <div class="deck-footer">
+    <span>LangGraph 渐进式教程</span>
+    <span>LG-06 / 11</span>
+  </div>
+  <div class="notes">
+    用两种方式实现同一个运维助手对比体验。预构建版 3 行代码搞定简单查询，但敏感操作直接执行无阻拦，长日志直接塞进 message history 导致 Token 暴涨，过程完全黑盒。自定义版在 restart_service 前有条件边检查 user_role，query_logs 做截断，stream() 逐节点输出可观测。关键差异：预构建版快但不可控，自定义版慢但安全。
+  </div>
+</section>
+
+<!-- Slide 10: 总结 -->
+<section class="slide" data-title="总结">
+  <div class="kicker">Summary</div>
+  <div class="h2">核心要点回顾</div>
+  <div class="grid g2 mt-m">
+    <div class="card">
+      <h4>create_react_agent 核心认知</h4>
+      <ul>
+        <li>LangGraph 1.x 唯一官方推荐的预构建 Agent</li>
+        <li>内部是 LLM → Tool → LLM 自动循环</li>
+        <li>State 只有 messages，不可扩展</li>
+        <li>循环终止判据：AIMessage.tool_calls 为空</li>
+        <li>有 remaining_steps / is_last_step 安全机制</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>选型与生态</h4>
+      <ul>
+        <li>标准 ReAct + 不需要监控 → 预构建</li>
+        <li>复杂路由 / HITL / 自定义 State → 自定义</li>
+        <li>多 Agent：supervisor（层级）、swarm（平级）</li>
+        <li>上下文管理：Trimming / Summarization / Tool 精简</li>
+        <li>先用预构建验证，再上 StateGraph 生产</li>
+      </ul>
+    </div>
+  </div>
+  <div class="mt-m card" style="text-align:center;">
+    <p style="font-size:14px; color:#38bdf8; font-weight:600;">"create_react_agent 是正统，预构建求快三行搞定，自定义求控全程透明。先用预构建验证，再上 StateGraph 生产。"</p>
+  </div>
+  <div class="deck-footer">
+    <span>LangGraph 渐进式教程</span>
+    <span>LG-06 / 11</span>
+  </div>
+  <div class="notes">
+    核心要点回顾：create_react_agent 是单 Agent 唯一官方推荐；多 Agent 生态有 create_supervisor 和 create_swarm；内部机制是 LLM → Tool → LLM 自动循环；State 只有 messages 不可扩展；选型原则是标准 ReAct 不需要监控用预构建，复杂路由 HITL 自定义 State 用自定义；上下文管理需要自己做 Trimming/Summarization；建议先用预构建验证需求，确认后再迁移到自定义 StateGraph。
+  </div>
+</section>
+
+</div>
+<script src="/Users/galaxyxieyu/.claude/skills/html-ppt-skill/assets/runtime.js"></script>
+</body></html>

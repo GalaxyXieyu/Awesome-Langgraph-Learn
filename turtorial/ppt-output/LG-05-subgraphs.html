@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LG-05：并行执行与子图</title>
+<style>
+body { width: 720pt; height: 405pt; margin: 0; padding: 0; overflow: hidden; font-family: -apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans SC',sans-serif; background: #1a1b26; color: #c0caf5; }
+.slide { width: 720pt; height: 405pt; padding: 36px 48px; box-sizing: border-box; display: none; position: relative; }
+.slide.is-active { display: flex; flex-direction: column; }
+.kicker { font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; color: #7aa2f7; margin-bottom: 8px; }
+.h1 { font-size: 42px; font-weight: 800; line-height: 1.2; margin: 0 0 16px 0; color: #c0caf5; }
+.h2 { font-size: 28px; font-weight: 700; line-height: 1.3; margin: 0 0 12px 0; color: #c0caf5; }
+.lede { font-size: 16px; line-height: 1.6; color: #a9b1d6; margin: 0; }
+.card { background: rgba(36,40,59,0.9); border: 1px solid rgba(122,162,247,0.2); border-radius: 8px; padding: 16px; }
+.card h4 { font-size: 14px; font-weight: 600; margin: 0 0 8px 0; color: #7aa2f7; }
+.card p { font-size: 12px; line-height: 1.5; color: #a9b1d6; margin: 0; }
+.grid { display: grid; gap: 12px; }
+.g2 { grid-template-columns: 1fr 1fr; }
+.g3 { grid-template-columns: 1fr 1fr 1fr; }
+.g4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+.mt-l { margin-top: 24px; }
+.mt-m { margin-top: 16px; }
+.tc { text-align: center; align-items: center; justify-content: center; }
+.center { display: flex; align-items: center; justify-content: center; }
+.deck-footer { position: absolute; bottom: 16px; left: 48px; right: 48px; display: flex; justify-content: space-between; font-size: 11px; color: #565f89; }
+.notes { display: none; }
+ul { margin: 0; padding-left: 20px; }
+li { font-size: 13px; line-height: 1.7; color: #a9b1d6; margin-bottom: 4px; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 12px; }
+th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid rgba(122,162,247,0.2); }
+th { color: #7aa2f7; font-weight: 600; background: rgba(36,40,59,0.6); }
+td { color: #a9b1d6; }
+pre { font-family: 'JetBrains Mono', 'SF Mono', monospace; font-size: 11px; line-height: 1.6; background: #0d1117; padding: 12px; border-radius: 6px; color: #e6edf3; overflow: hidden; }
+.accent { color: #7aa2f7; }
+.dim { color: #a9b1d6; }
+.tag { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 4px; background: rgba(122,162,247,0.15); color: #7aa2f7; }
+.flow-box { background: rgba(36,40,59,0.9); border: 1px solid rgba(122,162,247,0.2); border-radius: 6px; padding: 10px 14px; text-align: center; font-size: 12px; color: #c0caf5; }
+.arrow-d { text-align: center; color: #565f89; font-size: 14px; margin: 4px 0; }
+.arrow-h { color: #565f89; font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="deck">
+
+<!-- Slide 1: Cover -->
+<div class="slide is-active tc" data-index="1">
+  <div class="kicker">LangGraph 教程 · LG-05</div>
+  <div class="h1" style="font-size:48px;margin-bottom:20px;">并行执行与子图</div>
+  <div class="lede" style="max-width:520px;">让图学会分工合作：Fan-out / Fan-in、Reducer、Send 动态分发、子图模块化复用</div>
+  <div class="mt-l" style="display:flex;gap:12px;justify-content:center;">
+    <span class="tag">Fan-out</span>
+    <span class="tag">Fan-in</span>
+    <span class="tag">Reducer</span>
+    <span class="tag">Send</span>
+    <span class="tag">Subgraph</span>
+  </div>
+  <div class="deck-footer"><span>LangGraph 渐进式教程</span><span>1 / 10</span></div>
+</div>
+
+<!-- Slide 2: Agenda -->
+<div class="slide" data-index="2">
+  <div class="kicker">目录</div>
+  <div class="h2">本课内容</div>
+  <div class="grid g2 mt-m" style="flex:1;">
+    <div class="card"><h4>01 · Fan-out / Fan-in</h4><p>并行分发与汇聚等待，LangGraph 自动处理多上游边</p></div>
+    <div class="card"><h4>02 · Reducer 机制</h4><p>并行节点修改同一字段时的合并策略，防止写覆盖</p></div>
+    <div class="card"><h4>03 · Send 动态 Map-Reduce</h4><p>运行时动态分发子任务，并行执行后汇聚结果</p></div>
+    <div class="card"><h4>04 · Subgraph 构建</h4><p>独立 StateGraph 模块化复用，input/output 映射配置</p></div>
+    <div class="card"><h4>05 · 状态隔离与通信</h4><p>公共字段、映射函数、Store 跨子图通信三种方式</p></div>
+    <div class="card"><h4>06 · ResearchForge 实战</h4><p>并行研究系统与最佳实践 checklist</p></div>
+  </div>
+  <div class="deck-footer"><span>LangGraph 渐进式教程</span><span>2 / 10</span></div>
+</div>
+
+<!-- Slide 3: Problem -->
+<div class="slide" data-index="3">
+  <div class="kicker">开场引入</div>
+  <div class="h2">为什么要并行？</div>
+  <div class="lede mt-m">写行业研报需要查财报、查新闻、查竞品、查专家观点——串行执行总时间是 4 个之和，并行只是最慢的那个。</div>
+  <div class="grid g2 mt-l" style="flex:1;">
+    <div class="card">
+      <h4>串行执行</h4>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:12px;">
+        <div class="flow-box">输入</div>
+        <span class="arrow-h">→</span>
+        <div class="flow-box">查财报</div>
+        <span class="arrow-h">→</span>
+        <div class="flow-box">查新闻</div>
+        <span class="arrow-h">→</span>
+        <div class="flow-box">查竞品</div>
+        <span class="arrow-h">→</span>
+        <div class="flow-box">汇总</div>
+      </div>
+      <p style="margin-top:12px;">总时间 = T1 + T2 + T3 + T4</p>
+    </div>
+    <div class="card">
+      <h4>并行执行</h4>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:12px;">
+        <div class="flow-box">输入</div>
+        <span class="arrow-h">→</span>
+        <div style="display:flex;flex-direction:column;gap:4px;">
+          <div class="flow-box" style="font-size:10px;padding:6px 10px;">查财报</div>
+          <div class="flow-box" style="font-size:10px;padding:6px 10px;">查新闻</div>
+          <div class="flow-box" style="font-size:10px;padding:6px 10px;">查竞品</div>
+          <div class="flow-box" style="font-size:10px;padding:6px 10px;">查专家</div>
+        </div>
+        <span class="arrow-h">→</span>
+        <div class="flow-box">汇总</div>
+      </div>
+      <p style="margin-top:12px;">总时间 = max(T1, T2, T3, T4)</p>
+    </div>
+  </div>
+  <div class="deck-footer"><span>LangGraph 渐进式教程</span><span>3 / 10</span></div>
+</div>
+
+<!-- Slide 4: Fan-out / Fan-in -->
+<div class="slide" data-index="4">
+  <div class="kicker">核心内容</div>
+  <div class="h2">Fan-out / Fan-in</div>
+  <div class="lede mt-m">一个节点同时触发多个下游节点（Fan-out），多个节点完成后汇聚到一个节点（Fan-in）。</div>
+  <div class="grid g2 mt-m" style="flex:1;">
+    <div class="card">
+      <h4>Fan-out：并行分发</h4>
+      <p>parse_intent 节点有 4 条出边，分别指向 4 个数据源节点。LangGraph 自动并行执行。</p>
+      <pre style="margin-top:8px;">parent_builder.add_edge("parse", "finance")
+parent_builder.add_edge("parse", "news")
+parent_builder.add_edge("parse", "competitor")
+parent_builder.add_edge("parse", "expert")</pre>
+    </div>
+    <div class="card">
+      <h4>Fan-in：自动汇聚</h4>
+      <p>4 个节点都完成后，compile_report 才会执行。LangGraph 自动等待所有前置节点。</p>
+      <pre style="margin-top:8px;"># 4 条边都指向 collect
+parent_builder.add_edge("finance", "collect")
+parent_builder.add_edge("news", "collect")
+parent_builder.add_edge("competitor", "collect")
+parent_builder.add_edge("expert", "collect")</pre>
+    </div>
+  </div>
+  <div class="mt-m" style="background:rgba(36,40,59,0.9);border:1px solid rgba(122,162,247,0.2);border-radius:8px;padding:12px;text-align:center;">
+    <span style="font-size:13px;color:#a9b1d6;">Fan-out 像项目经理同时发 4 封邮件；Fan-in 像等 4 个人都回复后才变绿</span>
+  </div>
+  <div class="deck-footer"><span>LangGraph 渐进式教程</span><span>4 / 10</span></div>
+</div>
+
+<!-- Slide 5: Reducer -->
+<div class="slide" data-index="5">
+  <div class="kicker">核心内容</div>
+  <div class="h2">Reducer：并行的和平协议</div>
+  <div class="lede mt-m">多个并行节点同时修改同一个 State 字段时，没有 Reducer 就会写覆盖。</div>
+  <div class="grid g2 mt-m" style="flex:1;">
+    <div class="card">
+      <h4>内置 Reducer</h4>
+      <pre>from operator import add
+
+class AgentState(TypedDict):
+    # 多个节点往 findings 加内容，自动合并
+    findings: Annotated[list, add]</pre>
+      <p style="margin-top:8px;">operator.add：列表/数值累加</p>
+    </div>
+    <div class="card">
+      <h4>自定义 Reducer</h4>
+      <pre>class AgentState(TypedDict):
+    # 保留最近的 10 条日志
+    logs: Annotated[list,
+        lambda x, y: (x + y)[-10:]]
+
+    # 去重合并
+    tags: Annotated[set,
+        lambda x, y: x | y]</pre>
+    </div>
+  </div>
+  <div class="mt-m" style="background:rgba(36,40,59,0.9);border:1px solid rgba(122,162,247,0.2);border-radius:8px;padding:12px;">
+    <span style="font-size:13px;color:#a9b1d6;"><span class="accent">关键</span>：并行节点共享的字段必须用 Annotated + Reducer，否则是竞态条件</span>
+  </div>
+  <div class="deck-footer"><span>LangGraph 渐进式教程</span><span>5 / 10</span></div>
+</div>
+
+<!-- Slide 6: Send Dynamic Map-Reduce -->
+<div class="slide" data-index="6">
+  <div class="kicker">核心内容</div>
+  <div class="h2">Send 动态 Map-Reduce</div>
+  <div class="lede mt-m">运行时决定分发多少子任务，并行执行后自动 Fan-in 汇聚。</div>
+  <div style="flex:1;overflow:hidden;">
+    <div style="background:rgba(36,40,59,0.9);border:1px solid rgba(122,162,247,0.2);border-radius:8px;padding:12px;">
+      <pre>from langgraph.types import Send
+
+def dispatch(state: ParentState):
+    """Map 阶段：动态分发每个公司到子图"""
+    return [
+        Send("analyze_company", {"company": c})
+        for c in state["companies"]
+    ]
+
+# 条件边：dispatch 返回 Send 列表，动态分发
+parent_builder.add_conditional_edges(
+    START, dispatch, ["analyze_company"]
+)</pre>
+    </div>
+    <div class="grid g3 mt-m">
+      <div class="card"><h4>Send 参数</h4><p>Send("target_node", {"key": value})<br>第二个参数是子图的初始 State</p></div>
+      <div class="card"><h4>状态隔离</h4><p>子图从 Send 参数开始，独立于父图执行</p></div>
+      <div class="card"><h4>自动汇聚</h4><p>所有子图实例完成后，LangGraph 自动触发 Fan-in</p></div>
+    </div>
+  </div>
+  <div class="deck-footer"><span>LangGraph 渐进式教程</span><span>6 / 10</span></div>
+</div>
+
+<!-- Slide 7: Subgraph -->
+<div class="slide" data-index="7">
+  <div class="kicker">核心内容</div>
+  <div class="h2">Subgraph：模块化复用</div>
+  <div class="lede mt-m">子图是独立的 StateGraph，有自己的 State Schema，可单独测试、可嵌套复用。</div>
+  <div class="grid g2 mt-m" style="flex:1;">
+    <div class="card">
+      <h4>定义子图</h4>
+      <pre>child_builder = StateGraph(ChildState)
+child_builder.add_node("fetch", fetch_data)
+child_builder.add_node("summarize", summarize)
+child_builder.add_edge(START, "fetch")
+child_builder.add_edge("fetch", "summarize")
+child_graph = child_builder.compile()</pre>
+    </div>
+    <div class="card">
+      <h4>嵌入父图</h4>
+      <pre># 关键：编译后的子图作为节点
+parent_builder.add_node("research", child_graph)
+
+# input/output 映射（字段名不同时）
+parent_builder.add_node(
+    "research", child_graph,
+    input=lambda s: {"query": s["topic"]},
+    output=lambda s: {"findings": s["results"]},
+)</pre>
+    </div>
+  </div>
+  <div class="mt-m" style="background:rgba(36,40,59,0.9);border:1px solid rgba(122,162,247,0.2);border-radius:8px;padding:12px;">
+    <span style="font-size:13px;color:#a9b1d6;"><span class="accent">核心</span>：子图必须先 .compile()，然后作为 action 传给父图 add_node。子图默认继承父图 checkpointer。</span>
+  </div>
+  <div class="deck-footer"><span>LangGraph 渐进式教程</span><span>7 / 10</span></div>
+</div>
+
+<!-- Slide 8: State Isolation -->
+<div class="slide" data-index="8">
+  <div class="kicker">核心内容</div>
+  <div class="h2">状态隔离与通信</div>
+  <div class="lede mt-m">子图 State 与父图默认隔离，有三种跨图通信方式。</div>
+  <div style="flex:1;overflow:auto;">
+    <table>
+      <tr><th style="width:18%;">方式</th><th style="width:32%;">适用场景</th><th style="width:50%;">代码示例</th></tr>
+      <tr><td><strong>公共字段</strong></td><td>父子图有相同字段名</td><td>messages 在父子图中同名，自动透传</td></tr>
+      <tr><td><strong>input/output 映射</strong></td><td>字段名不同，需要格式转换</td><td>input=lambda s: {"query": s["topic"]}</td></tr>
+      <tr><td><strong>Store（长期记忆）</strong></td><td>多个子图需要共享数据</td><td>store.aput(("shared", uid), "key", data)</td></tr>
+    </table>
+  </div>
+  <div class="grid g2 mt-m">
+    <div class="card">
+      <h4>隔离的好处</h4>
+      <ul>
+        <li>封装性：中间状态不污染父图</li>
+        <li>可复用性：同一子图嵌入多个父图</li>
+        <li>可测试性：独立运行和调试</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>最佳实践</h4>
+      <ul>
+        <li>先独立测试子图</li>
+        <li>再嵌入父图，逐步集成</li>
+        <li>优先用公共字段，减少映射</li>
+        <li>子图 State 最小化</li>
+      </ul>
+    </div>
+  </div>
+  <div class="deck-footer"><span>LangGraph 渐进式教程</span><span>8 / 10</span></div>
+</div>
+
+<!-- Slide 9: Pitfalls -->
+<div class="slide" data-index="9">
+  <div class="kicker">常见误区</div>
+  <div class="h2">避坑指南</div>
+  <div style="flex:1;overflow:auto;">
+    <table>
+      <tr><th style="width:22%;">坑</th><th style="width:38%;">现象</th><th style="width:40%;">预警</th></tr>
+      <tr><td>并行节点修改非 Reducer 字段</td><td>数据互相覆盖</td><td>并行节点共享字段必须用 Annotated + Reducer</td></tr>
+      <tr><td>Fan-in 前置有循环</td><td>Fan-in 永远等不到</td><td>确保循环有明确终止条件</td></tr>
+      <tr><td>子图 State 与父图不兼容</td><td>字段映射错误，数据传不过去</td><td>input/output 映射必须显式配置</td></tr>
+      <tr><td>Send 分发太多子任务</td><td>内存/连接池耗尽</td><td>做上限控制，max_concurrency 限制并发</td></tr>
+      <tr><td>递归限制不当</td><td>并行 + 循环导致超级步过多</td><td>生产环境合理设置 recursion_limit</td></tr>
+    </table>
+  </div>
+  <div class="mt-m" style="background:rgba(36,40,59,0.9);border:1px solid rgba(122,162,247,0.2);border-radius:8px;padding:12px;">
+    <span style="font-size:13px;color:#a9b1d6;"><span class="accent">调试技巧</span>：先不并行，串行跑通每个节点，再改成并行；Reducer 验证打印合并前后 State；子图单独测试再嵌入。</span>
+  </div>
+  <div class="deck-footer"><span>LangGraph 渐进式教程</span><span>9 / 10</span></div>
+</div>
+
+<!-- Slide 10: Summary -->
+<div class="slide" data-index="10">
+  <div class="kicker">阶段小结</div>
+  <div class="h2">核心要点回顾</div>
+  <div class="grid g2 mt-m" style="flex:1;">
+    <div class="card">
+      <h4>并行机制</h4>
+      <ul>
+        <li><strong>Fan-out</strong>：一个节点触发多个下游同时执行</li>
+        <li><strong>Fan-in</strong>：多个节点完成后才触发下一个</li>
+        <li><strong>Reducer</strong>：定义并行字段合并策略</li>
+        <li><strong>Send</strong>：运行时动态分发子任务</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>子图机制</h4>
+      <ul>
+        <li><strong>Subgraph</strong>：独立 State、独立逻辑、可复用</li>
+        <li><strong>input/output 映射</strong>：显式配置字段传递</li>
+        <li><strong>公共字段</strong>：同名自动透传</li>
+        <li><strong>Store</strong>：跨子图共享数据</li>
+      </ul>
+    </div>
+  </div>
+  <div class="mt-l tc" style="font-size:14px;color:#a9b1d6;line-height:1.8;">
+    <em>"Fan-out 是群发，Fan-in 是等齐人；Reducer 是合并器，Send 是动态派活，Subgraph 是模块包。"</em>
+  </div>
+  <div class="deck-footer"><span>LangGraph 渐进式教程</span><span>10 / 10</span></div>
+</div>
+
+</div>
+<script>
+(function(){
+  var slides = document.querySelectorAll('.slide');
+  var current = 0;
+  function show(i){
+    slides.forEach(function(s){s.classList.remove('is-active');});
+    slides[i].classList.add('is-active');
+    current = i;
+  }
+  document.addEventListener('keydown', function(e){
+    if(e.key==='ArrowRight'||e.key===' '||e.key==='PageDown'){
+      if(current<slides.length-1) show(current+1);
+    }else if(e.key==='ArrowLeft'||e.key==='PageUp'){
+      if(current>0) show(current-1);
+    }else if(e.key==='Home'){ show(0); }
+    else if(e.key==='End'){ show(slides.length-1); }
+  });
+}());
+</script>
+</body>
+</html>

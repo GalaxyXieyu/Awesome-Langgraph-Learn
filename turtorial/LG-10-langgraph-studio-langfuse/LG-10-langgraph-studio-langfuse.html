@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LG-10 · LangGraph Studio 可视化调试与 Langfuse 可观测性入门</title>
+<link rel="stylesheet" href="/Users/galaxyxieyu/.claude/skills/html-ppt-skill/assets/fonts.css">
+<link rel="stylesheet" href="/Users/galaxyxieyu/.claude/skills/html-ppt-skill/assets/base.css">
+<link rel="stylesheet" id="theme-link" href="/Users/galaxyxieyu/.claude/skills/html-ppt-skill/assets/themes/tokyo-night.css">
+<link rel="stylesheet" href="/Users/galaxyxieyu/.claude/skills/html-ppt-skill/assets/animations/animations.css">
+<style>
+body { width: 720pt; height: 405pt; margin: 0; padding: 0; overflow: hidden; font-family: 'Inter','Noto Sans SC',sans-serif; background: #0f172a; color: #e2e8f0; }
+.slide { width: 720pt; height: 405pt; padding: 36px 48px; box-sizing: border-box; display: none; position: relative; }
+.slide.is-active { display: flex; flex-direction: column; }
+.kicker { font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; color: #94a3b8; margin-bottom: 8px; }
+.h1 { font-size: 42px; font-weight: 800; line-height: 1.2; margin: 0 0 16px 0; color: #f8fafc; }
+.h2 { font-size: 28px; font-weight: 700; line-height: 1.3; margin: 0 0 12px 0; color: #f1f5f9; }
+.lede { font-size: 16px; line-height: 1.6; color: #cbd5e1; margin: 0; }
+.card { background: rgba(30,41,59,0.8); border: 1px solid rgba(148,163,184,0.2); border-radius: 8px; padding: 16px; }
+.card h4 { font-size: 14px; font-weight: 600; margin: 0 0 8px 0; color: #38bdf8; }
+.card p { font-size: 12px; line-height: 1.5; color: #94a3b8; margin: 0; }
+.grid { display: grid; gap: 12px; }
+.g2 { grid-template-columns: 1fr 1fr; }
+.g3 { grid-template-columns: 1fr 1fr 1fr; }
+.mt-l { margin-top: 24px; }
+.mt-m { margin-top: 16px; }
+.tc { text-align: center; align-items: center; justify-content: center; }
+.center { display: flex; align-items: center; justify-content: center; }
+.deck-footer { position: absolute; bottom: 16px; left: 48px; right: 48px; display: flex; justify-content: space-between; font-size: 11px; color: #64748b; }
+.notes { display: none; }
+ul { margin: 0; padding-left: 20px; }
+li { font-size: 13px; line-height: 1.7; color: #cbd5e1; margin-bottom: 4px; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 12px; }
+th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid rgba(148,163,184,0.2); }
+th { color: #38bdf8; font-weight: 600; background: rgba(30,41,59,0.6); }
+td { color: #cbd5e1; }
+
+/* Extra helpers for this deck */
+.accent { color: #38bdf8; }
+.accent-2 { color: #a78bfa; }
+.accent-3 { color: #22d3ee; }
+.good { color: #4ade80; }
+.bad { color: #f87171; }
+.warn { color: #fbbf24; }
+.code { font-family: 'SF Mono', monospace; font-size: 11px; background: rgba(15,23,42,0.8); padding: 2px 6px; border-radius: 4px; color: #7dd3fc; }
+.tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; background: rgba(56,189,248,0.15); color: #38bdf8; }
+.mnemonic { background: linear-gradient(135deg, rgba(56,189,248,0.1), rgba(167,139,250,0.1)); border: 1px solid rgba(56,189,248,0.25); border-radius: 8px; padding: 16px 24px; font-size: 14px; line-height: 1.6; color: #e2e8f0; text-align: center; }
+.tree { font-family: 'SF Mono', monospace; font-size: 12px; line-height: 1.9; color: #94a3b8; white-space: pre; }
+
+@media print {
+  .slide { display: flex !important; page-break-after: always; break-after: page; }
+  .slide:last-child { page-break-after: auto; }
+  body { width: 100%; height: 100%; background: #0f172a; }
+}
+</style>
+</head>
+<body>
+<div class="deck">
+
+  <!-- ============ 1. COVER ============ -->
+  <section class="slide" data-title="Cover">
+    <p class="kicker">LG-10 / 工具课</p>
+    <h1 class="h1">LangGraph 图执行从<span class="accent">黑盒</span>变成了<span class="accent-2">玻璃盒</span></h1>
+    <p class="lede">LangGraph Studio 可视化调试 + Langfuse 全链路可观测性入门</p>
+    <p class="lede mt-m" style="font-size:14px;color:#64748b">让 WeatherBot 从"能跑"到"看得见"</p>
+    <div class="deck-footer">
+      <span>#langgraph #studio #langfuse #observability</span>
+      <span>1 / 10</span>
+    </div>
+    <div class="notes">
+      <p>大家好，欢迎来到 LG-10。上一节课你们写出了 WeatherBot，代码能跑、结果也对。但有个问题——图跑起来的时候，你其实是"盲"的。</p>
+      <p>你只知道输入和输出，不知道中间每个节点收到了什么 State、返回了什么、哪个节点最慢、哪个节点在烧 API 费用。今天这节课，我们要把图从"黑盒"变成"玻璃盒"。</p>
+      <p>我会介绍两个工具：第一个是 LangGraph Studio——开发时的显微镜，让你实时看到图怎么跑；第二个是 Langfuse——上线后的仪表盘，帮你记录每一次执行的完整链路。</p>
+    </div>
+  </section>
+
+  <!-- ============ 2. AGENDA ============ -->
+  <section class="slide" data-title="Agenda">
+    <p class="kicker">agenda</p>
+    <h2 class="h2">今天要讲的 4 件事</h2>
+    <div class="grid g2 mt-l">
+      <div class="card">
+        <h4>01 · LangGraph Studio</h4>
+        <p>图的"解剖台"——安装启动、界面四区、核心操作演示</p>
+      </div>
+      <div class="card">
+        <h4>02 · Langfuse 可观测性</h4>
+        <p>全链路"行车记录仪"——Trace/Span/Event、5 分钟接入、瀑布图分析</p>
+      </div>
+      <div class="card">
+        <h4>03 · 实战：WeatherBot 体检报告</h4>
+        <p>给 WeatherBot 加上 Langfuse，在 Studio 里跑通并分析执行链路</p>
+      </div>
+      <div class="card">
+        <h4>04 · 选型速查 + 总结</h4>
+        <p>Studio vs Langfuse 场景对照 + 记忆口诀</p>
+      </div>
+    </div>
+    <div class="deck-footer">
+      <span>LG-10 · LangGraph Studio + Langfuse</span>
+      <span>2 / 10</span>
+    </div>
+    <div class="notes">
+      <p>先过一下今天的议程，一共 4 个部分。</p>
+      <p>第一部分讲 LangGraph Studio——怎么安装、怎么启动、界面怎么看、核心操作有哪些。这是开发阶段最重要的调试工具。</p>
+      <p>第二部分讲 Langfuse——为什么需要它、核心概念 Trace/Span/Event 是什么、怎么 5 分钟接入、在界面里看什么。</p>
+      <p>第三部分是实战环节，把 WeatherBot 加上 Langfuse，在 Studio 里跑通，然后在 Langfuse 界面分析一次完整执行。</p>
+      <p>最后一部分是选型速查表——什么场景用 Studio、什么场景用 Langfuse，以及一个记忆口诀。</p>
+    </div>
+  </section>
+
+  <!-- ============ 3. STUDIO INTRO ============ -->
+  <section class="slide" data-title="Studio Intro">
+    <p class="kicker">// part 01 · langgraph studio</p>
+    <h2 class="h2">Studio 让你<span class="accent">实时看到</span>图的每一次执行</h2>
+    <div class="grid g2 mt-l">
+      <div>
+        <div class="card">
+          <h4>安装与启动</h4>
+          <p style="font-family:'SF Mono',monospace;font-size:11px;background:rgba(15,23,42,0.8);padding:10px 12px;border-radius:6px;margin-top:8px;color:#7dd3fc">
+            <span style="color:#4ade80">pip</span> install langgraph-cli<br>
+            <span style="color:#64748b"># langgraph.json 配置图路径</span><br>
+            <span style="color:#4ade80">langgraph</span> dev
+          </p>
+          <p class="mt-m">浏览器自动打开 <span class="code">localhost:2024</span></p>
+        </div>
+        <p style="font-size:12px;color:#64748b;margin-top:8px">常见坑：langgraph.json 里的 Python 路径要写对，指向 graph = builder.compile() 那个变量</p>
+      </div>
+      <div>
+        <div class="card">
+          <h4>界面四区</h4>
+          <ul class="mt-m">
+            <li><strong style="color:#38bdf8">① 图结构视图</strong> — Mermaid 动态渲染，节点逐个高亮</li>
+            <li><strong style="color:#a78bfa">② 运行配置区</strong> — 输入 State、选择 Stream/Invoke 模式</li>
+            <li><strong style="color:#22d3ee">③ 状态面板</strong> — 每个节点执行前后的完整 State（可展开）</li>
+            <li><strong style="color:#4ade80">④ 时间线/历史</strong> — 每次运行记录，可回放到任意节点</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="deck-footer">
+      <span>LG-10 · LangGraph Studio + Langfuse</span>
+      <span>3 / 10</span>
+    </div>
+    <div class="notes">
+      <p>LangGraph Studio 是什么？一句话说——它是图的"解剖台"。你写的 StateGraph 跑起来的时候，Studio 让你实时看到每一个节点怎么被调用、State 怎么变化。</p>
+      <p>安装很简单，pip install langgraph-cli，然后需要一个 langgraph.json 配置文件告诉 Studio 你的图在哪。启动命令是 langgraph dev，浏览器自动打开 localhost:2024。</p>
+      <p>界面分成四个区。左边是图结构视图，用 Mermaid 动态渲染，节点逐个变绿。右边上面是运行配置区，填输入 State、选 Stream 还是 Invoke 模式。右边中间是状态面板——这是最重要的区域。右边下面是时间线，每次运行的记录都在这里，可以点进去回放到任意节点。</p>
+    </div>
+  </section>
+
+  <!-- ============ 4. STUDIO OPERATIONS ============ -->
+  <section class="slide" data-title="Studio Operations">
+    <p class="kicker">// part 01 · core operations</p>
+    <h2 class="h2">Studio 的<span class="accent">时间旅行调试</span>让排查 bug 速度提升 10 倍</h2>
+    <div class="grid g2 mt-l">
+      <div class="card">
+        <h4>操作一：运行并观察节点高亮</h4>
+        <p>填入输入 → 点击 Run → 看节点逐个变绿</p>
+        <p class="mt-m" style="font-family:'SF Mono',monospace;font-size:11px;color:#64748b">START → parse_intent → extract_city → query_weather → format_weather_reply → END</p>
+      </div>
+      <div class="card">
+        <h4>操作二：查看节点 State（最重要）</h4>
+        <p>点击任意已执行节点，看三种 State：</p>
+        <ul class="mt-m">
+          <li><strong>Input State</strong> — 执行前收到的完整 State</li>
+          <li><strong>Output Update</strong> — 返回的增量 dict</li>
+          <li><strong>Merged State</strong> — 框架合并后的新 State</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>操作三：修改 State 重新运行</h4>
+        <p>时间线里点击节点 → 手动改 State → 点 "Replay from here"</p>
+        <p class="mt-m" style="color:#38bdf8"><strong>不用改代码、不用重启</strong>，直接看新走向</p>
+      </div>
+      <div class="card">
+        <h4>操作四：打断点</h4>
+        <p>节点右键 → "Set breakpoint"</p>
+        <p class="mt-m">运行到该节点自动暂停，查看 State、修改变量，然后 Continue 继续</p>
+      </div>
+    </div>
+    <div class="deck-footer">
+      <span>LG-10 · LangGraph Studio + Langfuse</span>
+      <span>4 / 10</span>
+    </div>
+    <div class="notes">
+      <p>Studio 有四个核心操作。</p>
+      <p>操作一：运行并观察节点高亮。你在输入区填一个消息，点击 Run，图结构视图里的节点会逐个变绿。你能清楚看到执行路径。每个节点的耗时也会实时显示。</p>
+      <p>操作二：查看节点 State。这是 Studio 最有价值的功能。点击任意已执行的节点，状态面板会展开显示三种 State。你可以验证 parse_intent 的 output 里 intent 是不是 "weather"，extract_city 的 output 里 city 是不是 "北京"。</p>
+      <p>操作三：修改 State 重新运行。这是 Studio 最强大的能力——"时间旅行调试"。运行完一次后，你在时间线里点击 parse_intent 节点，把 intent 改成 "time"，然后点 "Replay from here"。图会重新从 parse_intent 开始跑，这次走向 get_time 分支。不用改代码、不用重启，排查 bug 时极快。</p>
+      <p>操作四：打断点。在节点上右键 Set breakpoint，下次运行到该节点会自动暂停，你可以查看 State、修改变量，然后 Continue 继续。这跟调试普通程序一模一样。</p>
+    </div>
+  </section>
+
+  <!-- ============ 5. LANGFUSE WHY ============ -->
+  <section class="slide" data-title="Langfuse Why">
+    <p class="kicker">// part 02 · langfuse</p>
+    <h2 class="h2">Studio 是<span class="accent">开发显微镜</span>，Langfuse 是<span class="accent-2">上线仪表盘</span></h2>
+    <table class="mt-l">
+      <tr>
+        <th>能力</th>
+        <th style="text-align:center">Studio</th>
+        <th style="text-align:center">Langfuse</th>
+      </tr>
+      <tr><td>实时可视化执行</td><td style="text-align:center" class="good">强</td><td style="text-align:center" class="bad">弱（事后看）</td></tr>
+      <tr><td>历史记录持久化</td><td style="text-align:center" class="bad">只在本地内存</td><td style="text-align:center" class="good">云端/数据库存储</td></tr>
+      <tr><td>多请求对比</td><td style="text-align:center" class="bad">一次只能看一个</td><td style="text-align:center" class="good">批量筛选、对比</td></tr>
+      <tr><td>Token 用量统计</td><td style="text-align:center" class="bad">不显示</td><td style="text-align:center" class="good">精确到每次 LLM 调用</td></tr>
+      <tr><td>成本分析</td><td style="text-align:center" class="bad">不显示</td><td style="text-align:center" class="good">按模型、按时间段统计</td></tr>
+      <tr><td>团队协作</td><td style="text-align:center" class="bad">单机</td><td style="text-align:center" class="good">多用户共享项目</td></tr>
+      <tr><td>生产环境监控</td><td style="text-align:center" class="bad">开发工具</td><td style="text-align:center" class="good">生产级可观测性</td></tr>
+    </table>
+    <p class="lede mt-m tc" style="font-size:14px">两者<strong>互补</strong>，不是替代。Studio 开发看细节，Langfuse 上线看全局。</p>
+    <div class="deck-footer">
+      <span>LG-10 · LangGraph Studio + Langfuse</span>
+      <span>5 / 10</span>
+    </div>
+    <div class="notes">
+      <p>好，进入第二部分——Langfuse。先回答一个常见问题：Studio 不够吗？为什么还要 Langfuse？</p>
+      <p>我直接给一张对比表。Studio 在实时可视化执行上很强，节点高亮、改 State 重跑、打断点——这些都是开发阶段的刚需。但 Studio 的历史记录只在本地内存，关了浏览器就没了；一次只能看一个请求，没法批量对比；不显示 Token 用量和成本——你不知道哪个节点在烧 API 费用。</p>
+      <p>Langfuse 正好补上了这些缺口。它的历史记录持久化存储在云端或本地数据库；支持批量筛选和对比多个请求；精确统计每次 LLM 调用的 Token 用量；还能按模型、按时间段做成本分析；支持多用户团队协作；是生产级的可观测性平台。</p>
+      <p>所以记住这句话：Studio 是"开发时的显微镜"，Langfuse 是"上线后的仪表盘"。两者互补，不是替代。</p>
+    </div>
+  </section>
+
+  <!-- ============ 6. LANGFUSE CONCEPTS ============ -->
+  <section class="slide" data-title="Langfuse Concepts">
+    <p class="kicker">// part 02 · core concepts</p>
+    <h2 class="h2">Trace / Span / Event 三层结构<span class="accent">完整记录</span>每一次执行</h2>
+    <div class="grid g2 mt-l">
+      <div class="card">
+        <div class="tree">Trace（一次用户请求）
+<span style="color:#22d3ee">├──</span> Span: Node - parse_intent <span class="warn">(23ms)</span>
+<span style="color:#22d3ee">│</span>   <span style="color:#22d3ee">└──</span> Event: LLM Call <span class="warn">(312ms, tokens: 120→45)</span>
+<span style="color:#22d3ee">├──</span> Span: Node - extract_city <span class="warn">(15ms)</span>
+<span style="color:#22d3ee">├──</span> Span: Node - query_weather <span class="warn">(1203ms)</span>
+<span style="color:#22d3ee">│</span>   <span style="color:#22d3ee">└──</span> Event: HTTP Request <span class="warn">(1198ms)</span>
+<span style="color:#22d3ee">└──</span> Span: Node - format_weather_reply <span class="warn">(45ms)</span>
+    <span style="color:#22d3ee">└──</span> Event: LLM Call <span class="warn">(2300ms, tokens: 800→120)</span></div>
+      </div>
+      <div>
+        <div class="card">
+          <h4>Trace</h4>
+          <p>一次完整的图执行，对应一个 <span class="code">graph.invoke()</span> 调用</p>
+        </div>
+        <div class="card mt-m">
+          <h4>Span</h4>
+          <p>一个节点的执行，包含开始时间、耗时、输入输出</p>
+        </div>
+        <div class="card mt-m">
+          <h4>Event</h4>
+          <p>节点内部的具体操作：LLM 调用、HTTP 请求、数据库查询</p>
+        </div>
+      </div>
+    </div>
+    <div class="deck-footer">
+      <span>LG-10 · LangGraph Studio + Langfuse</span>
+      <span>6 / 10</span>
+    </div>
+    <div class="notes">
+      <p>Langfuse 的核心概念有三层：Trace、Span、Event。理解这三层，你就理解了 Langfuse 怎么组织数据。</p>
+      <p>Trace 是一次完整的图执行，对应你代码里的一次 graph.invoke() 调用。用户发一条消息，就是一个 Trace。</p>
+      <p>Span 是一个节点的执行。比如 parse_intent 执行了 23 毫秒，这就是一个 Span。每个 Span 包含开始时间、耗时、输入输出。</p>
+      <p>Event 是节点内部的具体操作。比如 parse_intent 里调了一次 LLM，耗时 312 毫秒，输入 120 tokens、输出 45 tokens——这是一个 Event。再比如 query_weather 里发了一个 HTTP 请求，耗时 1198 毫秒——这也是一个 Event。</p>
+      <p>看左边这棵树，你能一眼定位问题：query_weather 节点显示 1203 毫秒，但点进去发现 HTTP Request 占了 1198 毫秒。所以问题不是图的问题，是天气 API 响应慢。优化方向是加缓存或换 API。</p>
+      <p>这就是 Langfuse 的价值——瀑布图帮你精确找到瓶颈在哪一层。</p>
+    </div>
+  </section>
+
+  <!-- ============ 7. LANGFUSE SETUP ============ -->
+  <section class="slide" data-title="Langfuse Setup">
+    <p class="kicker">// part 02 · integration</p>
+    <h2 class="h2">接入 Langfuse 只需要<span class="accent">一行代码</span></h2>
+    <div class="grid g2 mt-l">
+      <div class="card">
+        <h4>Step 1 & 2：装包 + 配环境变量</h4>
+        <p style="font-family:'SF Mono',monospace;font-size:11px;background:rgba(15,23,42,0.8);padding:10px 12px;border-radius:6px;margin-top:8px;color:#7dd3fc">
+          <span style="color:#4ade80">pip</span> install langfuse<br><br>
+          <span style="color:#64748b"># 去 cloud.langfuse.com 注册，拿到 key</span><br>
+          <span style="color:#4ade80">export</span> LANGFUSE_PUBLIC_KEY=<span style="color:#a5d6ff">"pk-xxx"</span><br>
+          <span style="color:#4ade80">export</span> LANGFUSE_SECRET_KEY=<span style="color:#a5d6ff">"sk-xxx"</span>
+        </p>
+      </div>
+      <div class="card">
+        <h4>Step 3：一行代码接入</h4>
+        <p style="font-family:'SF Mono',monospace;font-size:11px;background:rgba(15,23,42,0.8);padding:10px 12px;border-radius:6px;margin-top:8px;color:#7dd3fc">
+          <span style="color:#4ade80">from</span> langfuse.callback <span style="color:#4ade80">import</span> CallbackHandler<br><br>
+          langfuse_handler = CallbackHandler(<br>
+          &nbsp;&nbsp;session_id=<span style="color:#a5d6ff">"weather-bot-demo"</span>,<br>
+          &nbsp;&nbsp;user_id=<span style="color:#a5d6ff">"student-01"</span>,<br>
+          )<br><br>
+          result = graph.invoke(<br>
+          &nbsp;&nbsp;{<span style="color:#a5d6ff">"messages"</span>: [HumanMessage(<span style="color:#a5d6ff">"..."</span>)]},<br>
+          &nbsp;&nbsp;config={<span style="color:#a5d6ff">"callbacks"</span>: [langfuse_handler]}<br>
+          )
+        </p>
+      </div>
+    </div>
+    <div class="card mt-l" style="border-left:3px solid #4ade80">
+      <p style="margin:0;font-size:13px"><strong style="color:#38bdf8">完了。</strong>不需要改图的定义，不需要改节点代码。LangGraph 会自动把每个节点、每次 LLM 调用都上报到 Langfuse。</p>
+    </div>
+    <div class="deck-footer">
+      <span>LG-10 · LangGraph Studio + Langfuse</span>
+      <span>7 / 10</span>
+    </div>
+    <div class="notes">
+      <p>接入 Langfuse 比你想象的简单得多，5 分钟搞定。</p>
+      <p>第一步，pip install langfuse。第二步，去 cloud.langfuse.com 注册一个账号，创建项目，拿到三个 key：PUBLIC_KEY、SECRET_KEY、HOST。Cloud 用户 HOST 用默认值就行。把前两个配成环境变量。</p>
+      <p>第三步，也是最关键的一步——一行代码接入。从 langfuse.callback 导入 CallbackHandler，创建一个实例，可以选填 session_id 和 user_id 来打标签。然后在 graph.invoke() 的时候，通过 config 参数把 callbacks 传进去。</p>
+      <p>完了。不需要改图的定义，不需要改任何节点代码。LangGraph 的回调机制会自动把每个节点的执行、每次 LLM 调用、每次工具调用都上报到 Langfuse。</p>
+    </div>
+  </section>
+
+  <!-- ============ 8. LANGFUSE DASHBOARD ============ -->
+  <section class="slide" data-title="Langfuse Dashboard">
+    <p class="kicker">// part 02 · what to look at</p>
+    <h2 class="h2">Langfuse 的<span class="accent">瀑布图</span>让慢节点和 Token 成本无处遁形</h2>
+    <div class="grid g2 mt-l">
+      <div class="card">
+        <h4>Trace 列表页</h4>
+        <ul class="mt-m">
+          <li>每次 <span class="code">invoke()</span> 一条记录</li>
+          <li>耗时、Token 数、成本一眼看到</li>
+          <li>支持按标签、用户、时间段筛选</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>Trace 详情页（瀑布图）</h4>
+        <p style="font-family:'SF Mono',monospace;font-size:11px;background:rgba(15,23,42,0.8);padding:10px 12px;border-radius:6px;margin-top:8px;color:#7dd3fc">
+          01:23:45.123 parse_intent&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#4ade80">████</span> (23ms)<br>
+          01:23:45.147 extract_city&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#4ade80">██</span> (15ms)<br>
+          01:23:45.163 query_weather&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#4ade80">████████████████</span> (1203ms) <span style="color:#fbbf24">← 最慢！</span><br>
+          01:23:46.367 format_weather&nbsp;&nbsp;&nbsp;<span style="color:#4ade80">████████</span> (2345ms)<br>
+          &nbsp;&nbsp;<span style="color:#22d3ee">└──</span> LLM Call&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#4ade80">████████████████</span> (2300ms) <span style="color:#fbbf24">← LLM 慢</span>
+        </p>
+      </div>
+    </div>
+    <div class="grid g3 mt-l">
+      <div class="card tc">
+        <span class="tag">Tags</span>
+        <p class="mt-m">按环境、项目打标签<br>避免开发数据混到生产</p>
+      </div>
+      <div class="card tc">
+        <span class="tag" style="background:rgba(167,139,250,0.15);color:#a78bfa">Score</span>
+        <p class="mt-m">给 Trace 打质量分数<br>0-1 分 + 评论</p>
+      </div>
+      <div class="card tc">
+        <span class="tag" style="background:rgba(34,211,238,0.15);color:#22d3ee">Prompt</span>
+        <p class="mt-m">点击节点看完整 prompt<br>输入输出、模型参数</p>
+      </div>
+    </div>
+    <div class="deck-footer">
+      <span>LG-10 · LangGraph Studio + Langfuse</span>
+      <span>8 / 10</span>
+    </div>
+    <div class="notes">
+      <p>接入之后，在 Langfuse 界面看两个页面。</p>
+      <p>第一个是 Trace 列表页。每次 invoke 一条记录，耗时、Token 数、成本一眼就能看到。你可以按标签、用户、时间段筛选。比如只看今天生产环境的请求，或者只看某个用户的请求。</p>
+      <p>第二个是 Trace 详情页，也就是瀑布图。这个页面是排查性能问题的利器。看右边这个示例：parse_intent 23 毫秒，extract_city 15 毫秒，query_weather 1203 毫秒——这里最慢。但点进去发现 HTTP Request 占了 1198 毫秒，所以问题不是图逻辑的问题，是外部 API 慢。</p>
+      <p>再看 format_weather_reply，总共 2345 毫秒，但 LLM Call 占了 2300 毫秒。这说明节点本身的逻辑很快，慢的是 LLM 推理。优化方向是换更快的模型或者精简 prompt。</p>
+      <p>下面三个小卡片是进阶功能：Tags 按环境打标签，避免开发数据混到生产；Score 给 Trace 打质量分数，做趋势监控；点击任意节点可以看完整的 prompt、输出、Token 用量、模型参数。</p>
+    </div>
+  </section>
+
+  <!-- ============ 9. PRACTICE ============ -->
+  <section class="slide" data-title="Practice">
+    <p class="kicker">// part 03 · hands-on</p>
+    <h2 class="h2">WeatherBot 加上 Langfuse 后，<span class="accent">每次执行都有迹可循</span></h2>
+    <p style="font-family:'SF Mono',monospace;font-size:11px;background:rgba(15,23,42,0.8);padding:10px 12px;border-radius:6px;margin-top:8px;color:#7dd3fc">
+      <span style="color:#64748b"># === 接入 Langfuse（在原有代码最后加这几行）===</span><br>
+      <span style="color:#4ade80">from</span> langfuse.callback <span style="color:#4ade80">import</span> CallbackHandler<br><br>
+      langfuse_handler = CallbackHandler(<br>
+      &nbsp;&nbsp;tags=[<span style="color:#a5d6ff">"env:development"</span>, <span style="color:#a5d6ff">"tutorial:lg-10"</span>]<br>
+      )<br><br>
+      <span style="color:#4ade80">for</span> query <span style="color:#4ade80">in</span> [<span style="color:#a5d6ff">"北京今天天气怎么样？"</span>, <span style="color:#a5d6ff">"现在几点了？"</span>, <span style="color:#a5d6ff">"讲个笑话"</span>]:<br>
+      &nbsp;&nbsp;result = graph.invoke(<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;{<span style="color:#a5d6ff">"messages"</span>: [HumanMessage(query)]},<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;config={<span style="color:#a5d6ff">"callbacks"</span>: [langfuse_handler]}<br>
+      &nbsp;&nbsp;)<br>
+      &nbsp;&nbsp;<span style="color:#4ade80">print</span>(<span style="color:#a5d6ff">f"用户: {query}"</span>)<br>
+      &nbsp;&nbsp;<span style="color:#4ade80">print</span>(<span style="color:#a5d6ff">f"Bot: {result['response']}\n"</span>)
+    </p>
+    <div class="grid g3 mt-l">
+      <div class="card tc">
+        <h4>课后作业 1</h4>
+        <p class="mt-m">在 Studio 里跑起来<br>截图图结构视图、状态面板、时间线</p>
+      </div>
+      <div class="card tc">
+        <h4>课后作业 2</h4>
+        <p class="mt-m">在 Langfuse 找三次 Trace<br>分析哪条分支耗时最长、为什么</p>
+      </div>
+      <div class="card tc">
+        <h4>思考题</h4>
+        <p class="mt-m">Studio 里把 intent 从 "weather"<br>改成 "other"，图会怎么走？</p>
+      </div>
+    </div>
+    <div class="deck-footer">
+      <span>LG-10 · LangGraph Studio + Langfuse</span>
+      <span>9 / 10</span>
+    </div>
+    <div class="notes">
+      <p>进入实战环节。WeatherBot 的完整代码讲义里已经有了，我重点讲接入 Langfuse 的部分。</p>
+      <p>在原有代码的最后，加这几行：导入 CallbackHandler，创建一个实例，打上两个标签——env:development 和 tutorial:lg-10。然后用 for 循环跑三个查询：天气、时间、笑话。每个查询都通过 config 传入 callbacks。</p>
+      <p>跑完之后，你去 Langfuse 界面，应该能看到三条 Trace。第一条走 weather 分支：parse_intent → extract_city → query_weather → format_weather_reply。第二条走 time 分支：parse_intent → get_time。第三条走 fallback 分支：parse_intent → fallback_reply。</p>
+      <p>课后作业有三个。第一个，在 Studio 里跑起来，截图三张。第二个，去 Langfuse 界面找到刚才的三次 Trace，回答哪条分支耗时最长、为什么。第三个思考题：Studio 里把 parse_intent 的 output 里 intent 从 "weather" 改成 "other"，重跑后图会怎么走？验证你的判断。</p>
+    </div>
+  </section>
+
+  <!-- ============ 10. SUMMARY ============ -->
+  <section class="slide" data-title="Summary">
+    <p class="kicker">// part 04 · summary</p>
+    <h2 class="h2">Studio 开发看细节，Langfuse 上线看<span class="accent">全局</span></h2>
+    <div class="grid g2 mt-l">
+      <div class="card">
+        <h4>LangGraph Studio —— 开发显微镜</h4>
+        <ul class="mt-m">
+          <li><span class="code">langgraph dev</span> 启动</li>
+          <li>节点高亮执行、查看 State、修改 State 重跑</li>
+          <li>核心能力：<strong style="color:#38bdf8">时间旅行调试</strong></li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>Langfuse —— 上线仪表盘</h4>
+        <ul class="mt-m">
+          <li>一行 <span class="code">CallbackHandler</span> 接入</li>
+          <li>Trace 看完整链路，瀑布图定位慢节点</li>
+          <li>Token 用量、成本分析、Tags、Score</li>
+        </ul>
+      </div>
+    </div>
+    <div class="mnemonic mt-l">
+      <p style="margin:0"><strong>记忆口诀</strong></p>
+      <p style="margin:8px 0 0 0;font-size:13px;color:#94a3b8">Studio 开发看细节，Langfuse 上线看全局。<br>Trace 是家谱，瀑布图找瓶颈，Tags 分环境，Score 量质量。</p>
+    </div>
+    <div class="deck-footer">
+      <span>LG-10 · 后续 LG-02~LG-07 每写一个 Agent 都用 Studio + Langfuse 调一遍</span>
+      <span>10 / 10</span>
+    </div>
+    <div class="notes">
+      <p>来到今天的总结。</p>
+      <p>我们学了两个让图从"黑盒"变"玻璃盒"的工具。第一个是 LangGraph Studio——开发时的显微镜。langgraph dev 启动，节点高亮执行、查看 State、修改 State 重跑、打断点。它的核心能力是时间旅行调试——不用改代码就能在中间节点改状态，看图会怎么走。</p>
+      <p>第二个是 Langfuse——上线后的仪表盘。一行 CallbackHandler 接入，Trace 看完整执行链路，瀑布图定位慢节点，Token 用量和成本分析精确到每次 LLM 调用。Tags 分环境，Score 量质量。</p>
+      <p>记住这个口诀：Studio 开发看细节，Langfuse 上线看全局。Trace 是家谱，瀑布图找瓶颈，Tags 分环境，Score 量质量。</p>
+      <p>与后续课程的衔接：LG-02 到 LG-07，每写一个新 Agent，都用 Studio 调一遍逻辑，用 Langfuse 看一遍 Trace。养成习惯。LG-09 会深入讲 Langfuse 的 Dataset、Prompt Hub、生产部署。今天的课是"入门"，那节课是"精通"。</p>
+      <p>好，LG-10 就到这里。谢谢大家！</p>
+    </div>
+  </section>
+
+</div>
+<script src="/Users/galaxyxieyu/.claude/skills/html-ppt-skill/assets/runtime.js"></script>
+</body></html>

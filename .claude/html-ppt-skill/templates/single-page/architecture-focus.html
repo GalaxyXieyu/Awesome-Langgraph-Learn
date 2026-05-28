@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>Architecture Focus</title>
+<link rel="stylesheet" href="../../assets/fonts.css">
+<link rel="stylesheet" href="../../assets/base.css">
+<link rel="stylesheet" id="theme-link" href="../../assets/themes/tokyo-night.css">
+<link rel="stylesheet" href="../../assets/animations/animations.css">
+<style>
+.focus-arch{display:grid;grid-template-rows:auto auto;gap:24px;margin-top:18px}
+.focus-arch .rail{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;align-items:center}
+.focus-arch .node{position:relative;padding:22px 18px;border-radius:18px;border:1px solid var(--border);background:var(--surface);box-shadow:var(--shadow);min-height:150px}
+.focus-arch .node::after{content:"";position:absolute;top:50%;right:-16px;width:14px;height:2px;background:var(--border-strong)}
+.focus-arch .node:last-child::after{display:none}
+.focus-arch .node .ey{display:inline-flex;padding:4px 10px;border-radius:999px;font-size:11px;font-family:var(--font-mono);color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent);border:1px solid color-mix(in srgb,var(--accent) 22%,transparent)}
+.focus-arch .node h4{font-size:22px;margin:16px 0 10px}
+.focus-arch .node p{font-size:13px;line-height:1.6;color:var(--text-2);margin:0}
+.focus-arch .node.active{border-color:color-mix(in srgb,var(--accent) 42%,transparent);box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 14%,transparent),0 22px 50px rgba(0,0,0,.16);transform:translateY(-6px)}
+.focus-arch .node.active::before{content:"CURRENT";position:absolute;top:12px;right:12px;font-size:10px;font-family:var(--font-mono);letter-spacing:.08em;color:var(--accent)}
+.focus-arch .detail{display:grid;grid-template-columns:1.2fr .8fr;gap:22px}
+.focus-arch .panel{border-radius:22px;border:1px solid var(--border);background:var(--surface);padding:24px 26px;box-shadow:var(--shadow)}
+.focus-arch .panel h3{font-size:30px;margin:10px 0 8px}
+.focus-arch .panel p{margin:0;color:var(--text-2);line-height:1.7}
+.focus-arch .parts{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:18px}
+.focus-arch .part{padding:14px 14px 12px;border-radius:14px;background:var(--surface-2);border:1px solid var(--border)}
+.focus-arch .part b{display:block;font-size:14px;margin-bottom:4px}
+.focus-arch .part span{font-size:12px;color:var(--text-3);line-height:1.55}
+.focus-arch .metrics{display:flex;flex-direction:column;gap:12px}
+.focus-arch .metric{padding:16px 16px 14px;border-radius:14px;background:var(--surface-2);border:1px solid var(--border)}
+.focus-arch .metric .n{display:block;font-size:32px;line-height:1;font-weight:800;letter-spacing:-.04em}
+.focus-arch .metric .t{display:block;font-size:12px;color:var(--text-3);margin-top:6px}
+</style>
+</head><body class="single">
+<div class="deck"><section class="slide is-active" data-title="Architecture Focus">
+  <p class="kicker">Architecture · 节点聚焦</p>
+  <h2 class="h2">逐个点亮节点，再在下面展开它的职责与结构</h2>
+  <div class="focus-arch">
+    <div class="rail anim-stagger-list" data-anim-target>
+      <div class="node"><span class="ey">01</span><h4>Frontend</h4><p>会话、任务、可视化、交互工作台。</p></div>
+      <div class="node active"><span class="ey">02</span><h4>API / Queue</h4><p>接收请求、创建任务、把长链路执行从同步接口拆开。</p></div>
+      <div class="node"><span class="ey">03</span><h4>Graph Runtime</h4><p>图编排、Writer、工具、中断和上下文注入。</p></div>
+      <div class="node"><span class="ey">04</span><h4>State Layer</h4><p>记忆、缓存、向量检索、观测与持久化。</p></div>
+    </div>
+    <div class="detail">
+      <div class="panel anim-fade-up" data-anim="fade-up">
+        <span class="ey">Focused detail</span>
+        <h3>API / Queue 这一层到底做什么？</h3>
+        <p>它不是简单转发请求，而是承担“控制面”的角色：接收会话上下文、参数和 graph 选择，创建 task，决定任务由谁执行，并把执行结果持续流式回传给前端。</p>
+        <div class="parts">
+          <div class="part"><b>FastAPI</b><span>REST API + SSE 入口，对前端暴露 sessions / tasks / agents / models 等端点。</span></div>
+          <div class="part"><b>Task lifecycle</b><span>生成 task_id，记录状态、失败、恢复点和任务输出。</span></div>
+          <div class="part"><b>Celery dispatch</b><span>把长任务交给 worker，不阻塞 API 进程。</span></div>
+          <div class="part"><b>Streaming bridge</b><span>把 Writer 产出的中间步骤与最终结果送回 UI。</span></div>
+        </div>
+      </div>
+      <div class="metrics anim-fade-right" data-anim="fade-right">
+        <div class="metric"><span class="n">4</span><span class="t">recommended nodes in the top rail</span></div>
+        <div class="metric"><span class="n">1</span><span class="t">focused node per beat</span></div>
+        <div class="metric"><span class="n">2-4</span><span class="t">detail cards / metrics below</span></div>
+      </div>
+    </div>
+  </div>
+</section></div>
+<script src="../../assets/runtime.js"></script>
+</body></html>

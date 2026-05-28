@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LG-07：流式输出与实时监控</title>
+<style>
+body { width: 720pt; height: 405pt; margin: 0; padding: 0; overflow: hidden; font-family: -apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans SC',sans-serif; background: #1a1b26; color: #c0caf5; }
+.slide { width: 720pt; height: 405pt; padding: 36px 48px; box-sizing: border-box; display: none; position: relative; }
+.slide.is-active { display: flex; flex-direction: column; }
+.kicker { font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; color: #7aa2f7; margin-bottom: 8px; }
+.h1 { font-size: 42px; font-weight: 800; line-height: 1.2; margin: 0 0 16px 0; color: #c0caf5; }
+.h2 { font-size: 28px; font-weight: 700; line-height: 1.3; margin: 0 0 12px 0; color: #c0caf5; }
+.lede { font-size: 16px; line-height: 1.6; color: #a9b1d6; margin: 0; }
+.card { background: rgba(36,40,59,0.9); border: 1px solid rgba(122,162,247,0.2); border-radius: 8px; padding: 16px; }
+.card h4 { font-size: 14px; font-weight: 600; margin: 0 0 8px 0; color: #7aa2f7; }
+.card p { font-size: 12px; line-height: 1.5; color: #a9b1d6; margin: 0; }
+.grid { display: grid; gap: 12px; }
+.g2 { grid-template-columns: 1fr 1fr; }
+.g3 { grid-template-columns: 1fr 1fr 1fr; }
+.mt-l { margin-top: 24px; }
+.mt-m { margin-top: 16px; }
+.tc { text-align: center; align-items: center; justify-content: center; }
+.center { display: flex; align-items: center; justify-content: center; }
+.deck-footer { position: absolute; bottom: 16px; left: 48px; right: 48px; display: flex; justify-content: space-between; font-size: 11px; color: #565f89; }
+.notes { display: none; }
+ul { margin: 0; padding-left: 20px; }
+li { font-size: 13px; line-height: 1.7; color: #a9b1d6; margin-bottom: 4px; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 12px; }
+th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid rgba(122,162,247,0.2); }
+th { color: #7aa2f7; font-weight: 600; background: rgba(36,40,59,0.6); }
+td { color: #a9b1d6; }
+pre { font-family: 'JetBrains Mono', 'SF Mono', monospace; font-size: 11px; line-height: 1.6; background: #0d1117; padding: 12px; border-radius: 6px; color: #e6edf3; overflow: hidden; }
+.accent { color: #7aa2f7; }
+.dim { color: #a9b1d6; }
+.tag { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 4px; background: rgba(122,162,247,0.15); color: #7aa2f7; }
+.tag-ok { background: rgba(74,222,128,0.15); color: #4ade80; }
+.tag-warn { background: rgba(251,191,36,0.15); color: #fbbf24; }
+.spectrum { display: flex; align-items: center; gap: 4px; margin-top: 12px; font-size: 11px; }
+.spectrum-item { flex: 1; text-align: center; padding: 8px 4px; border-radius: 6px; background: rgba(36,40,59,0.6); border: 1px solid rgba(122,162,247,0.2); color: #a9b1d6; }
+.spectrum-item.active { background: rgba(122,162,247,0.15); border-color: rgba(122,162,247,0.4); color: #7aa2f7; font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="deck">
+
+<!-- Slide 1: Cover -->
+<div class="slide is-active tc" data-index="1">
+  <div class="kicker">LangGraph 教程 · LG-07</div>
+  <div class="h1" style="font-size:48px;margin-bottom:20px;">流式输出与实时监控</div>
+  <div class="lede" style="max-width:520px;">把黑盒变成透明盒——让每一步执行都实时可见</div>
+  <div class="mt-l" style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+    <span class="tag">values</span>
+    <span class="tag">updates</span>
+    <span class="tag">messages</span>
+    <span class="tag">custom</span>
+    <span class="tag">tasks</span>
+  </div>
+  <div class="deck-footer"><span>LangGraph 渐进式教程</span><span>1 / 10</span></div>
+</div>
+
+<!-- Slide 2: Agenda -->
+<div class="slide" data-index="2">
+  <div class="kicker">目录</div>
+  <div class="h2">本课内容</div>
+  <div class="grid g2 mt-m" style="flex:1;">
+    <div class="card"><h4>01 · Stream Mode 全景概览</h4><p>7 种 stream_mode 的粒度光谱与选型</p></div>
+    <div class="card"><h4>02 · 核心 Stream Mode 深度讲解</h4><p>values、updates、messages、custom、tasks</p></div>
+    <div class="card"><h4>03 · 多 Mode 组合与嵌套 Agent</h4><p>组合使用、subgraphs=True、ns 命名空间过滤</p></div>
+    <div class="card"><h4>04 · 前端协议与业务决策</h4><p>三段式协议、消息信封、流式 vs 非流式决策矩阵</p></div>
+    <div class="card"><h4>05 · LiveWriter 案例</h4><p>实时写作助手的流式实现与前端消费</p></div>
+    <div class="card"><h4>06 · 常见误区与总结</h4><p>7 个最容易踩的坑、调试技巧、记忆口诀</p></div>
+  </div>
+  <div class="deck-footer"><span>LangGraph 渐进式教程</span><span>2 / 10</span></div>
+</div>
+
+<!-- Slide 3: Stream Mode Overview -->
+<div class="slide" data-index="3">
+  <div class="kicker">核心内容</div>
+  <div class="h2">7 种 stream_mode，粒度从粗到细</div>
+  <div class="spectrum">
+    <span class="spectrum-item">checkpoints</span>
+    <span style="color:#565f89;">→</span>
+    <span class="spectrum-item">values</span>
+    <span style="color:#565f89;">→</span>
+    <span class="spectrum-item">updates</span>
+    <span style="color:#565f89;">→</span>
+    <span class="spectrum-item">tasks</span>
+    <span style="color:#565f89;">→</span>
+    <span class="spectrum-item active">messages</span>
+    <span style="color:#565f89;">→</span>
+    <span class="spectrum-item">custom</span>
+  </div>
+  <div style="flex:1;overflow:auto;margin-top:12px;">
+    <table>
+      <tr><th>模式</th><th>何时推送</th><th>推送内容</th><th>适用场景</th></tr>
+      <tr><td>values</td><td>每个超级步结束</td><td>完整 State</td><td>状态面板、节点高亮</td></tr>
+      <tr><td>updates</td><td>每个超级步结束</td><td>节点返回的增量</td><td>带宽敏感、增量更新</td></tr>
+      <tr><td>messages</td><td>LLM 生成每个 token</td><td>(AIMessageChunk, metadata)</td><td>打字机效果、实时对话</td></tr>
+      <tr><td>custom</td><td>Node 内调用 writer()</td><td>自定义的任何数据</td><td>进度条、业务通知</td></tr>
+      <tr><td>tasks</td><td>任务 start/finish</td><td>TaskPayload / TaskResultPayload</td><td>执行监控、性能分析</td></tr>
+      <tr><td>debug</td><td>checkpoints + tasks</td><td>DebugPayload</td><td>开发调试（数据量大）</td></tr>
+    </table>
+  </div>
+  <div class="deck-footer"><span>LangGraph 渐进式教程</span><span>3 / 10</span></div>
+</div>
+
+<!-- Slide 4: values vs updates -->
+<div class="slide" data-index="4">
+  <div class="kicker">核心内容</div>
+  <div class="h2">values 看全局，updates 看变化</div>
+  <div class="grid g2 mt-m" style="flex:1;">
+    <div class="card">
+      <h4>stream_mode="values" — 完整状态快照</h4>
+      <pre style="margin-top:8px;font-size:10px;">{
+  "type": "values",
+  "ns": (),           # 命名空间
+  "data": {         # 完整的 State
+    "messages": [...],
+    "outline": ["引言", "背景"],
+    "current_node": "outline_planner"
+  }
+}</pre>
+      <p style="margin-top:8px;">每次推送都是<strong>完整 State</strong>，直接替换即可。State 大时带宽消耗高。</p>
+    </div>
+    <div class="card">
+      <h4>stream_mode="updates" — 增量更新</h4>
+      <pre style="margin-top:8px;font-size:10px;">{
+  "type": "updates",
+  "ns": (),
+  "data": {
+    "outline_planner": {
+      "outline": ["引言", "背景"]
+    }
+  }
+}</pre>
+      <p style="margin-top:8px;">只推送<strong>节点返回值</strong>，数据量小。前端需要 merge 到现有 State。</p>
+    </div>
+  </div>
+  <div class="mt-m card">
+    <h4>vs 对比</h4>
+    <p>values 适合 State 小、需要完整视图的场景；updates 适合 State 大、带宽敏感的场景（如移动端）。并行节点执行时，updates 会分开发送每个节点的结果。</p>
+  </div>
+  <div class="deck-footer"><span>LangGraph 渐进式教程</span><span>4 / 10</span></div>
+</div>
+
+<!-- Slide 5: messages mode -->
+<div class="slide" data-index="5">
+  <div class="kicker">核心内容</div>
+  <div class="h2">messages 模式让 LLM 的每个 token 实时可见</div>
+  <div style="background:rgba(36,40,59,0.9);border:1px solid rgba(122,162,247,0.2);border-radius:8px;padding:12px;margin-top:12px;">
+    <pre>async for chunk in graph.astream(input, stream_mode="messages"):
+    msg, metadata = chunk["data"]
+    print(f"来自节点: {metadata['langgraph_node']}")
+    print(f"Token: {msg.content}")</pre>
+  </div>
+  <div class="grid g2 mt-m" style="flex:1;">
+    <div class="card">
+      <h4>数据结构</h4>
+      <pre style="margin-top:8px;font-size:10px;">{
+  "type": "messages",
+  "ns": (),
+  "data": (
+    AIMessageChunk(content="我"),
+    {
+      "langgraph_step": 3,
+      "langgraph_node": "writer",
+      "langgraph_triggers": ["researcher"]
+    }
+  )
+}</pre>
+    </div>
+    <div class="card">
+      <h4>前端拼接（关键！）</h4>
+      <pre style="margin-top:8px;font-size:10px;">full_text = ""
+async for chunk in graph.astream(...):
+    msg, metadata = chunk["data"]
+    if hasattr(msg, "content"):
+        full_text += msg.content   # ← 追加，不是替换！
+    update_ui(full_text)</pre>
+    </div>
+  </div>
+  <div class="deck-footer"><span>LangGraph 渐进式教程</span><span>5 / 10</span></div>
+</div>
+
+<!-- Slide 6: custom vs tasks -->
+<div class="slide" data-index="6">
+  <div class="kicker">核心内容</div>
+  <div class="h2">custom 看进度，tasks 看生命周期</div>
+  <div class="grid g2 mt-m" style="flex:1;">
+    <div class="card">
+      <h4>stream_mode="custom" — 自定义事件</h4>
+      <pre style="margin-top:8px;font-size:10px;">async def research_node(state, writer):
+    sources = ["财经数据", "新闻", "竞品"]
+    for i, source in enumerate(sources):
+        writer({
+            "type": "progress",
+            "source": source,
+            "percent": (i + 1) / len(sources) * 100,
+            "status": "searching"
+        })
+        await search(source)</pre>
+      <p style="margin-top:8px;">writer 是<strong>自动注入</strong>的——只要在 Node 函数签名中声明 writer 参数，LangGraph 就会自动传入。</p>
+    </div>
+    <div class="card">
+      <h4>stream_mode="tasks" — 任务生命周期</h4>
+      <pre style="margin-top:8px;font-size:10px;"># Task Start
+{"type": "tasks", "data": {
+    "id": "outline_planner-abc",
+    "name": "outline_planner",
+    "input": {...},
+    "triggers": ["__start__"]
+}}
+
+# Task Finish
+{"type": "tasks", "data": {
+    "id": "outline_planner-abc",
+    "name": "outline_planner",
+    "error": None,
+    "result": {"outline": [...]}
+}}</pre>
+      <p style="margin-top:8px;">自动追踪 start/finish，<strong>无需在 Node 内手动 yield</strong>。失败时 error 字段包含完整错误信息。</p>
+    </div>
+  </div>
+  <div class="deck-footer"><span>LangGraph 渐进式教程</span><span>6 / 10</span></div>
+</div>
+
+<!-- Slide 7: Combined Modes -->
+<div class="slide" data-index="7">
+  <div class="kicker">核心内容</div>
+  <div class="h2">组合多种 mode，同时实现打字机 + 进度条 + 监控</div>
+  <div style="background:rgba(36,40,59,0.9);border:1px solid rgba(122,162,247,0.2);border-radius:8px;padding:12px;margin-top:12px;">
+    <pre>async for mode, chunk in graph.astream(
+    input,
+    stream_mode=["messages", "custom", "tasks"],
+    subgraphs=True    # ← 多 Agent 嵌套时必须开启
+):
+    if mode == "messages":
+        msg, metadata = chunk["data"]
+        append_token(msg.content)      # 打字机效果
+    elif mode == "custom":
+        update_progress(chunk["data"]["percent"])  # 进度条
+    elif mode == "tasks":
+        highlight_node(chunk["data"]["name"])   # 节点高亮</pre>
+  </div>
+  <div class="grid g2 mt-m" style="flex:1;">
+    <div class="card">
+      <h4>ns 命名空间含义</h4>
+      <ul style="margin-top:8px;">
+        <li><strong>()</strong> = 顶层图</li>
+        <li><strong>("subgraph",)</strong> = 名为 subgraph 的子图</li>
+        <li><strong>("supervisor", "weather_expert")</strong> = supervisor 图中的 weather_expert 子图</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>前端处理策略</h4>
+      <ul style="margin-top:8px;">
+        <li>顶层图事件 → <strong>主面板</strong>显示</li>
+        <li>子图事件 → <strong>可折叠详情面板</strong></li>
+        <li>多层嵌套 → 按层级分组展示</li>
+      </ul>
+    </div>
+  </div>
+  <div class="deck-footer"><span>LangGraph 渐进式教程</span><span>7 / 10</span></div>
+</div>
+
+<!-- Slide 8: Frontend Protocol -->
+<div class="slide" data-index="8">
+  <div class="kicker">核心内容</div>
+  <div class="h2">三段式流式协议：Start → Processing → End</div>
+  <div class="grid g3 mt-m">
+    <div class="card" style="text-align:center;">
+      <h4>start</h4>
+      <p>占位，创建消息容器，插入进度条</p>
+    </div>
+    <div class="card" style="text-align:center;">
+      <h4>processing</h4>
+      <p>内容增量，追加到容器，更新打字机</p>
+    </div>
+    <div class="card" style="text-align:center;">
+      <h4>end</h4>
+      <p>收尾，移除光标，启用复制，触发后续</p>
+    </div>
+  </div>
+  <div style="flex:1;overflow:auto;margin-top:12px;">
+    <table>
+      <tr><th>场景</th><th>是否流式</th><th>理由</th></tr>
+      <tr><td>LLM 生成自然语言</td><td><span class="tag-ok">必须流式</span></td><td>消除等待焦虑、提升 perceived speed</td></tr>
+      <tr><td>思考过程/推理链</td><td><span class="tag-ok">建议流式</span></td><td>让用户看到"AI 在思考"，建立信任</td></tr>
+      <tr><td>工具调用参数</td><td><span class="tag-warn">非流式</span></td><td>结构化数据，一次性展示更高效</td></tr>
+      <tr><td>工具执行结果</td><td><span class="tag-warn">非流式</span></td><td>结果完整性要求高，片段无意义</td></tr>
+      <tr><td>错误信息</td><td><span class="tag-warn">非流式</span></td><td>错误需要立即、完整呈现</td></tr>
+    </table>
+  </div>
+  <div class="deck-footer"><span>LangGraph 渐进式教程</span><span>8 / 10</span></div>
+</div>
+
+<!-- Slide 9: LiveWriter -->
+<div class="slide" data-index="9">
+  <div class="kicker">实战案例</div>
+  <div class="h2">LiveWriter：实时写作助手</div>
+  <div style="flex:1;overflow:auto;margin-top:12px;">
+    <table>
+      <tr><th>概念</th><th>LiveWriter 中的体现</th></tr>
+      <tr><td>values</td><td>实时状态面板显示当前执行到哪个节点</td></tr>
+      <tr><td>updates</td><td>段落进度条只接收新增的内容</td></tr>
+      <tr><td>messages</td><td>打字机效果，逐字生成文章</td></tr>
+      <tr><td>custom</td><td>自定义进度事件：「大纲完成 100%」「资料检索中...」</td></tr>
+      <tr><td>tasks</td><td>并行任务的执行状态（pending→running→completed）</td></tr>
+    </table>
+  </div>
+  <div style="background:rgba(36,40,59,0.9);border:1px solid rgba(122,162,247,0.2);border-radius:8px;padding:12px;margin-top:12px;">
+    <pre style="font-size:10px;">// 前端 WebSocket 消费示例
+ws.onmessage = (event) => {
+    const msg = JSON.parse(event.data);
+    switch (msg.type) {
+        case "token":      document.getElementById("article").textContent += msg.content; break;
+        case "progress":   updateProgressBar(msg.source, msg.percent); break;
+        case "task_start": highlightNode(msg.node); break;
+        case "task_end":   markNodeComplete(msg.node, msg.success); break;
+    }
+};</pre>
+  </div>
+  <div class="deck-footer"><span>LangGraph 渐进式教程</span><span>9 / 10</span></div>
+</div>
+
+<!-- Slide 10: Summary -->
+<div class="slide" data-index="10">
+  <div class="kicker">阶段小结</div>
+  <div class="h2">核心要点回顾</div>
+  <div class="grid g2 mt-m" style="flex:1;">
+    <div class="card">
+      <h4>5 种核心 Stream Mode</h4>
+      <ul>
+        <li><strong>values</strong> = 完整状态快照——适合状态面板</li>
+        <li><strong>updates</strong> = 增量更新——适合带宽敏感场景</li>
+        <li><strong>messages</strong> = token 级流式——适合打字机效果</li>
+        <li><strong>custom</strong> = 自定义事件——适合进度条</li>
+        <li><strong>tasks</strong> = 任务生命周期——适合监控</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>关键技巧与注意事项</h4>
+      <ul>
+        <li>组合 mode 时返回 <strong>(mode, chunk)</strong> 元组，需要解包</li>
+        <li>多 Agent 嵌套必须设置 <strong>subgraphs=True</strong></li>
+        <li>通过 <strong>ns</strong> 命名空间区分事件来源</li>
+        <li>messages 的 token 用 <strong>+= 追加</strong>，不是替换</li>
+        <li>三段式协议：<strong>start → processing → end</strong></li>
+      </ul>
+    </div>
+  </div>
+  <div class="mt-l tc" style="font-size:14px;color:#a9b1d6;line-height:1.8;">
+    <em>"values 看全局，updates 看变化，messages 看逐字，custom 看进度，tasks 看生命周期，subgraphs=True 看嵌套。"</em>
+  </div>
+  <div class="deck-footer"><span>LangGraph 渐进式教程</span><span>10 / 10</span></div>
+</div>
+
+</div>
+<script>
+(function(){
+  var slides = document.querySelectorAll('.slide');
+  var current = 0;
+  function show(i){
+    slides.forEach(function(s){s.classList.remove('is-active');});
+    slides[i].classList.add('is-active');
+    current = i;
+  }
+  document.addEventListener('keydown', function(e){
+    if(e.key==='ArrowRight'||e.key===' '||e.key==='PageDown'){
+      if(current<slides.length-1) show(current+1);
+    }else if(e.key==='ArrowLeft'||e.key==='PageUp'){
+      if(current>0) show(current-1);
+    }else if(e.key==='Home'){ show(0); }
+    else if(e.key==='End'){ show(slides.length-1); }
+  });
+}());
+</script>
+</body>
+</html>

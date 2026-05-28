@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>Pipeline Focus</title>
+<link rel="stylesheet" href="../../assets/fonts.css">
+<link rel="stylesheet" href="../../assets/base.css">
+<link rel="stylesheet" id="theme-link" href="../../assets/themes/tokyo-night.css">
+<link rel="stylesheet" href="../../assets/animations/animations.css">
+<style>
+.pf-wrap{display:grid;grid-template-rows:auto auto;gap:26px;margin-top:18px}
+.pf-line{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;align-items:center}
+.pf-node{position:relative;padding:20px 18px;border-radius:18px;border:1px solid var(--border);background:var(--surface);box-shadow:var(--shadow);min-height:170px}
+.pf-node:not(:last-child)::after{content:"";position:absolute;top:50%;right:-18px;width:18px;height:2px;background:var(--border-strong)}
+.pf-node .k{display:inline-flex;padding:4px 10px;border-radius:999px;font-size:11px;font-family:var(--font-mono);color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent);border:1px solid color-mix(in srgb,var(--accent) 22%,transparent)}
+.pf-node h4{margin:16px 0 8px;font-size:22px}
+.pf-node p{margin:0;color:var(--text-2);font-size:13px;line-height:1.6}
+.pf-node.active{transform:translateY(-6px);border-color:color-mix(in srgb,var(--accent) 42%,transparent);box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 14%,transparent),0 24px 56px rgba(0,0,0,.16)}
+.pf-node.active::before{content:"FOCUS";position:absolute;top:12px;right:12px;font-size:10px;font-family:var(--font-mono);letter-spacing:.08em;color:var(--accent)}
+.pf-detail{display:grid;grid-template-columns:1.1fr .9fr;gap:22px}
+.pf-panel{padding:24px 26px;border-radius:22px;border:1px solid var(--border);background:var(--surface);box-shadow:var(--shadow)}
+.pf-panel h3{font-size:30px;margin:10px 0 8px}
+.pf-panel p{margin:0;color:var(--text-2);line-height:1.7}
+.pf-bullets{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:18px}
+.pf-bullets .item{padding:14px 14px 12px;border-radius:14px;background:var(--surface-2);border:1px solid var(--border)}
+.pf-bullets .item b{display:block;font-size:14px;margin-bottom:4px}
+.pf-bullets .item span{font-size:12px;color:var(--text-3);line-height:1.55}
+.pf-side{display:flex;flex-direction:column;gap:12px}
+.pf-metric{padding:16px 16px 14px;border-radius:14px;background:var(--surface-2);border:1px solid var(--border)}
+.pf-metric .n{display:block;font-size:32px;line-height:1;font-weight:800;letter-spacing:-.04em}
+.pf-metric .t{display:block;font-size:12px;color:var(--text-3);margin-top:6px}
+</style>
+</head><body class="single">
+<div class="deck"><section class="slide is-active" data-title="Pipeline Focus">
+  <p class="kicker">Pipeline · 节点聚焦</p>
+  <h2 class="h2">先把整条链路摆出来，再聚焦当前阶段的输入、动作和输出</h2>
+  <div class="pf-wrap">
+    <div class="pf-line anim-stagger-list" data-anim-target>
+      <div class="pf-node"><span class="k">01</span><h4>Input</h4><p>用户问题、文件、上下文、会话状态。</p></div>
+      <div class="pf-node active"><span class="k">02</span><h4>Analyze</h4><p>意图识别、路由判断、参数整理、任务初始化。</p></div>
+      <div class="pf-node"><span class="k">03</span><h4>Execute</h4><p>调用 graph / tool / search / writer 持续流式执行。</p></div>
+      <div class="pf-node"><span class="k">04</span><h4>Return</h4><p>结果输出、状态落盘、中断恢复、前端回放。</p></div>
+    </div>
+    <div class="pf-detail">
+      <div class="pf-panel anim-fade-up" data-anim="fade-up">
+        <span class="k">Focused stage</span>
+        <h3>Analyze 阶段：为什么它决定了后面整条链路的质量？</h3>
+        <p>这一步负责把自然语言请求转换成“系统可执行的任务描述”。如果分析层做得弱，后面的 graph、tool、writer 再强，也只是在执行一个被误解的目标。</p>
+        <div class="pf-bullets">
+          <div class="item"><b>Intent</b><span>判断用户是在问答、研究、写作、查询还是执行型任务。</span></div>
+          <div class="item"><b>Routing</b><span>决定进入哪个 graph、哪个 mode，是否需要人机确认。</span></div>
+          <div class="item"><b>Parameters</b><span>补齐运行参数，整理模型、工具、限制条件和上下文。</span></div>
+          <div class="item"><b>Risk control</b><span>在高风险动作前插入中断点，避免错误执行代价过高。</span></div>
+        </div>
+      </div>
+      <div class="pf-side anim-fade-right" data-anim="fade-right">
+        <div class="pf-metric"><span class="n">4</span><span class="t">recommended stages in the top pipeline</span></div>
+        <div class="pf-metric"><span class="n">1</span><span class="t">focused stage per reveal beat</span></div>
+        <div class="pf-metric"><span class="n">3</span><span class="t">best detail dimensions: intent / action / output</span></div>
+      </div>
+    </div>
+  </div>
+</section></div>
+<script src="../../assets/runtime.js"></script>
+</body></html>

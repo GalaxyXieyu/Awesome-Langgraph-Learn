@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LG-07：流式输出与实时监控</title>
+<link rel="stylesheet" href="/Users/galaxyxieyu/.claude/skills/html-ppt-skill/assets/fonts.css">
+<link rel="stylesheet" href="/Users/galaxyxieyu/.claude/skills/html-ppt-skill/assets/base.css">
+<link rel="stylesheet" id="theme-link" href="/Users/galaxyxieyu/.claude/skills/html-ppt-skill/assets/themes/tokyo-night.css">
+<link rel="stylesheet" href="/Users/galaxyxieyu/.claude/skills/html-ppt-skill/assets/animations/animations.css">
+<style>
+body { width: 720pt; height: 405pt; margin: 0; padding: 0; overflow: hidden; font-family: 'Inter','Noto Sans SC',sans-serif; background: #0f172a; color: #e2e8f0; }
+.slide { width: 720pt; height: 405pt; padding: 36px 48px; box-sizing: border-box; display: none; position: relative; }
+.slide.is-active { display: flex; flex-direction: column; }
+.kicker { font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; color: #94a3b8; margin-bottom: 8px; }
+.h1 { font-size: 42px; font-weight: 800; line-height: 1.2; margin: 0 0 16px 0; color: #f8fafc; }
+.h2 { font-size: 28px; font-weight: 700; line-height: 1.3; margin: 0 0 12px 0; color: #f1f5f9; }
+.lede { font-size: 16px; line-height: 1.6; color: #cbd5e1; margin: 0; }
+.card { background: rgba(30,41,59,0.8); border: 1px solid rgba(148,163,184,0.2); border-radius: 8px; padding: 16px; }
+.card h4 { font-size: 14px; font-weight: 600; margin: 0 0 8px 0; color: #38bdf8; }
+.card p { font-size: 12px; line-height: 1.5; color: #94a3b8; margin: 0; }
+.grid { display: grid; gap: 12px; }
+.g2 { grid-template-columns: 1fr 1fr; }
+.g3 { grid-template-columns: 1fr 1fr 1fr; }
+.mt-l { margin-top: 24px; }
+.mt-m { margin-top: 16px; }
+.tc { text-align: center; align-items: center; justify-content: center; }
+.center { display: flex; align-items: center; justify-content: center; }
+.deck-footer { position: absolute; bottom: 16px; left: 48px; right: 48px; display: flex; justify-content: space-between; font-size: 11px; color: #64748b; }
+.notes { display: none; }
+ul { margin: 0; padding-left: 20px; }
+li { font-size: 13px; line-height: 1.7; color: #cbd5e1; margin-bottom: 4px; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 12px; }
+th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid rgba(148,163,184,0.2); }
+th { color: #38bdf8; font-weight: 600; background: rgba(30,41,59,0.6); }
+td { color: #cbd5e1; }
+.code-block { background: rgba(15,23,42,0.9); border: 1px solid rgba(148,163,184,0.15); border-radius: 6px; padding: 12px 16px; font-family: 'JetBrains Mono','Fira Code',monospace; font-size: 11px; line-height: 1.6; color: #a5b4fc; overflow-x: auto; }
+.code-block .kw { color: #c084fc; }
+.code-block .fn { color: #60a5fa; }
+.code-block .str { color: #86efac; }
+.code-block .comment { color: #64748b; }
+.spectrum { display: flex; align-items: center; gap: 4px; margin-top: 12px; font-size: 11px; }
+.spectrum-item { flex: 1; text-align: center; padding: 8px 4px; border-radius: 6px; background: rgba(30,41,59,0.6); border: 1px solid rgba(148,163,184,0.2); color: #94a3b8; }
+.spectrum-item.active { background: rgba(56,189,248,0.15); border-color: rgba(56,189,248,0.4); color: #38bdf8; font-weight: 600; }
+.tag { display: inline-block; background: rgba(56,189,248,0.15); border: 1px solid rgba(56,189,248,0.3); border-radius: 4px; padding: 2px 8px; font-size: 11px; color: #38bdf8; }
+.tag-warn { background: rgba(251,191,36,0.15); border-color: rgba(251,191,36,0.3); color: #fbbf24; }
+.tag-ok { background: rgba(74,222,128,0.15); border-color: rgba(74,222,128,0.3); color: #4ade80; }
+
+@media print {
+  .slide { display: flex !important; page-break-after: always; break-after: page; }
+  .slide:last-child { page-break-after: auto; }
+  body { width: 100%; height: 100%; background: #0f172a; }
+}
+</style>
+</head>
+<body>
+<div class="deck">
+
+<!-- Slide 1: 封面 -->
+<section class="slide tc" data-title="封面">
+  <div class="kicker">LangGraph 教程 · LG-07</div>
+  <div class="h1" style="font-size:48px;">流式输出与实时监控</div>
+  <p class="lede" style="margin-top:12px;">把黑盒变成透明盒——让每一步执行都实时可见</p>
+  <div style="margin-top:32px; display:flex; gap:16px; justify-content:center;">
+    <span class="tag">values</span>
+    <span class="tag">updates</span>
+    <span class="tag">messages</span>
+    <span class="tag">custom</span>
+    <span class="tag">tasks</span>
+  </div>
+  <div class="deck-footer">
+    <span>LangGraph 渐进式教程</span>
+    <span>LG-07 / 11</span>
+  </div>
+  <div class="notes">
+    开场白：大家用过 ChatGPT 吧？它的打字机效果不只是为了好看，更重要的是消除等待焦虑。但我们前面写的图都是黑盒执行：调用 invoke()，等几秒或几十秒，然后蹦出一个最终结果。今天的主题是把黑盒变成透明盒——让每一个中间状态、每一条生成的 token、每一次节点执行，都实时推送到用户眼前。
+  </div>
+</section>
+
+<!-- Slide 2: 目录 -->
+<section class="slide" data-title="目录">
+  <div class="kicker">Contents</div>
+  <div class="h2">本章节内容</div>
+  <div class="grid g2 mt-m">
+    <div class="card">
+      <h4>01 Stream Mode 全景概览</h4>
+      <p>7 种 stream_mode 的粒度光谱与选型</p>
+    </div>
+    <div class="card">
+      <h4>02 核心 Stream Mode 深度讲解</h4>
+      <p>values、updates、messages、custom、tasks</p>
+    </div>
+    <div class="card">
+      <h4>03 多 Mode 组合与嵌套 Agent</h4>
+      <p>组合使用、subgraphs=True、ns 命名空间过滤</p>
+    </div>
+    <div class="card">
+      <h4>04 前端协议与业务决策</h4>
+      <p>三段式协议、消息信封、流式 vs 非流式决策矩阵</p>
+    </div>
+    <div class="card">
+      <h4>05 LiveWriter 案例</h4>
+      <p>实时写作助手的流式实现与前端消费</p>
+    </div>
+    <div class="card">
+      <h4>06 常见误区与总结</h4>
+      <p>7 个最容易踩的坑、调试技巧、记忆口诀</p>
+    </div>
+  </div>
+  <div class="deck-footer">
+    <span>LangGraph 渐进式教程</span>
+    <span>LG-07 / 11</span>
+  </div>
+  <div class="notes">
+    本节课围绕流式输出展开，从 7 种 stream_mode 的全景概览，到每种模式的深度讲解，再到多模式组合与多 Agent 嵌套时的流式事件处理，最后通过 LiveWriter 案例展示完整的业务实现。
+  </div>
+</section>
+
+<!-- Slide 3: Stream Mode 全景概览 -->
+<section class="slide" data-title="Stream Mode 全景概览">
+  <div class="kicker">Stream Mode Overview</div>
+  <div class="h2">7 种 stream_mode，粒度从粗到细</div>
+  <div class="spectrum">
+    <span class="spectrum-item">checkpoints</span>
+    <span style="color:#64748b;">→</span>
+    <span class="spectrum-item">values</span>
+    <span style="color:#64748b;">→</span>
+    <span class="spectrum-item">updates</span>
+    <span style="color:#64748b;">→</span>
+    <span class="spectrum-item">tasks</span>
+    <span style="color:#64748b;">→</span>
+    <span class="spectrum-item active">messages</span>
+    <span style="color:#64748b;">→</span>
+    <span class="spectrum-item">custom</span>
+  </div>
+  <table class="mt-m">
+    <tr><th>模式</th><th>何时推送</th><th>推送内容</th><th>适用场景</th></tr>
+    <tr><td>values</td><td>每个超级步结束</td><td>完整 State</td><td>状态面板、节点高亮</td></tr>
+    <tr><td>updates</td><td>每个超级步结束</td><td>节点返回的增量</td><td>带宽敏感、增量更新</td></tr>
+    <tr><td>messages</td><td>LLM 生成每个 token</td><td>(AIMessageChunk, metadata)</td><td>打字机效果、实时对话</td></tr>
+    <tr><td>custom</td><td>Node 内调用 writer()</td><td>自定义的任何数据</td><td>进度条、业务通知</td></tr>
+    <tr><td>tasks</td><td>任务 start/finish</td><td>TaskPayload / TaskResultPayload</td><td>执行监控、性能分析</td></tr>
+    <tr><td>debug</td><td>checkpoints + tasks</td><td>DebugPayload</td><td>开发调试（数据量大）</td></tr>
+  </table>
+  <div class="deck-footer">
+    <span>LangGraph 渐进式教程</span>
+    <span>LG-07 / 11</span>
+  </div>
+  <div class="notes">
+    LangGraph 1.x 提供 7 种 stream_mode，按粒度从粗到细排列。checkpoints 最粗，推送 Checkpoint 快照；values 推送完整 State；updates 只推送节点返回值；tasks 自动追踪节点生命周期；messages 是 LLM 每生成一个 token 就推送；custom 最灵活，通过 writer() 主动推送任意数据；debug 是 checkpoints + tasks 的组合，数据量最大，只建议在开发阶段使用。选型原则：人读的东西流式，机器读的东西非流式。
+  </div>
+</section>
+
+<!-- Slide 4: values 与 updates -->
+<section class="slide" data-title="values 与 updates">
+  <div class="kicker">State Observation</div>
+  <div class="h2">values 看全局，updates 看变化</div>
+  <div class="grid g2 mt-m">
+    <div class="card">
+      <h4>stream_mode="values" — 完整状态快照</h4>
+      <div class="code-block" style="margin-top:8px; font-size:10px;">
+{
+  <span class="str">"type"</span>: <span class="str">"values"</span>,
+  <span class="str">"ns"</span>: (),           <span class="comment"># 命名空间</span>
+  <span class="str">"data"</span>: {         <span class="comment"># 完整的 State</span>
+    <span class="str">"messages"</span>: [...],
+    <span class="str">"outline"</span>: [<span class="str">"引言"</span>, <span class="str">"背景"</span>],
+    <span class="str">"current_node"</span>: <span class="str">"outline_planner"</span>
+  }
+}
+      </div>
+      <p style="margin-top:8px;">每次推送都是<strong>完整 State</strong>，直接替换即可。State 大时带宽消耗高。</p>
+    </div>
+    <div class="card">
+      <h4>stream_mode="updates" — 增量更新</h4>
+      <div class="code-block" style="margin-top:8px; font-size:10px;">
+{
+  <span class="str">"type"</span>: <span class="str">"updates"</span>,
+  <span class="str">"ns"</span>: (),
+  <span class="str">"data"</span>: {
+    <span class="str">"outline_planner"</span>: {
+      <span class="str">"outline"</span>: [<span class="str">"引言"</span>, <span class="str">"背景"</span>]
+    }
+  }
+}
+      </div>
+      <p style="margin-top:8px;">只推送<strong>节点返回值</strong>，数据量小。前端需要 merge 到现有 State。</p>
+    </div>
+  </div>
+  <div class="mt-m card">
+    <h4>vs 对比</h4>
+    <p>values 适合 State 小、需要完整视图的场景；updates 适合 State 大、带宽敏感的场景（如移动端）。并行节点执行时，updates 会分开发送每个节点的结果。</p>
+  </div>
+  <div class="deck-footer">
+    <span>LangGraph 渐进式教程</span>
+    <span>LG-07 / 11</span>
+  </div>
+  <div class="notes">
+    values 每次超级步结束后推送完整的 State。优点是前端处理简单——直接替换整个 State。缺点是如果 State 很大，带宽消耗高。updates 只推送每个节点返回的增量数据，数据结构是 {node_name: node_output}。优点是数据量小，适合带宽敏感场景。缺点是前端需要把增量 merge 到现有 State。并行节点同时执行时，updates 会分开发送每个节点的结果。
+  </div>
+</section>
+
+<!-- Slide 5: messages 模式 — Token 级流式 -->
+<section class="slide" data-title="messages 模式">
+  <div class="kicker">Token Streaming</div>
+  <div class="h2">messages 模式让 LLM 的每个 token 实时可见</div>
+  <div class="code-block mt-m">
+<span class="kw">async for</span> chunk <span class="kw">in</span> graph.astream(input, stream_mode=<span class="str">"messages"</span>):
+    msg, metadata = chunk[<span class="str">"data"</span>]
+    <span class="kw">print</span>(<span class="str">f"来自节点: {metadata['langgraph_node']}"</span>)
+    <span class="kw">print</span>(<span class="str">f"Token: {msg.content}"</span>)
+  </div>
+  <div class="grid g2 mt-m">
+    <div class="card">
+      <h4>数据结构</h4>
+      <div class="code-block" style="margin-top:8px; font-size:10px;">
+{
+  <span class="str">"type"</span>: <span class="str">"messages"</span>,
+  <span class="str">"ns"</span>: (),
+  <span class="str">"data"</span>: (
+    AIMessageChunk(content=<span class="str">"我"</span>),
+    {
+      <span class="str">"langgraph_step"</span>: 3,
+      <span class="str">"langgraph_node"</span>: <span class="str">"writer"</span>,
+      <span class="str">"langgraph_triggers"</span>: [<span class="str">"researcher"</span>]
+    }
+  )
+}
+      </div>
+    </div>
+    <div class="card">
+      <h4>前端拼接（关键！）</h4>
+      <div class="code-block" style="margin-top:8px; font-size:10px;">
+full_text = <span class="str">""</span>
+<span class="kw">async for</span> chunk <span class="kw">in</span> graph.astream(...):
+    msg, metadata = chunk[<span class="str">"data"</span>]
+    <span class="kw">if</span> <span class="fn">hasattr</span>(msg, <span class="str">"content"</span>):
+        full_text += msg.content   <span class="comment"># ← 追加，不是替换！</span>
+    update_ui(full_text)
+      </div>
+    </div>
+  </div>
+  <div class="deck-footer">
+    <span>LangGraph 渐进式教程</span>
+    <span>LG-07 / 11</span>
+  </div>
+  <div class="notes">
+    messages 模式是实现打字机效果的核心。数据结构是 (AIMessageChunk, metadata) 元组。metadata 包含 langgraph_step、langgraph_node、langgraph_triggers 等信息——告诉你这个 token 来自哪个节点、第几步、被谁触发。前端拼接有一个最容易踩的坑：token 是增量，必须用 += 追加，不能赋值替换。messages 模式只捕获通过 LangChain ChatModel 调用产生的 token。如果节点内直接 return 字符串，不走 LLM，不会触发 messages 事件。
+  </div>
+</section>
+
+<!-- Slide 6: custom 与 tasks 模式 -->
+<section class="slide" data-title="custom 与 tasks">
+  <div class="kicker">Custom Events & Lifecycle</div>
+  <div class="h2">custom 看进度，tasks 看生命周期</div>
+  <div class="grid g2 mt-m">
+    <div class="card">
+      <h4>stream_mode="custom" — 自定义事件</h4>
+      <div class="code-block" style="margin-top:8px; font-size:10px;">
+<span class="kw">async def</span> <span class="fn">research_node</span>(state, writer):
+    sources = [<span class="str">"财经数据"</span>, <span class="str">"新闻"</span>, <span class="str">"竞品"</span>]
+    <span class="kw">for</span> i, source <span class="kw">in</span> <span class="fn">enumerate</span>(sources):
+        writer({
+            <span class="str">"type"</span>: <span class="str">"progress"</span>,
+            <span class="str">"source"</span>: source,
+            <span class="str">"percent"</span>: (i + 1) / <span class="fn">len</span>(sources) * 100,
+            <span class="str">"status"</span>: <span class="str">"searching"</span>
+        })
+        <span class="kw">await</span> search(source)
+      </div>
+      <p style="margin-top:8px;">writer 是<strong>自动注入</strong>的——只要在 Node 函数签名中声明 writer 参数，LangGraph 就会自动传入。</p>
+    </div>
+    <div class="card">
+      <h4>stream_mode="tasks" — 任务生命周期</h4>
+      <div class="code-block" style="margin-top:8px; font-size:10px;">
+<span class="comment"># Task Start</span>
+{<span class="str">"type"</span>: <span class="str">"tasks"</span>, <span class="str">"data"</span>: {
+    <span class="str">"id"</span>: <span class="str">"outline_planner-abc"</span>,
+    <span class="str">"name"</span>: <span class="str">"outline_planner"</span>,
+    <span class="str">"input"</span>: {...},
+    <span class="str">"triggers"</span>: [<span class="str">"__start__"</span>]
+}}
+
+<span class="comment"># Task Finish</span>
+{<span class="str">"type"</span>: <span class="str">"tasks"</span>, <span class="str">"data"</span>: {
+    <span class="str">"id"</span>: <span class="str">"outline_planner-abc"</span>,
+    <span class="str">"name"</span>: <span class="str">"outline_planner"</span>,
+    <span class="str">"error"</span>: <span class="kw">None</span>,
+    <span class="str">"result"</span>: {<span class="str">"outline"</span>: [...]}
+}}
+      </div>
+      <p style="margin-top:8px;">自动追踪 start/finish，<strong>无需在 Node 内手动 yield</strong>。失败时 error 字段包含完整错误信息。</p>
+    </div>
+  </div>
+  <div class="deck-footer">
+    <span>LangGraph 渐进式教程</span>
+    <span>LG-07 / 11</span>
+  </div>
+  <div class="notes">
+    custom 的核心是 writer 函数。只要在 Node 函数签名中声明 writer 参数，LangGraph 就会自动注入。你在 Node 内部调用 writer({...}) 推送任意自定义数据。tasks 是自动的——不需要你在 Node 里写任何代码，LangGraph 自动发送每个节点的 start 和 finish 事件。通过 start 和 finish 的时间差，可以计算每个节点的执行时长。custom 是手动的、业务级的、可以多次推送的，适合前端进度条；tasks 是自动的、系统级的、节点级粒度的，适合性能监控和错误追踪。
+  </div>
+</section>
+
+<!-- Slide 7: 多 Mode 组合与嵌套 Agent -->
+<section class="slide" data-title="多 Mode 组合与嵌套 Agent">
+  <div class="kicker">Combined Modes & Nested Agents</div>
+  <div class="h2">组合多种 mode，同时实现打字机 + 进度条 + 监控</div>
+  <div class="code-block mt-m">
+<span class="comment"># 同时获取 messages + custom + tasks</span>
+<span class="kw">async for</span> mode, chunk <span class="kw">in</span> graph.astream(
+    input,
+    stream_mode=[<span class="str">"messages"</span>, <span class="str">"custom"</span>, <span class="str">"tasks"</span>],
+    subgraphs=<span class="kw">True</span>    <span class="comment"># ← 多 Agent 嵌套时必须开启</span>
+):
+    <span class="kw">if</span> mode == <span class="str">"messages"</span>:
+        msg, metadata = chunk[<span class="str">"data"</span>]
+        append_token(msg.content)      <span class="comment"># 打字机效果</span>
+    <span class="kw">elif</span> mode == <span class="str">"custom"</span>:
+        update_progress(chunk[<span class="str">"data"</span>][<span class="str">"percent"</span>])  <span class="comment"># 进度条</span>
+    <span class="kw">elif</span> mode == <span class="str">"tasks"</span>:
+        highlight_node(chunk[<span class="str">"data"</span>][<span class="str">"name"</span>])   <span class="comment"># 节点高亮</span>
+  </div>
+  <div class="grid g2 mt-m">
+    <div class="card">
+      <h4>ns 命名空间含义</h4>
+      <ul style="margin-top:8px;">
+        <li><strong>()</strong> = 顶层图</li>
+        <li><strong>("subgraph",)</strong> = 名为 subgraph 的子图</li>
+        <li><strong>("supervisor", "weather_expert")</strong> = supervisor 图中的 weather_expert 子图</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>前端处理策略</h4>
+      <ul style="margin-top:8px;">
+        <li>顶层图事件 → <strong>主面板</strong>显示</li>
+        <li>子图事件 → <strong>可折叠详情面板</strong></li>
+        <li>多层嵌套 → 按层级分组展示</li>
+      </ul>
+    </div>
+  </div>
+  <div class="deck-footer">
+    <span>LangGraph 渐进式教程</span>
+    <span>LG-07 / 11</span>
+  </div>
+  <div class="notes">
+    实际项目中很少只用一种 stream_mode。最常见的组合是 messages + custom + tasks。组合 mode 时，每次迭代返回 (mode, chunk) 元组——mode 是字符串，告诉你这是什么类型的事件；chunk 是事件数据。多 Agent 嵌套时必须设置 subgraphs=True，子图的事件才会流出来。每个 StreamPart 都包含 ns 字段，用来标识事件来源的图层级。前端处理策略：顶层图的事件直接展示在主面板；子图的事件默认折叠在详情面板里，点击才展开。
+  </div>
+</section>
+
+<!-- Slide 8: 前端协议与业务决策 -->
+<section class="slide" data-title="前端协议与业务决策">
+  <div class="kicker">Frontend Protocol & Business Decision</div>
+  <div class="h2">三段式流式协议：Start → Processing → End</div>
+  <div class="grid g3 mt-m">
+    <div class="card" style="text-align:center;">
+      <h4>start</h4>
+      <p>占位，创建消息容器，插入进度条</p>
+    </div>
+    <div class="card" style="text-align:center;">
+      <h4>processing</h4>
+      <p>内容增量，追加到容器，更新打字机</p>
+    </div>
+    <div class="card" style="text-align:center;">
+      <h4>end</h4>
+      <p>收尾，移除光标，启用复制，触发后续</p>
+    </div>
+  </div>
+  <table class="mt-m">
+    <tr><th>场景</th><th>是否流式</th><th>理由</th></tr>
+    <tr><td>LLM 生成自然语言</td><td><span class="tag-ok">必须流式</span></td><td>消除等待焦虑、提升 perceived speed</td></tr>
+    <tr><td>思考过程/推理链</td><td><span class="tag-ok">建议流式</span></td><td>让用户看到"AI 在思考"，建立信任</td></tr>
+    <tr><td>工具调用参数</td><td><span class="tag-warn">非流式</span></td><td>结构化数据，一次性展示更高效</td></tr>
+    <tr><td>工具执行结果</td><td><span class="tag-warn">非流式</span></td><td>结果完整性要求高，片段无意义</td></tr>
+    <tr><td>错误信息</td><td><span class="tag-warn">非流式</span></td><td>错误需要立即、完整呈现</td></tr>
+  </table>
+  <div class="deck-footer">
+    <span>LangGraph 渐进式教程</span>
+    <span>LG-07 / 11</span>
+  </div>
+  <div class="notes">
+    对于必须流式的消息，推荐三段式协议：start 阶段告知前端"这个流开始了"，创建消息容器；processing 阶段推送实际的内容增量；end 阶段告知前端"这个流结束了"，可以做后续操作。没有 end 的问题很严重：前端不知道流什么时候结束，光标永远闪烁，无法触发后续操作，网络抖动时无法区分"还在生成"还是"已断连"。核心原则：人读的东西流式，机器读的东西非流式。LLM 生成的自然语言流式，工具调用和错误信息非流式。
+  </div>
+</section>
+
+<!-- Slide 9: LiveWriter 案例 -->
+<section class="slide" data-title="LiveWriter 案例">
+  <div class="kicker">Case Study: LiveWriter</div>
+  <div class="h2">实时写作助手：并行检索 → 逐段生成 → 实时显示</div>
+  <table class="mt-m">
+    <tr><th>概念</th><th>LiveWriter 中的体现</th></tr>
+    <tr><td>values</td><td>实时状态面板显示当前执行到哪个节点</td></tr>
+    <tr><td>updates</td><td>段落进度条只接收新增的内容</td></tr>
+    <tr><td>messages</td><td>打字机效果，逐字生成文章</td></tr>
+    <tr><td>custom</td><td>自定义进度事件：「大纲完成 100%」「资料检索中...」</td></tr>
+    <tr><td>tasks</td><td>并行任务的执行状态（pending→running→completed）</td></tr>
+  </table>
+  <div class="code-block mt-m" style="font-size:10px;">
+<span class="comment"># 前端 WebSocket 消费示例</span>
+ws.onmessage = (event) => {
+    <span class="kw">const</span> msg = JSON.parse(event.data);
+    <span class="kw">switch</span> (msg.type) {
+        <span class="kw">case</span> <span class="str">"token"</span>:      document.getElementById(<span class="str">"article"</span>).textContent += msg.content; <span class="kw">break</span>;
+        <span class="kw">case</span> <span class="str">"progress"</span>:   updateProgressBar(msg.source, msg.percent); <span class="kw">break</span>;
+        <span class="kw">case</span> <span class="str">"task_start"</span>: highlightNode(msg.node); <span class="kw">break</span>;
+        <span class="kw">case</span> <span class="str">"task_end"</span>:   markNodeComplete(msg.node, msg.success); <span class="kw">break</span>;
+    }
+};
+  </div>
+  <div class="deck-footer">
+    <span>LangGraph 渐进式教程</span>
+    <span>LG-07 / 11</span>
+  </div>
+  <div class="notes">
+    LiveWriter 是一个完整的实时写作助手案例：用户输入主题 → AI 并行检索资料 → 逐段生成文章 → 实时显示进度。每种 stream_mode 都有对应的 UI 体现：values 驱动状态面板，updates 驱动段落进度条，messages 驱动打字机效果，custom 驱动进度通知，tasks 驱动节点高亮和完成标记。前端通过 WebSocket 接收后端流式事件，根据消息类型分发到不同的 UI 更新逻辑。
+  </div>
+</section>
+
+<!-- Slide 10: 总结 -->
+<section class="slide" data-title="总结">
+  <div class="kicker">Summary</div>
+  <div class="h2">核心要点回顾</div>
+  <div class="grid g2 mt-m">
+    <div class="card">
+      <h4>5 种核心 Stream Mode</h4>
+      <ul>
+        <li><strong>values</strong> = 完整状态快照——适合状态面板</li>
+        <li><strong>updates</strong> = 增量更新——适合带宽敏感场景</li>
+        <li><strong>messages</strong> = token 级流式——适合打字机效果</li>
+        <li><strong>custom</strong> = 自定义事件——适合进度条</li>
+        <li><strong>tasks</strong> = 任务生命周期——适合监控</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>关键技巧与注意事项</h4>
+      <ul>
+        <li>组合 mode 时返回 <strong>(mode, chunk)</strong> 元组，需要解包</li>
+        <li>多 Agent 嵌套必须设置 <strong>subgraphs=True</strong></li>
+        <li>通过 <strong>ns</strong> 命名空间区分事件来源</li>
+        <li>messages 的 token 用 <strong>+= 追加</strong>，不是替换</li>
+        <li>三段式协议：<strong>start → processing → end</strong></li>
+      </ul>
+    </div>
+  </div>
+  <div class="mt-m card" style="text-align:center;">
+    <p style="font-size:14px; color:#38bdf8; font-weight:600;">"values 看全局，updates 看变化，messages 看逐字，custom 看进度，tasks 看生命周期，subgraphs=True 看嵌套。"</p>
+  </div>
+  <div class="deck-footer">
+    <span>LangGraph 渐进式教程</span>
+    <span>LG-07 / 11</span>
+  </div>
+  <div class="notes">
+    核心要点回顾：values 看全局，每次超级步后推送完整 State；updates 看变化，只推送节点返回值；messages 看逐字，LLM 每生成一个 token 就推送，前端用 += 追加；custom 看进度，Node 内通过 writer() 主动推送；tasks 看生命周期，自动追踪节点 start/finish；多 Agent 嵌套时设置 subgraphs=True，通过 ns 区分来源；组合使用多种 stream_mode 可以构建完整的实时 UI。记住口诀："values 看全局，updates 看变化，messages 看逐字，custom 看进度，tasks 看生命周期，subgraphs=True 看嵌套。"
+  </div>
+</section>
+
+</div>
+<script src="/Users/galaxyxieyu/.claude/skills/html-ppt-skill/assets/runtime.js"></script>
+</body></html>

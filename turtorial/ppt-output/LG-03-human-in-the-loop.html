@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LG-03 人机协作与 Hooks</title>
+<style>
+body { width: 720pt; height: 405pt; margin: 0; padding: 0; overflow: hidden; font-family: -apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans SC',sans-serif; background: #1a1b26; color: #c0caf5; }
+.slide { width: 720pt; height: 405pt; padding: 36px 48px; box-sizing: border-box; display: none; position: relative; }
+.slide.is-active { display: flex; flex-direction: column; }
+.kicker { font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; color: #7aa2f7; margin-bottom: 8px; }
+.h1 { font-size: 42px; font-weight: 800; line-height: 1.2; margin: 0 0 16px 0; color: #c0caf5; }
+.h2 { font-size: 28px; font-weight: 700; line-height: 1.3; margin: 0 0 12px 0; color: #c0caf5; }
+.lede { font-size: 16px; line-height: 1.6; color: #a9b1d6; margin: 0; }
+.card { background: rgba(36,40,59,0.9); border: 1px solid rgba(122,162,247,0.2); border-radius: 8px; padding: 16px; }
+.card h4 { font-size: 14px; font-weight: 600; margin: 0 0 8px 0; color: #7aa2f7; }
+.card p { font-size: 12px; line-height: 1.5; color: #a9b1d6; margin: 0; }
+.grid { display: grid; gap: 12px; }
+.g2 { grid-template-columns: 1fr 1fr; }
+.g3 { grid-template-columns: 1fr 1fr 1fr; }
+.mt-l { margin-top: 24px; }
+.mt-m { margin-top: 16px; }
+.tc { text-align: center; align-items: center; justify-content: center; }
+.center { display: flex; align-items: center; justify-content: center; }
+.deck-footer { position: absolute; bottom: 16px; left: 48px; right: 48px; display: flex; justify-content: space-between; font-size: 11px; color: #565f89; }
+.notes { display: none; }
+ul { margin: 0; padding-left: 20px; }
+li { font-size: 13px; line-height: 1.7; color: #a9b1d6; margin-bottom: 4px; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 12px; }
+th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid rgba(122,162,247,0.2); }
+th { color: #7aa2f7; font-weight: 600; background: rgba(36,40,59,0.6); }
+td { color: #a9b1d6; }
+pre { font-family: 'JetBrains Mono', 'SF Mono', monospace; font-size: 11px; line-height: 1.6; background: #0d1117; padding: 12px; border-radius: 6px; color: #e6edf3; overflow: hidden; }
+.accent { color: #7aa2f7; }
+.dim { color: #a9b1d6; }
+.tag { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 4px; background: rgba(122,162,247,0.15); color: #7aa2f7; }
+</style>
+</head>
+<body>
+<div class="deck">
+
+<!-- Slide 1: Cover -->
+<div class="slide is-active tc" style="background: linear-gradient(135deg, #1a1b26 0%, #24283b 100%);">
+  <div class="kicker">LangGraph 教程 · LG-03</div>
+  <div class="h1" style="font-size: 48px; margin-bottom: 20px;">人机协作与 Hooks</div>
+  <div class="lede" style="font-size: 20px; color: #a9b1d6; max-width: 560px;">让图学会「停下来问人」——HITL 三层架构与生产级封装</div>
+  <div class="mt-l" style="display: flex; gap: 12px; justify-content: center;">
+    <span class="tag">interrupt_before</span>
+    <span class="tag">interrupt()</span>
+    <span class="tag">Command(resume)</span>
+  </div>
+  <div class="deck-footer"><span>LangGraph 渐进式教程</span><span>1 / 10</span></div>
+</div>
+
+<!-- Slide 2: Agenda -->
+<div class="slide">
+  <div class="kicker">目录</div>
+  <div class="h2">本课内容概览</div>
+  <div class="grid g2 mt-m">
+    <div class="card">
+      <h4>01 HITL 三层架构</h4>
+      <p>编译时配置 / 预构建 Agent / 节点内动态中断</p>
+    </div>
+    <div class="card">
+      <h4>02 interrupt_before / after</h4>
+      <p>声明式中断：执行前拦截 vs 执行后审查</p>
+    </div>
+    <div class="card">
+      <h4>03 interrupt() 与重执行陷阱</h4>
+      <p>动态中断 + 拆分节点模式</p>
+    </div>
+    <div class="card">
+      <h4>04 create_react_agent HITL</h4>
+      <p>工具调用审批 + post_model_hook</p>
+    </div>
+    <div class="card">
+      <h4>05 生产级封装</h4>
+      <p>ToolInteractionEnvelope + RenderSchema + Resume 协议</p>
+    </div>
+    <div class="card">
+      <h4>06 常见误区</h4>
+      <p>忘记 checkpointer、interrupt 和异常混用等</p>
+    </div>
+  </div>
+  <div class="deck-footer"><span>LangGraph 渐进式教程</span><span>2 / 10</span></div>
+</div>
+
+<!-- Slide 3: Three Layers -->
+<div class="slide">
+  <div class="kicker">01 HITL 三层架构</div>
+  <div class="h2">组件关系全景图</div>
+  <table style="font-size: 11px;">
+    <tr><th>层级</th><th>控制粒度</th><th>改节点代码</th><th>动态条件</th><th>重执行风险</th><th>适用场景</th></tr>
+    <tr><td><span class="accent">Layer 1</span> compile</td><td>节点级</td><td>否</td><td>否（静态）</td><td>无</td><td>固定审批点</td></tr>
+    <tr><td><span class="accent">Layer 2</span> prebuilt</td><td>Agent 内节点</td><td>否</td><td>否</td><td>无</td><td>ReAct 工具审批</td></tr>
+    <tr><td><span class="accent">Layer 3</span> in-node</td><td>节点内任意</td><td>是</td><td>是</td><td><strong>有</strong></td><td>运行时动态决定</td></tr>
+  </table>
+  <div class="mt-m" style="background: rgba(36,40,59,0.9); border: 1px solid rgba(122,162,247,0.3); border-radius: 8px; padding: 14px 18px;">
+    <p style="font-size: 13px; color: #7aa2f7; margin: 0 0 6px 0; font-weight: 600;">决策树</p>
+    <p style="font-size: 12px; color: #a9b1d6; margin: 0; line-height: 1.7;">是否需要运行时数据决定中断？<br>
+    -> 是 -> Layer 3（interrupt()），但节点内有昂贵操作？-> 是 -> 拆成「计算节点 -> 中断节点」<br>
+    -> 否 -> 使用预构建 Agent？-> 是 -> Layer 2 -> 否 -> Layer 1</p>
+  </div>
+  <div class="deck-footer"><span>LangGraph 渐进式教程</span><span>3 / 10</span></div>
+</div>
+
+<!-- Slide 4: interrupt_before vs after -->
+<div class="slide">
+  <div class="kicker">02 编译时配置</div>
+  <div class="h2">interrupt_before vs interrupt_after</div>
+  <div class="grid g2 mt-m">
+    <div class="card">
+      <h4>interrupt_before —— 执行前拦截</h4>
+      <p style="margin-bottom: 8px;">节点代码完全不执行，resume 后第一次执行</p>
+      <pre style="font-size: 10px;">graph = builder.compile(
+    checkpointer=InMemorySaver(),
+    interrupt_before=["publish"]
+)
+# 审批员先看输入，决定是否让 AI 处理</pre>
+    </div>
+    <div class="card">
+      <h4>interrupt_after —— 执行后审查</h4>
+      <p style="margin-bottom: 8px;">节点已执行完，writes 已保存，再中断</p>
+      <pre style="font-size: 10px;">graph = builder.compile(
+    checkpointer=InMemorySaver(),
+    interrupt_after=["generate"]
+)
+# AI 生成内容后让人类确认</pre>
+    </div>
+  </div>
+  <table class="mt-m" style="font-size: 11px;">
+    <tr><th>维度</th><th>interrupt_before</th><th>interrupt_after</th></tr>
+    <tr><td>节点执行了吗</td><td><strong>否</strong></td><td><strong>是</strong></td></tr>
+    <tr><td>resume 后节点执行吗</td><td>是（第一次）</td><td>否（已执行过）</td></tr>
+    <tr><td>state 有输出吗</td><td>否</td><td>是</td></tr>
+    <tr><td>适用场景</td><td>审批输入/前置确认</td><td>审查输出/后置确认</td></tr>
+  </table>
+  <div class="deck-footer"><span>LangGraph 渐进式教程</span><span>4 / 10</span></div>
+</div>
+
+<!-- Slide 5: Re-execution Pitfall -->
+<div class="slide">
+  <div class="kicker">03 interrupt() 陷阱</div>
+  <div class="h2">重执行陷阱与拆分节点模式</div>
+  <div class="lede">interrupt() 恢复时，节点从头重新执行！interrupt() 前的代码会重跑。</div>
+  <div class="grid g2 mt-m">
+    <div class="card">
+      <h4>错误写法（计算 + 中断混在一起）</h4>
+      <pre style="font-size: 10px;">def bad_node(state):
+    result = expensive_compute(state)  # resume 时重跑！
+    user_input = interrupt({"data": result})
+    return {"output": process(user_input)}</pre>
+    </div>
+    <div class="card">
+      <h4>正确写法（拆分节点）</h4>
+      <pre style="font-size: 10px;">def compute_node(state):
+    result = expensive_compute(state)
+    return {"analysis_result": result}  # 写入 state
+
+def human_confirm_node(state):
+    result = state["analysis_result"]  # 从 state 读取
+    decision = interrupt({"content": result})
+    return {"confirmed": decision == "approve"}</pre>
+    </div>
+  </div>
+  <div class="mt-m" style="background: rgba(122,162,247,0.1); border-left: 3px solid #7aa2f7; padding: 10px 14px; border-radius: 0 6px 6px 0;">
+    <p style="font-size: 12px; color: #c0caf5; margin: 0;"><span class="accent">拆分原则：</span>计算节点不抛 interrupt；中断节点只读 state，不执行副作用。</p>
+  </div>
+  <div class="deck-footer"><span>LangGraph 渐进式教程</span><span>5 / 10</span></div>
+</div>
+
+<!-- Slide 6: create_react_agent HITL -->
+<div class="slide">
+  <div class="kicker">04 预构建 Agent</div>
+  <div class="h2">create_react_agent 的 HITL 配置</div>
+  <div class="mt-m">
+    <pre style="font-size: 10px;">agent = create_react_agent(
+    "openai:gpt-4",
+    tools=[check_weather, send_email],
+    interrupt_before=["tools"],   # 工具执行前确认（防止误操作）
+    interrupt_after=["agent"],    # LLM 输出后审查（质量控制）
+    checkpointer=InMemorySaver(),
+)</pre>
+  </div>
+  <div class="grid g2 mt-m">
+    <div class="card">
+      <h4>工具调用前审批</h4>
+      <p>LLM 决定调用工具后，先暂停等用户确认。用户看到 "AI 要执行 send_email，确认吗？"</p>
+    </div>
+    <div class="card">
+      <h4>LLM 输出后审查</h4>
+      <p>LLM 每次输出后暂停，用户可审查/修改。如果没有 tool_call，直接审查答案。</p>
+    </div>
+  </div>
+  <div class="mt-m" style="background: rgba(122,162,247,0.1); border-left: 3px solid #7aa2f7; padding: 10px 14px; border-radius: 0 6px 6px 0;">
+    <p style="font-size: 12px; color: #c0caf5; margin: 0;"><span class="accent">注意：</span>create_react_agent 的 interrupt_before/after 直接透传给 workflow.compile()，节点名固定为 "agent" 和 "tools"。</p>
+  </div>
+  <div class="deck-footer"><span>LangGraph 渐进式教程</span><span>6 / 10</span></div>
+</div>
+
+<!-- Slide 7: Production Envelope -->
+<div class="slide">
+  <div class="kicker">05 生产级封装</div>
+  <div class="h2">ToolInteractionEnvelope 结构化通信</div>
+  <div class="lede">工具不直接中断，返回信封让上层决定。信封包含状态、渲染契约、动作请求。</div>
+  <div class="mt-m">
+    <pre style="font-size: 10px;">class ToolInteractionEnvelope(TypedDict):
+    version: str              # 协议版本
+    status: str               # ok / needs_input / needs_confirmation / error
+    domain: str               # 业务域
+    summary: str              # 给 LLM 看的摘要
+    data: dict                # 结构化数据
+    render_schema: dict       # 前端渲染契约
+    action_request: dict      # 动作请求（risk / requires_confirmation）</pre>
+  </div>
+  <div class="grid g2 mt-m">
+    <div class="card">
+      <h4>RenderSchema 前端契约</h4>
+      <p style="font-size: 11px;">标准字段类型：static_text、single_select_card、checkbox、text_input、date_input、time_input、file_upload</p>
+    </div>
+    <div class="card">
+      <h4>Resume 协议</h4>
+      <p style="font-size: 11px;">Operation: submit / continue / revise / regenerate / retry<br>
+      Decision: confirm -> accept, cancel -> reject, edit -> edit + args</p>
+    </div>
+  </div>
+  <div class="deck-footer"><span>LangGraph 渐进式教程</span><span>7 / 10</span></div>
+</div>
+
+<!-- Slide 8: Copilot vs Interactive -->
+<div class="slide">
+  <div class="kicker">05 生产级封装</div>
+  <div class="h2">双模式工具包装器</div>
+  <div class="grid g2 mt-m">
+    <div class="card">
+      <h4>Copilot 模式（自动执行）</h4>
+      <p>适合只读查询。auto=True 时工具直接执行，无需确认。</p>
+      <pre style="font-size: 10px; margin-top: 8px;"># web_search_tool、calculator_tool
+# 搜索、计算——自动执行</pre>
+    </div>
+    <div class="card">
+      <h4>Interactive 模式（需要确认）</h4>
+      <p>适合写操作。auto=False 时工具返回信封，触发中断。</p>
+      <pre style="font-size: 10px; margin-top: 8px;"># library_booking_tool、send_email_tool
+# 订位、发邮件——需要确认</pre>
+    </div>
+  </div>
+  <div class="mt-m" style="background: rgba(36,40,59,0.9); border: 1px solid rgba(122,162,247,0.3); border-radius: 8px; padding: 14px 18px;">
+    <p style="font-size: 13px; color: #7aa2f7; margin: 0 0 6px 0; font-weight: 600;">运行时上下文注入</p>
+    <p style="font-size: 11px; color: #a9b1d6; margin: 0; line-height: 1.6;">writer 通过 ContextVar 注入，不暴露在工具的 args_schema 中。LLM 看不到 writer 参数，但工具内部可安全使用。</p>
+  </div>
+  <div class="deck-footer"><span>LangGraph 渐进式教程</span><span>8 / 10</span></div>
+</div>
+
+<!-- Slide 9: Pitfalls -->
+<div class="slide">
+  <div class="kicker">06 常见误区</div>
+  <div class="h2">HITL 最容易踩的坑</div>
+  <table style="font-size: 11px;">
+    <tr><th>坑</th><th>现象</th><th>正确做法</th></tr>
+    <tr><td>忘记 checkpointer</td><td>interrupt 后无法恢复</td><td>HITL 必须配 checkpointer！</td></tr>
+    <tr><td>interrupt 和异常混用</td><td>Exception 终止执行</td><td>HITL 必须用 interrupt() 原语</td></tr>
+    <tr><td>在工具里用 interrupt()</td><td>工具异常，图不暂停</td><td>用 interrupt_before=["tools"]</td></tr>
+    <tr><td>resume 值格式不对</td><td>被中断节点收不到值</td><td>Command(resume=...) 的值就是 interrupt() 返回值</td></tr>
+    <tr><td>Hooks 里修改 State</td><td>Pre-hook 改了影响后续</td><td>用 llm_input_messages 临时注入</td></tr>
+    <tr><td>审批流设计太复杂</td><td>中断 5 次，体验差</td><td>HITL 是安全阀，不是每一步都问</td></tr>
+    <tr><td>多层中断冲突</td><td>before 和 in-node 同时触发</td><td>设计时确保逻辑不重叠</td></tr>
+  </table>
+  <div class="mt-m" style="background: rgba(122,162,247,0.1); border-left: 3px solid #7aa2f7; padding: 10px 14px; border-radius: 0 6px 6px 0;">
+    <p style="font-size: 12px; color: #c0caf5; margin: 0;"><span class="accent">调试技巧：</span>graph.get_state(config) 看 .next 字段；snapshot.tasks 看 interrupts 字段；节点内加 print 检测重执行。</p>
+  </div>
+  <div class="deck-footer"><span>LangGraph 渐进式教程</span><span>9 / 10</span></div>
+</div>
+
+<!-- Slide 10: Summary -->
+<div class="slide">
+  <div class="kicker">07 阶段小结</div>
+  <div class="h2">核心要点回顾</div>
+  <div class="grid g2 mt-m">
+    <div class="card">
+      <h4>三层架构</h4>
+      <p>编译时 -> 预构建 Agent -> 节点内动态，粒度递增，风险递增</p>
+    </div>
+    <div class="card">
+      <h4>interrupt_before</h4>
+      <p>节点不执行，resume 后第一次执行</p>
+    </div>
+    <div class="card">
+      <h4>interrupt_after</h4>
+      <p>节点已执行完，resume 直接流转</p>
+    </div>
+    <div class="card">
+      <h4>interrupt() 陷阱</h4>
+      <p>恢复时从头重新执行，必须拆分节点</p>
+    </div>
+    <div class="card">
+      <h4>生产级封装</h4>
+      <p>信封标准化 + RenderSchema 驱动 UI + Resume 统一协议</p>
+    </div>
+    <div class="card">
+      <h4>双模式包装</h4>
+      <p>Copilot 自动执行 / Interactive 人工确认</p>
+    </div>
+  </div>
+  <div class="mt-m" style="background: rgba(36,40,59,0.9); border: 1px solid rgba(122,162,247,0.3); border-radius: 8px; padding: 14px 18px;">
+    <p style="font-size: 14px; color: #7aa2f7; margin: 0 0 6px 0; font-weight: 600;">记忆口诀</p>
+    <p style="font-size: 13px; color: #a9b1d6; margin: 0; line-height: 1.7;">compile 配 before/after，不动代码就生效；<br>
+    节点内写 interrupt，千万要拆分防重跑；<br>
+    Agent 工具要审批，tools 节点暂停好；<br>
+    resume 是 playback，state 已在 checkpoint 存好。</p>
+  </div>
+  <div class="deck-footer"><span>LangGraph 渐进式教程</span><span>10 / 10</span></div>
+</div>
+
+</div>
+<script>
+(function(){
+  var slides = document.querySelectorAll('.slide');
+  var current = 0;
+  function show(i){
+    slides[current].classList.remove('is-active');
+    current = (i + slides.length) % slides.length;
+    slides[current].classList.add('is-active');
+  }
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') show(current + 1);
+    if(e.key === 'ArrowLeft' || e.key === 'PageUp') show(current - 1);
+    if(e.key === 'Home') show(0);
+    if(e.key === 'End') show(slides.length - 1);
+  });
+})();
+</script>
+</body>
+</html>

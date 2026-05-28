@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LG-01：LangGraph 基础与图构建</title>
+<link rel="stylesheet" href="/Users/galaxyxieyu/.claude/skills/html-ppt-skill/assets/fonts.css">
+<link rel="stylesheet" href="/Users/galaxyxieyu/.claude/skills/html-ppt-skill/assets/base.css">
+<link rel="stylesheet" id="theme-link" href="/Users/galaxyxieyu/.claude/skills/html-ppt-skill/assets/themes/tokyo-night.css">
+<link rel="stylesheet" href="/Users/galaxyxieyu/.claude/skills/html-ppt-skill/assets/animations/animations.css">
+<style>
+body { width: 720pt; height: 405pt; margin: 0; padding: 0; overflow: hidden; font-family: 'Inter','Noto Sans SC',sans-serif; background: #0f172a; color: #e2e8f0; }
+.slide { width: 720pt; height: 405pt; padding: 36px 48px; box-sizing: border-box; display: none; position: relative; }
+.slide.is-active { display: flex; flex-direction: column; }
+.kicker { font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; color: #94a3b8; margin-bottom: 8px; }
+.h1 { font-size: 42px; font-weight: 800; line-height: 1.2; margin: 0 0 16px 0; color: #f8fafc; }
+.h2 { font-size: 28px; font-weight: 700; line-height: 1.3; margin: 0 0 12px 0; color: #f1f5f9; }
+.lede { font-size: 16px; line-height: 1.6; color: #cbd5e1; margin: 0; }
+.card { background: rgba(30,41,59,0.8); border: 1px solid rgba(148,163,184,0.2); border-radius: 8px; padding: 16px; }
+.card h4 { font-size: 14px; font-weight: 600; margin: 0 0 8px 0; color: #38bdf8; }
+.card p { font-size: 12px; line-height: 1.5; color: #94a3b8; margin: 0; }
+.grid { display: grid; gap: 12px; }
+.g2 { grid-template-columns: 1fr 1fr; }
+.g3 { grid-template-columns: 1fr 1fr 1fr; }
+.mt-l { margin-top: 24px; }
+.mt-m { margin-top: 16px; }
+.tc { text-align: center; align-items: center; justify-content: center; }
+.center { display: flex; align-items: center; justify-content: center; }
+.deck-footer { position: absolute; bottom: 16px; left: 48px; right: 48px; display: flex; justify-content: space-between; font-size: 11px; color: #64748b; }
+.notes { display: none; }
+ul { margin: 0; padding-left: 20px; }
+li { font-size: 13px; line-height: 1.7; color: #cbd5e1; margin-bottom: 4px; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 12px; }
+th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid rgba(148,163,184,0.2); }
+th { color: #38bdf8; font-weight: 600; background: rgba(30,41,59,0.6); }
+td { color: #cbd5e1; }
+.quote { font-size: 18px; font-style: italic; color: #94a3b8; border-left: 3px solid #38bdf8; padding-left: 16px; margin: 16px 0; }
+.tag { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 4px; background: rgba(56,189,248,0.15); color: #38bdf8; margin-right: 6px; }
+.highlight { color: #38bdf8; font-weight: 600; }
+.code-block { background: rgba(15,23,42,0.9); border: 1px solid rgba(148,163,184,0.15); border-radius: 6px; padding: 12px 16px; font-family: 'JetBrains Mono','Fira Code',monospace; font-size: 11px; line-height: 1.6; color: #cbd5e1; overflow-x: auto; }
+.code-block .kw { color: #c678dd; }
+.code-block .str { color: #98c379; }
+.code-block .fn { color: #61afef; }
+.code-block .cm { color: #5c6370; font-style: italic; }
+.pitfall { background: rgba(244,63,94,0.1); border-left: 3px solid #f43f5e; padding: 10px 14px; border-radius: 0 6px 6px 0; margin-top: 12px; }
+.pitfall h4 { color: #f43f5e; font-size: 13px; margin: 0 0 4px 0; }
+.pitfall p { font-size: 12px; color: #cbd5e1; margin: 0; }
+.arrow { text-align: center; color: #64748b; font-size: 18px; margin: 4px 0; }
+
+@media print {
+  .slide { display: flex !important; page-break-after: always; break-after: page; }
+  .slide:last-child { page-break-after: auto; }
+  body { width: 100%; height: 100%; background: #0f172a; }
+}
+</style>
+</head>
+<body>
+<div class="deck">
+
+<!-- Slide 1: 封面 -->
+<section class="slide tc" data-title="封面">
+  <div class="kicker">LangGraph 系列课程 · LG-01</div>
+  <div class="h1" style="font-size:44px;margin-bottom:16px;">LangGraph 基础与图构建</div>
+  <div class="lede" style="font-size:18px;color:#94a3b8;">从 Chain 到 Graph：WeatherBot 实战</div>
+  <div style="margin-top:28px;font-size:13px;color:#64748b;">目标：3 小时后独立写出带路由判断的 WeatherBot</div>
+  <div class="deck-footer">
+    <span>LangGraph 教程</span>
+    <span>1 / 10</span>
+  </div>
+  <div class="notes">
+    这节课是整个课程的基石。后面的循环、并行、多智能体、持久化，都是在这节课的概念上长出来的。LangChain 的 Chain 写法很优雅，但业务逻辑一复杂就开始失控。LangGraph 的思路很简单：把工作流从"一条直线"变成"一张图"。
+  </div>
+</section>
+
+<!-- Slide 2: 目录 -->
+<section class="slide" data-title="目录">
+  <div class="kicker">Contents</div>
+  <div class="h2">本节课要讲什么</div>
+  <div class="grid g2 mt-l">
+    <div class="card">
+      <h4>01 五个核心概念</h4>
+      <p>State、Node、Edge、compile、invoke/stream 的关系总览</p>
+    </div>
+    <div class="card">
+      <h4>02 State —— 图里的共享数据</h4>
+      <p>TypedDict 定义、Annotated + Reducer、常见坑</p>
+    </div>
+    <div class="card">
+      <h4>03 Node —— 图里的处理单元</h4>
+      <p>接收 state 返回 dict 的函数，可以是任何 Python 代码</p>
+    </div>
+    <div class="card">
+      <h4>04 Edge —— 普通边与条件边</h4>
+      <p>确定性连接 vs 动态路由，Router 函数的写法</p>
+    </div>
+    <div class="card">
+      <h4>05 构建与运行</h4>
+      <p>compile 的作用、invoke vs stream 的区别</p>
+    </div>
+    <div class="card">
+      <h4>06 完整案例与对比实验</h4>
+      <p>WeatherBot 实战、纯函数 vs LangGraph 代码膨胀对比</p>
+    </div>
+  </div>
+  <div class="deck-footer">
+    <span>LangGraph 教程</span>
+    <span>2 / 10</span>
+  </div>
+  <div class="notes">
+    今天的课程分为六个部分。先从五个核心概念的总览开始，然后逐一拆解 State、Node、Edge，接着讲 compile 和运行方式，再用完整的 WeatherBot 案例串起来，最后做纯函数 vs LangGraph 的对比实验。
+  </div>
+</section>
+
+<!-- Slide 3: 五个核心概念 -->
+<section class="slide" data-title="五个核心概念">
+  <div class="kicker">Core Concepts</div>
+  <div class="h2">五个核心概念一句话说清关系</div>
+  <div class="card mt-m">
+    <h4>State（状态）= 贯穿整个图的共享数据</h4>
+    <p>TypedDict 定义，所有节点接收完整 State，返回增量更新</p>
+  </div>
+  <div class="arrow">↓</div>
+  <div class="grid g2">
+    <div class="card">
+      <h4>Node（节点）= 处理函数</h4>
+      <p>接收 State，返回 dict。可以是任何 Python 函数、LangChain Runnable、甚至另一个图</p>
+    </div>
+    <div class="card">
+      <h4>Edge（边）= 节点之间的连接</h4>
+      <p>普通边：A 做完必定到 B<br>条件边：根据 State 动态决定下一步</p>
+    </div>
+  </div>
+  <div class="arrow">↓</div>
+  <div class="card">
+    <h4>compile() = 把上面这些东西编译成可执行的图对象</h4>
+  </div>
+  <div class="arrow">↓</div>
+  <div class="card">
+    <h4>invoke() / stream() = 运行图</h4>
+    <p>invoke 直接给结果，stream 逐个节点输出中间状态</p>
+  </div>
+  <div class="deck-footer">
+    <span>LangGraph 教程</span>
+    <span>3 / 10</span>
+  </div>
+  <div class="notes">
+    这张图讲清楚五个核心概念的关系。用一句话概括：State 是数据，Node 是处理，Edge 是路由，compile 是生成，invoke/stream 是运行。今天的目标就是搞懂这五个东西怎么配合，然后写出带路由判断的 WeatherBot。
+  </div>
+</section>
+
+<!-- Slide 4: State -->
+<section class="slide" data-title="State —— 图里的共享数据">
+  <div class="kicker">State</div>
+  <div class="h2">State —— 图里的共享数据</div>
+  <div class="code-block mt-m">
+<span class="kw">class</span> <span class="fn">WeatherState</span>(TypedDict):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;messages: Annotated[<span class="kw">list</span>, add]&nbsp;&nbsp;&nbsp;<span class="cm"># 对话历史，用 add 累加</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;intent: <span class="kw">str</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="cm"># 用户意图</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;city: <span class="kw">str</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="cm"># 城市</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;weather_data: <span class="kw">dict</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="cm"># API 返回数据</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;response: <span class="kw">str</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="cm"># 最终回复</span>
+  </div>
+  <div class="grid g2 mt-m">
+    <div class="card">
+      <h4>三个关键点</h4>
+      <ul>
+        <li>每个节点接收<strong>完整 State</strong></li>
+        <li>节点返回<strong>增量更新</strong>，只改需要的字段</li>
+        <li><code>Annotated[field, reducer]</code> 决定字段怎么合并</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>两个核心 Reducer</h4>
+      <ul>
+        <li><code>operator.add</code>：列表直接拼接</li>
+        <li><code>add_messages</code>：拼接 + 按 ID 去重 + 支持删除</li>
+      </ul>
+    </div>
+  </div>
+  <div class="pitfall">
+    <h4>常见坑</h4>
+    <p>节点内直接 <code>state["city"] = "北京"</code> 不会生效！必须通过返回值让框架合并。</p>
+  </div>
+  <div class="deck-footer">
+    <span>LangGraph 教程</span>
+    <span>4 / 10</span>
+  </div>
+  <div class="notes">
+    State 是一个 TypedDict，定义了图中所有节点共享的数据结构。每个节点接收完整 State，节点 A 可以看到 Node B 产生的数据。节点返回增量更新，return {"city": "北京"} 只会更新 city 字段。Annotated 加 reducer 决定字段怎么合并。最常见的坑：节点内直接修改 state 不会生效，必须通过返回值让框架合并。
+  </div>
+</section>
+
+<!-- Slide 5: Node -->
+<section class="slide" data-title="Node —— 图里的处理单元">
+  <div class="kicker">Node</div>
+  <div class="h2">Node —— 图里的处理单元</div>
+  <div class="code-block mt-m">
+<span class="kw">def</span> <span class="fn">parse_intent</span>(state: WeatherState):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;text = state[<span class="str">"messages"</span>][-1].content<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">if</span> <span class="str">"天气"</span> <span class="kw">in</span> text: <span class="kw">return</span> {<span class="str">"intent"</span>: <span class="str">"weather"</span>}<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">elif</span> <span class="str">"时间"</span> <span class="kw">in</span> text: <span class="kw">return</span> {<span class="str">"intent"</span>: <span class="str">"time"</span>}<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">return</span> {<span class="str">"intent"</span>: <span class="str">"other"</span>}<br><br>
+<span class="kw">def</span> <span class="fn">query_weather</span>(state: WeatherState):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">return</span> {<span class="str">"weather_data"</span>: {<span class="str">"temp"</span>: 25, <span class="str">"condition"</span>: <span class="str">"晴"</span>}}<br><br>
+<span class="kw">def</span> <span class="fn">format_reply</span>(state: WeatherState):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;data = state[<span class="str">"weather_data"</span>]<br>
+&nbsp;&nbsp;&nbsp;&nbsp;reply = <span class="str">f"{state['city']}今天{data['condition']}，{data['temp']}度"</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">return</span> {<span class="str">"response"</span>: reply}
+  </div>
+  <div class="card mt-m">
+    <h4>Node 的本质</h4>
+    <ul>
+      <li>就是一个函数：接收 <code>state</code>，返回一个 <code>dict</code></li>
+      <li>可以是<strong>任何 Python 函数</strong>，不限于 AI 调用（数据库查询、API 调用、文件处理）</li>
+      <li>也可以是 LangChain Runnable、甚至另一个完整的图（Subgraph）</li>
+      <li>返回值必须是 dict，字符串要包装成 <code>{"result": string}</code></li>
+    </ul>
+  </div>
+  <div class="deck-footer">
+    <span>LangGraph 教程</span>
+    <span>5 / 10</span>
+  </div>
+  <div class="notes">
+    Node 就是一个函数，接收 state，返回一个 dict。看这三个例子：parse_intent 解析用户意图，query_weather 调用天气 API（mock），format_reply 生成回复文本。Node 的本质很简单：可以是任何 Python 函数，不限于 AI 调用。唯一约束是返回值必须是 dict。
+  </div>
+</section>
+
+<!-- Slide 6: Edge -->
+<section class="slide" data-title="Edge —— 普通边与条件边">
+  <div class="kicker">Edge</div>
+  <div class="h2">Edge —— 普通边与条件边</div>
+  <div class="grid g2 mt-m">
+    <div class="card">
+      <h4>普通边（确定性连接）</h4>
+      <div class="code-block" style="margin-top:8px;">
+builder.add_edge(START, <span class="str">"parse_intent"</span>)<br>
+builder.add_edge(<span class="str">"extract_city"</span>, <span class="str">"query_weather"</span>)<br>
+builder.add_edge(<span class="str">"format_reply"</span>, END)
+      </div>
+      <p style="margin-top:8px;font-size:11px;color:#64748b;">A 做完必定到 B。START/END 需从 langgraph.graph 导入。</p>
+    </div>
+    <div class="card">
+      <h4>条件边（图的灵魂）</h4>
+      <div class="code-block" style="margin-top:8px;">
+<span class="kw">def</span> <span class="fn">route_by_intent</span>(state) -> <span class="kw">str</span>:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">if</span> state[<span class="str">"intent"</span>] == <span class="str">"weather"</span>:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">return</span> <span class="str">"extract_city"</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">elif</span> state[<span class="str">"intent"</span>] == <span class="str">"time"</span>:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">return</span> <span class="str">"get_time"</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">return</span> <span class="str">"fallback"</span><br><br>
+builder.add_conditional_edges(<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="str">"parse_intent"</span>, route_by_intent)
+      </div>
+    </div>
+  </div>
+  <div class="pitfall">
+    <h4>关键约束</h4>
+    <p>一个节点的出边<strong>只能是普通边或条件边，二选一</strong>，不能同时有。Router 返回的字符串必须对应已注册的节点名。</p>
+  </div>
+  <div class="deck-footer">
+    <span>LangGraph 教程</span>
+    <span>6 / 10</span>
+  </div>
+  <div class="notes">
+    边分两种。普通边是确定性连接。条件边让图能根据 State 内容动态决定下一步走哪个节点。Router 函数接收 state，返回目标节点的名字字符串。add_conditional_edges 的第三个参数建议写上目标节点映射，便于 Mermaid 可视化。关键约束：一个节点的出边只能是普通边或条件边，二选一。
+  </div>
+</section>
+
+<!-- Slide 7: 构建与运行 -->
+<section class="slide" data-title="五步构建 + 两种运行">
+  <div class="kicker">Build & Run</div>
+  <div class="h2">五步构建 + 两种运行方式</div>
+  <div class="code-block mt-m">
+<span class="cm"># 1. 定义 StateSchema</span><br>
+<span class="kw">class</span> <span class="fn">WeatherState</span>(TypedDict): ...<br><br>
+<span class="cm"># 2. 创建 Builder，添加所有节点</span><br>
+builder = StateGraph(WeatherState)<br>
+builder.add_node(<span class="str">"parse_intent"</span>, parse_intent)<br>
+builder.add_node(<span class="str">"query_weather"</span>, query_weather)<br><br>
+<span class="cm"># 3. 连接普通边</span><br>
+builder.add_edge(START, <span class="str">"parse_intent"</span>)<br><br>
+<span class="cm"># 4. 连接条件边</span><br>
+builder.add_conditional_edges(<span class="str">"parse_intent"</span>, route_by_intent)<br><br>
+<span class="cm"># 5. 编译</span><br>
+graph = builder.compile()
+  </div>
+  <div class="grid g2 mt-m">
+    <div class="card">
+      <h4>invoke —— 直接给最终结果</h4>
+      <div class="code-block" style="margin-top:8px;">
+result = graph.invoke({<span class="str">"messages"</span>: [HumanMessage(<span class="str">"北京天气"</span>)]})<br>
+<span class="cm"># 输出: 北京今天晴，25度</span>
+      </div>
+    </div>
+    <div class="card">
+      <h4>stream —— 逐个节点输出中间状态</h4>
+      <div class="code-block" style="margin-top:8px;">
+<span class="kw">for</span> chunk <span class="kw">in</span> graph.stream({...}):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="fn">print</span>(chunk)&nbsp;&nbsp;<span class="cm"># 调试 + 实时进度反馈</span>
+      </div>
+    </div>
+  </div>
+  <div class="deck-footer">
+    <span>LangGraph 教程</span>
+    <span>7 / 10</span>
+  </div>
+  <div class="notes">
+    构建图的五步走：定义 StateSchema、添加 Node、连接普通边、连接条件边、compile 编译。compile 会做类型检查、边验证、生成可执行对象。不 compile 直接 invoke 会报错。invoke 直接给最终结果，适合生产；stream 逐个节点输出中间状态，适合调试和实时反馈。
+  </div>
+</section>
+
+<!-- Slide 8: WeatherBot 完整案例 -->
+<section class="slide" data-title="完整案例：WeatherBot">
+  <div class="kicker">WeatherBot</div>
+  <div class="h2">完整案例：带路由的 WeatherBot</div>
+  <div class="grid g2 mt-m">
+    <div class="card">
+      <h4>三条分支</h4>
+      <div class="code-block" style="margin-top:8px;font-size:10px;">
+天气分支:<br>
+START->parse_intent->extract_city<br>
+&nbsp;&nbsp;->query_weather->format_reply->END<br><br>
+时间分支:<br>
+START->parse_intent->get_time->END<br><br>
+兜底分支:<br>
+START->parse_intent->fallback->END
+      </div>
+    </div>
+    <div class="card">
+      <h4>运行效果</h4>
+      <div class="code-block" style="margin-top:8px;font-size:10px;">
+用户: 北京今天天气怎么样？<br>
+Bot: 北京今天晴，25度<br><br>
+用户: 现在几点了？<br>
+Bot: 现在是 14:30<br><br>
+用户: 讲个笑话<br>
+Bot: 抱歉，我暂时只能回答<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;天气和时间相关的问题。
+      </div>
+    </div>
+  </div>
+  <div class="card mt-m">
+    <h4>可视化查看你画的图</h4>
+    <div class="code-block" style="margin-top:8px;">
+<span class="cm"># Jupyter 直接显示</span><br>
+display(Image(graph.get_graph().draw_mermaid_png()))<br><br>
+<span class="cm"># 或保存为文件 / Mermaid 文本</span><br>
+<span class="fn">print</span>(graph.get_graph().draw_mermaid())
+    </div>
+  </div>
+  <div class="deck-footer">
+    <span>LangGraph 教程</span>
+    <span>8 / 10</span>
+  </div>
+  <div class="notes">
+    WeatherBot 的完整效果：用户输入一句话，先判断意图。问天气就走提取城市、查询天气、格式化回复这条分支。问时间就直接返回当前时间。其他问题走兜底回复。可视化有三种方式：Jupyter 直接显示、保存 PNG、输出 Mermaid 文本粘贴到 mermaid.live 查看。
+  </div>
+</section>
+
+<!-- Slide 9: 纯函数 vs LangGraph -->
+<section class="slide" data-title="纯函数 vs LangGraph 对比实验">
+  <div class="kicker">Comparison</div>
+  <div class="h2">需求升级时，代码量怎么变？</div>
+  <table class="mt-m">
+    <tr>
+      <th>需求升级</th>
+      <th>纯函数代码量</th>
+      <th>LangGraph 代码量</th>
+    </tr>
+    <tr>
+      <td>基础 WeatherBot</td>
+      <td>10 行</td>
+      <td>30 行</td>
+    </tr>
+    <tr>
+      <td>+ API 失败重试 3 次</td>
+      <td style="color:#f43f5e;">35 行 ↑250%</td>
+      <td style="color:#38bdf8;">40 行 ↑33%</td>
+    </tr>
+    <tr>
+      <td>+ 并行查天气和空气质量</td>
+      <td style="color:#f43f5e;">60+ 行 ↑500%</td>
+      <td style="color:#38bdf8;">55 行 ↑83%</td>
+    </tr>
+    <tr>
+      <td>+ 城市不明确时问用户</td>
+      <td style="color:#f43f5e;">架构重写</td>
+      <td style="color:#38bdf8;">70 行 ↑133%</td>
+    </tr>
+  </table>
+  <div class="grid g2 mt-m">
+    <div class="card" style="border-left:3px solid #f43f5e;">
+      <h4 style="color:#f43f5e;">纯函数的困境</h4>
+      <ul>
+        <li>重试代码和业务代码缠在一起</li>
+        <li>并行需要自己造线程轮子</li>
+        <li>没有"暂停等用户"的概念</li>
+        <li>每加一个需求就要重构已有代码</li>
+      </ul>
+    </div>
+    <div class="card" style="border-left:3px solid #38bdf8;">
+      <h4 style="color:#38bdf8;">LangGraph 的优势</h4>
+      <ul>
+        <li>重试 = 图上画个圈，独立路由规则</li>
+        <li>并行 = 声明式，框架自动调度</li>
+        <li>HITL = 加一个节点 + 一条边</li>
+        <li>加需求就是加节点/加边，不影响已有结构</li>
+      </ul>
+    </div>
+  </div>
+  <div class="quote mt-m">"纯函数做'一次性的事'，LangGraph 做'有状态、可编排、可恢复的事'。"</div>
+  <div class="deck-footer">
+    <span>LangGraph 教程</span>
+    <span>9 / 10</span>
+  </div>
+  <div class="notes">
+    这是今天最重要的一张对比图。纯函数的复杂度是指数级爆炸，每加一个需求就要重构已有代码。LangGraph 的复杂度是线性增长，加需求就是加节点加边，不影响已有结构。纯函数做一次性的事，LangGraph 做有状态、可编排、可恢复的事。
+  </div>
+</section>
+
+<!-- Slide 10: 总结 -->
+<section class="slide" data-title="总结">
+  <div class="kicker">Summary</div>
+  <div class="h2">阶段小结</div>
+  <div class="grid g2 mt-l">
+    <div class="card">
+      <h4>五个核心概念</h4>
+      <ul>
+        <li><strong>State</strong> — TypedDict，定义共享数据结构</li>
+        <li><strong>Node</strong> — 接收 state 返回 dict 的函数</li>
+        <li><strong>Edge</strong> — 普通边确定性连接，条件边动态路由</li>
+        <li><strong>compile</strong> — 类型检查、边验证、生成可执行图</li>
+        <li><strong>invoke / stream</strong> — 运行图的两种方式</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>构建流程</h4>
+      <div style="font-size:13px;color:#cbd5e1;line-height:2;">
+        定义 StateSchema<br>
+        <span style="color:#64748b;">↓</span><br>
+        添加 Node<br>
+        <span style="color:#64748b;">↓</span><br>
+        连接 Edge（普通 + 条件）<br>
+        <span style="color:#64748b;">↓</span><br>
+        Compile<br>
+        <span style="color:#64748b;">↓</span><br>
+        invoke / stream
+      </div>
+    </div>
+  </div>
+  <div class="mt-l" style="text-align:center;font-size:15px;color:#94a3b8;font-style:italic;">
+    "状态是数据，节点是工厂，边是传送带，<br>
+    条件边是分岔口，编译出图纸，stream 看过程。"
+  </div>
+  <div class="deck-footer">
+    <span>LangGraph 教程</span>
+    <span>10 / 10</span>
+  </div>
+  <div class="notes">
+    阶段小结：今天学了五个核心概念和构建流程。下节课 LG-02，我们要让图更聪明：循环让图能够重试和迭代，工具让 AI 能够调用外部 API，Human-in-the-loop 让人在流程中间介入审核。这些都是让 WeatherBot 变成生产级系统的关键能力。
+  </div>
+</section>
+
+</div>
+<script src="/Users/galaxyxieyu/.claude/skills/html-ppt-skill/assets/runtime.js"></script>
+</body></html>

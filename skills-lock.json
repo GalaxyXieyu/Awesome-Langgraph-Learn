@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "gpt-image": {
+      "source": "wuyoscar/GPT-Image2-Skill",
+      "sourceType": "github",
+      "skillPath": "skills/gpt-image/SKILL.md",
+      "computedHash": "34ebb7192dcd2c59195ecc8dfb8cf023412906531a7984d1651821e0267a0382"
+    }
+  }
+}

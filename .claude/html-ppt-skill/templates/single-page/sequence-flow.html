@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>Sequence Flow</title>
+<link rel="stylesheet" href="../../assets/fonts.css">
+<link rel="stylesheet" href="../../assets/base.css">
+<link rel="stylesheet" id="theme-link" href="../../assets/themes/tokyo-night.css">
+<link rel="stylesheet" href="../../assets/animations/animations.css">
+<style>
+.sf-wrap{display:grid;grid-template-rows:auto auto;gap:24px;margin-top:18px}
+.sf-head{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
+.sf-head .col{padding:14px 14px 12px;border-radius:16px;background:var(--surface);border:1px solid var(--border);text-align:center;box-shadow:var(--shadow)}
+.sf-head .col b{display:block;font-size:18px}
+.sf-head .col span{display:block;font-size:12px;color:var(--text-3);margin-top:4px}
+.sf-body{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;align-items:start}
+.sf-track{display:flex;flex-direction:column;gap:14px}
+.sf-msg{padding:16px 14px 14px;border-radius:16px;background:var(--surface-2);border:1px solid var(--border);min-height:84px}
+.sf-msg.active{background:color-mix(in srgb,var(--accent) 10%,var(--surface));border-color:color-mix(in srgb,var(--accent) 38%,transparent);box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 12%,transparent)}
+.sf-msg b{display:block;font-size:14px;margin-bottom:4px}
+.sf-msg span{font-size:12px;color:var(--text-3);line-height:1.55}
+.sf-detail{display:grid;grid-template-columns:1.05fr .95fr;gap:22px}
+.sf-panel{padding:24px 26px;border-radius:22px;border:1px solid var(--border);background:var(--surface);box-shadow:var(--shadow)}
+.sf-panel h3{font-size:30px;margin:10px 0 8px}
+.sf-panel p{margin:0;color:var(--text-2);line-height:1.7}
+.sf-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:18px}
+.sf-card{padding:14px 14px 12px;border-radius:14px;background:var(--surface-2);border:1px solid var(--border)}
+.sf-card b{display:block;font-size:14px;margin-bottom:4px}
+.sf-card span{font-size:12px;color:var(--text-3);line-height:1.55}
+.sf-side{display:flex;flex-direction:column;gap:12px}
+.sf-metric{padding:16px 16px 14px;border-radius:14px;background:var(--surface-2);border:1px solid var(--border)}
+.sf-metric .n{display:block;font-size:32px;line-height:1;font-weight:800;letter-spacing:-.04em}
+.sf-metric .t{display:block;font-size:12px;color:var(--text-3);margin-top:6px}
+</style>
+</head><body class="single">
+<div class="deck"><section class="slide is-active" data-title="Sequence Flow">
+  <p class="kicker">Sequence · 消息流</p>
+  <h2 class="h2">适合讲“谁先发消息、谁处理中、谁回结果”的时序式逻辑</h2>
+  <div class="sf-wrap">
+    <div>
+      <div class="sf-head">
+        <div class="col"><b>User</b><span>发起请求</span></div>
+        <div class="col"><b>Frontend</b><span>收集参数 / 展示流</span></div>
+        <div class="col"><b>API / Worker</b><span>任务控制面</span></div>
+        <div class="col"><b>Graph Runtime</b><span>执行与输出</span></div>
+      </div>
+      <div class="sf-body mt-s anim-stagger-list" data-anim-target>
+        <div class="sf-track">
+          <div class="sf-msg"><b>1. Ask</b><span>输入问题、文件、目标。</span></div>
+          <div class="sf-msg"><b>5. Confirm</b><span>必要时做中断确认。</span></div>
+        </div>
+        <div class="sf-track">
+          <div class="sf-msg active"><b>2. Package</b><span>整理 session、task 参数和 UI 状态。</span></div>
+          <div class="sf-msg"><b>6. Render</b><span>把中间步骤和最终结果回放给用户。</span></div>
+        </div>
+        <div class="sf-track">
+          <div class="sf-msg"><b>3. Dispatch</b><span>创建任务、写状态、推给 worker。</span></div>
+          <div class="sf-msg"><b>7. Persist</b><span>记录状态、失败与恢复点。</span></div>
+        </div>
+        <div class="sf-track">
+          <div class="sf-msg"><b>4. Execute</b><span>运行 graph / tool / writer。</span></div>
+          <div class="sf-msg"><b>8. Stream</b><span>持续写出 thinking / plan / tool / result。</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="sf-detail">
+      <div class="sf-panel anim-fade-up" data-anim="fade-up">
+        <span class="kicker" style="display:inline-block">focused interaction</span>
+        <h3>Frontend 的这一跳为什么值得单独讲？</h3>
+        <p>因为它不是“把输入框内容 POST 给后端”这么简单。前端要同时承担参数整理、任务状态订阅、消息标准化、UI 回放和中断确认，这决定了整套系统到底是“可操作工作台”还是“普通聊天窗”。</p>
+        <div class="sf-cards">
+          <div class="sf-card"><b>Input shaping</b><span>模型、模式、文件、上下文一起进请求。</span></div>
+          <div class="sf-card"><b>State sync</b><span>task_id 与流式状态保持同步。</span></div>
+          <div class="sf-card"><b>Playback</b><span>把 thinking / tool / interrupt 渲染成可理解的过程。</span></div>
+        </div>
+      </div>
+      <div class="sf-side anim-fade-right" data-anim="fade-right">
+        <div class="sf-metric"><span class="n">4</span><span class="t">recommended actors in the timeline</span></div>
+        <div class="sf-metric"><span class="n">1</span><span class="t">current interaction focus</span></div>
+        <div class="sf-metric"><span class="n">6-8</span><span class="t">good number of visible messages</span></div>
+      </div>
+    </div>
+  </div>
+</section></div>
+<script src="../../assets/runtime.js"></script>
+</body></html>

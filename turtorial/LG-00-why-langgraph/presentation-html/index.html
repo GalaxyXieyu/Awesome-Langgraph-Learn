@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="tokyo-night">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LG-00：为什么选择 LangGraph？</title>
+<link rel="stylesheet" href="assets/fonts.css">
+<link rel="stylesheet" href="assets/base.css">
+<link rel="stylesheet" id="theme-link" href="assets/themes/tokyo-night.css">
+<link rel="stylesheet" href="assets/animations/animations.css">
+<style>
+  /* ===== LG-00 Custom Overrides ===== */
+  .deck{background:var(--bg);}
+
+  /* Cover with gradient mesh */
+  .cover-bg{position:absolute;inset:0;overflow:hidden;z-index:0}
+  .cover-bg::before{content:"";position:absolute;top:-50%;left:-30%;width:80%;height:120%;
+    background:radial-gradient(ellipse at center,rgba(122,162,247,.15) 0%,transparent 70%);border-radius:50%}
+  .cover-bg::after{content:"";position:absolute;bottom:-40%;right:-20%;width:70%;height:100%;
+    background:radial-gradient(ellipse at center,rgba(187,154,247,.12) 0%,transparent 70%);border-radius:50%}
+  .cover-content{position:relative;z-index:1}
+
+  /* Framework tag pills */
+  .fw-tag{display:inline-flex;align-items:center;gap:8px;padding:8px 16px;border-radius:var(--radius-sm);
+    background:var(--surface);border:1px solid var(--border);font-size:14px;font-weight:500;transition:all .3s var(--ease)}
+  .fw-tag:hover{border-color:var(--accent);transform:translateY(-2px)}
+  .fw-tag .dot{width:8px;height:8px;border-radius:50%;background:var(--text-3)}
+  .fw-tag.active .dot{background:var(--good);box-shadow:0 0 8px var(--good)}
+  .fw-tag.active{border-color:var(--good);background:rgba(158,206,106,.08)}
+
+  /* Comparison table */
+  .compare-table{width:100%;border-collapse:collapse;font-size:14px}
+  .compare-table th,.compare-table td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--border)}
+  .compare-table th{background:var(--surface-2);font-weight:600;color:var(--text-1);font-size:13px}
+  .compare-table td{color:var(--text-2)}
+  .compare-table tr:hover td{background:rgba(122,162,247,.04)}
+  .compare-table .col-lg{width:140px;font-weight:600;color:var(--good)}
+  .compare-table .check{color:var(--good);font-weight:700}
+  .compare-table .cross{color:var(--bad);opacity:.7}
+  .compare-table .partial{color:var(--warn)}
+
+  /* Code block styling */
+  .code-block{background:var(--bg-soft);border:1px solid var(--border);border-radius:var(--radius);
+    padding:20px 24px;font-family:var(--font-mono);font-size:13px;line-height:1.7;overflow:auto;color:var(--text-2)}
+  .code-block .kw{color:#bb9af7}
+  .code-block .fn{color:#7aa2f7}
+  .code-block .str{color:#9ece6a}
+  .code-block .cmt{color:#565f89;font-style:italic}
+  .code-block .num{color:#ff9e64}
+
+  /* Scenario cards */
+  .scenario-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+    padding:20px;transition:all .3s var(--ease)}
+  .scenario-card:hover{border-color:var(--accent);transform:translateY(-3px);box-shadow:var(--shadow)}
+  .scenario-card .rec{font-size:12px;color:var(--accent);font-weight:600;margin-top:8px}
+
+  /* Numbered steps */
+  .step-num{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;
+    border-radius:50%;background:var(--accent);color:#fff;font-weight:700;font-size:16px;flex-shrink:0}
+  .step-line{width:2px;height:100%;background:var(--border);margin-left:17px}
+
+  /* Hook slide special */
+  .hook-big{font-size:120px;font-weight:900;line-height:1;letter-spacing:-.04em;
+    background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+
+  /* CTA / closing accent */
+  .closing-verse{font-size:28px;line-height:1.8;font-weight:600;color:var(--text-1);
+    font-family:var(--font-serif)}
+  .closing-verse span{display:block}
+  .closing-verse .hl{color:var(--good)}
+
+  /* Table scroll container */
+  .table-wrap{overflow:auto;max-height:380px;border-radius:var(--radius);border:1px solid var(--border)}
+  .table-wrap::-webkit-scrollbar{width:6px;height:6px}
+  .table-wrap::-webkit-scrollbar-thumb{background:var(--border-strong);border-radius:3px}
+
+  /* Layer cake diagram */
+  .layer-cake{display:flex;flex-direction:column;gap:8px}
+  .layer{position:relative;padding:16px 20px;border-radius:var(--radius-sm);
+    font-size:14px;font-weight:500}
+  .layer-1{background:rgba(247,118,142,.15);border-left:3px solid var(--bad)}
+  .layer-2{background:rgba(224,175,104,.15);border-left:3px solid var(--warn)}
+  .layer-3{background:rgba(158,206,106,.15);border-left:3px solid var(--good)}
+  .layer-num{position:absolute;right:16px;top:50%;transform:translateY(-50%);font-size:24px;font-weight:800;opacity:.15}
+
+  /* Mermaid-like graph nodes */
+  .graph-node{display:inline-flex;align-items:center;justify-content:center;padding:10px 18px;
+    border-radius:var(--radius-sm);background:var(--surface);border:1.5px solid var(--border-strong);
+    font-size:13px;font-weight:600;color:var(--text-1);font-family:var(--font-mono)}
+  .graph-node.start{border-color:var(--good);color:var(--good)}
+  .graph-node.ai{border-color:var(--accent);color:var(--accent)}
+  .graph-node.human{border-color:var(--warn);color:var(--warn)}
+  .graph-edge{color:var(--text-3);font-size:18px;margin:0 6px}
+  .graph-row{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;margin:6px 0}
+
+  /* Reduced motion support */
+  @media (prefers-reduced-motion: reduce){
+    [class*="anim-"]{animation:none!important}
+  }
+</style>
+</head>
+<body data-themes="tokyo-night,dracula,catppuccin-mocha,nord,corporate-clean" data-theme-base="assets/themes/">
+<div class="deck">
+
+<!-- ============ SLIDE 1: COVER ============ -->
+<section class="slide is-active" data-title="Cover">
+  <div class="cover-bg"></div>
+  <div class="cover-content">
+    <p class="kicker anim-fade-up" data-anim="fade-up">LG-00 / 课程导论</p>
+    <h1 class="h1 anim-fade-up" data-anim="fade-up" style="font-size:68px;max-width:900px">
+      为什么选择 <span class="gradient-text">LangGraph</span>？
+    </h1>
+    <p class="lede mt-m anim-fade-up" data-anim="fade-up" style="animation-delay:.15s">
+      AI Agent 框架全景对比 · 企业级选型指南
+    </p>
+    <div class="mt-l anim-fade-up" data-anim="fade-up" style="animation-delay:.25s">
+      <span class="pill">LangChain 生态</span>
+      <span class="pill pill-accent">有向图编排</span>
+      <span class="pill">生产级部署</span>
+    </div>
+  </div>
+  <div class="deck-footer">
+    <span class="mono">LangGraph 渐进式课程</span>
+    <span class="slide-number" data-current="1" data-total="15"></span>
+  </div>
+  <div class="notes">
+    欢迎来到 LangGraph 渐进式课程的第一课。今天我们不写代码，先解决一个核心问题：企业的 AI 应用项目，到底怎么选框架？
+    2024 到 2025 年，AI Agent 框架井喷，但真正往企业里落的时候，你会发现 Demo 很美好，生产很残酷。
+    今天这节课，我们不跑 Demo，不吹概念，就聊一个问题：怎么选框架，怎么设计？
+  </div>
+</section>
+
+<!-- ============ SLIDE 2: AGENDA ============ -->
+<section class="slide" data-title="Agenda">
+  <p class="kicker anim-fade-up" data-anim="fade-up">agenda</p>
+  <h2 class="h2 anim-fade-up" data-anim="fade-up">今天讲 5 件事</h2>
+  <div class="stack mt-l" style="gap:16px">
+    <div class="agenda-row anim-fade-up" data-anim="fade-up" style="animation-delay:.05s;display:flex;align-items:center;gap:20px;padding:16px 20px;background:var(--surface);border-radius:var(--radius);border:1px solid var(--border)">
+      <span class="step-num" style="width:44px;height:44px;font-size:18px">01</span>
+      <div>
+        <div style="font-size:18px;font-weight:600">开场引入</div>
+        <div class="dim" style="font-size:14px">AI Agent 框架井喷 · Demo vs 生产</div>
+      </div>
+    </div>
+    <div class="agenda-row anim-fade-up" data-anim="fade-up" style="animation-delay:.1s;display:flex;align-items:center;gap:20px;padding:16px 20px;background:var(--surface);border-radius:var(--radius);border:1px solid var(--border)">
+      <span class="step-num" style="width:44px;height:44px;font-size:18px">02</span>
+      <div>
+        <div style="font-size:18px;font-weight:600">企业级核心需求</div>
+        <div class="dim" style="font-size:14px">三层问题 · 持久化 · 人机协作 · 可视化调试</div>
+      </div>
+    </div>
+    <div class="agenda-row anim-fade-up" data-anim="fade-up" style="animation-delay:.15s;display:flex;align-items:center;gap:20px;padding:16px 20px;background:var(--surface);border-radius:var(--radius);border:1px solid var(--border)">
+      <span class="step-num" style="width:44px;height:44px;font-size:18px">03</span>
+      <div>
+        <div style="font-size:18px;font-weight:600">框架全景对比</div>
+        <div class="dim" style="font-size:14px">7 个框架 · 七维度能力矩阵</div>
+      </div>
+    </div>
+    <div class="agenda-row anim-fade-up" data-anim="fade-up" style="animation-delay:.2s;display:flex;align-items:center;gap:20px;padding:16px 20px;background:var(--surface);border-radius:var(--radius);border:1px solid var(--border)">
+      <span class="step-num" style="width:44px;height:44px;font-size:18px">04</span>
+      <div>
+        <div style="font-size:18px;font-weight:600">LangGraph 不可替代的原因</div>
+        <div class="dim" style="font-size:14px">图级原生深度 · 编排层设计 · 传统业务零改动接入</div>
+      </div>
+    </div>
+    <div class="agenda-row anim-fade-up" data-anim="fade-up" style="animation-delay:.25s;display:flex;align-items:center;gap:20px;padding:16px 20px;background:var(--surface);border-radius:var(--radius);border:1px solid var(--border)">
+      <span class="step-num" style="width:44px;height:44px;font-size:18px">05</span>
+      <div>
+        <div style="font-size:18px;font-weight:600">诚实边界与务实建议</div>
+        <div class="dim" style="font-size:14px">不是银弹 · 选型策略 · 下节课预告</div>
+      </div>
+    </div>
+  </div>
+  <div class="deck-footer">
+    <span class="mono">LG-00 · 为什么选择 LangGraph？</span>
+    <span class="slide-number" data-current="2" data-total="15"></span>
+  </div>
+  <div class="notes">
+    今天的议程：先讲企业级 AI 应用面临的真实问题，然后做框架全景对比，接着深入分析 LangGraph 不可替代的两个核心原因，最后诚实地说清楚它的边界。大概 30 分钟。
+  </div>
+</section>
+
+<!-- ============ SLIDE 3: HOOK ============ -->
+<section class="slide" data-title="Hook">
+  <div class="cover-bg"></div>
+  <div class="cover-content" style="text-align:center">
+    <p class="kicker anim-fade-up" data-anim="fade-up">2024-2025</p>
+    <div class="hook-big anim-fade-up" data-anim="fade-up" style="animation-delay:.1s;font-size:90px">AI Agent<br>框架井喷</div>
+    <div class="mt-l anim-fade-up" data-anim="fade-up" style="animation-delay:.25s">
+      <span class="fw-tag">LangChain</span>
+      <span class="fw-tag">LangGraph</span>
+      <span class="fw-tag">CrewAI</span>
+      <span class="fw-tag">AutoGen</span>
+      <span class="fw-tag">Agno</span>
+      <span class="fw-tag">Pydantic AI</span>
+      <span class="fw-tag">LlamaIndex</span>
+    </div>
+    <p class="lede mt-l anim-fade-up" data-anim="fade-up" style="animation-delay:.35s;margin:24px auto 0;color:var(--bad);font-weight:500">
+      每个框架的宣传都吹得神乎其神。<br>
+      <span style="color:var(--text-1);font-weight:700;font-size:28px">但 Demo 很美好，生产很残酷。</span>
+    </p>
+  </div>
+  <div class="deck-footer">
+    <span class="mono">#agent-framework #production</span>
+    <span class="slide-number" data-current="3" data-total="15"></span>
+  </div>
+  <div class="notes">
+    2024 到 2025 年，AI Agent 框架井喷。你可能已经试过几个——帮你订机票、规划旅行、写周报，代码跑起来五分钟出 Demo，确实很酷。
+    但真正往企业里落的时候呢？循环逻辑写不了，状态丢了没法恢复，人工介入不知道怎么插，服务一重启会话全没了。Demo 和生产之间，隔着一整条鸿沟。
+  </div>
+</section>
+
+<!-- ============ SLIDE 4: 企业级三层问题 ============ -->
+<section class="slide" data-title="Enterprise Needs">
+  <p class="kicker anim-fade-up" data-anim="fade-up">企业级项目的核心需求</p>
+  <h2 class="h2 anim-fade-up" data-anim="fade-up">Demo 证明"AI 能做"<br>企业级要确保"<span class="gradient-text">AI 能一直可靠地做</span>"</h2>
+  <div class="grid g3 mt-l" style="gap:20px">
+    <div class="card card-accent anim-fade-up" data-anim="fade-up" style="animation-delay:.05s">
+      <div style="font-size:48px;font-weight:800;color:var(--bad);opacity:.3;line-height:1">01</div>
+      <h4 style="margin-top:-16px">业务流程不是一次性的</h4>
+      <div class="stack" style="margin-top:12px;font-size:14px;line-height:1.8">
+        <div class="dim">用户填到一半的表单 → 状态必须能中断和恢复</div>
+        <div class="dim">审批不通过要打回重走 → 流程不能写死</div>
+        <div class="dim">涉及金额、合规 → AI 不能擅自做主，必须有人审核</div>
+      </div>
+    </div>
+    <div class="card card-accent anim-fade-up" data-anim="fade-up" style="animation-delay:.15s">
+      <div style="font-size:48px;font-weight:800;color:var(--warn);opacity:.3;line-height:1">02</div>
+      <h4 style="margin-top:-16px">系统不会永远稳定运行</h4>
+      <div class="stack" style="margin-top:12px;font-size:14px;line-height:1.8">
+        <div class="dim">进程重启、容器漂移 → 状态必须持久化到数据库</div>
+        <div class="dim">单 Agent 不可能精通所有领域 → 必须多 Agent 协作</div>
+        <div class="dim">API 调用失败 → 需要重试和降级策略</div>
+      </div>
+    </div>
+    <div class="card card-accent anim-fade-up" data-anim="fade-up" style="animation-delay:.25s">
+      <div style="font-size:48px;font-weight:800;color:var(--good);opacity:.3;line-height:1">03</div>
+      <h4 style="margin-top:-16px">出了问题不能靠猜</h4>
+      <div class="stack" style="margin-top:12px;font-size:14px;line-height:1.8">
+        <div class="dim">AI 黑盒推理无从复现 → 必须全链路追踪</div>
+        <div class="dim">任务跑 30 秒没反馈 → 必须流式输出实时进度</div>
+        <div class="dim">生产 Bug 可能损失百万 → 必须可视化调试</div>
+      </div>
+    </div>
+  </div>
+  <div class="deck-footer">
+    <span class="mono">#enterprise-ai #reliability</span>
+    <span class="slide-number" data-current="4" data-total="15"></span>
+  </div>
+  <div class="notes">
+    把 AI 塞进真实业务流程，三层问题会逐个找上门。
+    第一层：业务流程不是一次性的——状态要能中断恢复，流程不能写死，重要决策必须有人审核。
+    第二层：系统不会永远稳定——状态要持久化，单 Agent 不够要协作，失败要重试。
+    第三层：出了问题不能靠猜——AI 黑盒要可追溯，用户需要实时反馈，生产环境要可视化调试。
+    企业级买的不是 AI 的能力，而是 AI 的可靠性、可控性和可维护性。
+  </div>
+</section>
+
+<!-- ============ SLIDE 5: 框架全景扫描 ============ -->
+<section class="slide" data-title="Framework Scan">
+  <p class="kicker anim-fade-up" data-anim="fade-up">框架全景扫描 · 不拉踩，只说事实</p>
+  <h2 class="h2 anim-fade-up" data-anim="fade-up">7 个框架，一句话说清</h2>
+  <div class="stack mt-l" style="gap:12px">
+    <div class="anim-fade-up" data-anim="fade-up" style="animation-delay:.05s;display:flex;align-items:center;gap:16px;padding:14px 20px;background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);border-left:3px solid var(--good)">
+      <span style="font-family:var(--font-mono);font-weight:700;color:var(--good);min-width:120px">LangGraph</span>
+      <span class="dim">基于有向图的 Agent 工作流编排。精确控制流程、状态透明、传统业务零改动接入。</span>
+      <span class="pill pill-accent" style="margin-left:auto;flex-shrink:0">本课主角</span>
+    </div>
+    <div class="anim-fade-up" data-anim="fade-up" style="animation-delay:.1s;display:flex;align-items:center;gap:16px;padding:14px 20px;background:var(--surface);border-radius:var(--radius);border:1px solid var(--border)">
+      <span style="font-family:var(--font-mono);font-weight:600;color:var(--accent-2);min-width:120px">CrewAI</span>
+      <span class="dim">角色扮演驱动的多 Agent 协作。角色抽象自然，但持久化和图级状态管理薄弱。</span>
+    </div>
+    <div class="anim-fade-up" data-anim="fade-up" style="animation-delay:.15s;display:flex;align-items:center;gap:16px;padding:14px 20px;background:var(--surface);border-radius:var(--radius);border:1px solid var(--border)">
+      <span style="font-family:var(--font-mono);font-weight:600;color:var(--accent-2);min-width:120px">Agno</span>
+      <span class="dim">轻量级 Agent 构建工具包。极致速度和低内存，但复杂循环工作流可维护性不如图结构。</span>
+    </div>
+    <div class="anim-fade-up" data-anim="fade-up" style="animation-delay:.2s;display:flex;align-items:center;gap:16px;padding:14px 20px;background:var(--surface);border-radius:var(--radius);border:1px solid var(--border)">
+      <span style="font-family:var(--font-mono);font-weight:600;color:var(--accent-2);min-width:120px">AutoGen</span>
+      <span class="dim">对话驱动的多 Agent 框架。多 Agent 聊天场景是强项，但对话模型强耦合。</span>
+    </div>
+    <div class="anim-fade-up" data-anim="fade-up" style="animation-delay:.25s;display:flex;align-items:center;gap:16px;padding:14px 20px;background:var(--surface);border-radius:var(--radius);border:1px solid var(--border)">
+      <span style="font-family:var(--font-mono);font-weight:600;color:var(--accent-2);min-width:120px">Pydantic AI</span>
+      <span class="dim">类型安全的 Agent 框架。Pydantic 重度用户的菜，生态较新。</span>
+    </div>
+    <div class="anim-fade-up" data-anim="fade-up" style="animation-delay:.3s;display:flex;align-items:center;gap:16px;padding:14px 20px;background:var(--surface);border-radius:var(--radius);border:1px solid var(--border)">
+      <span style="font-family:var(--font-mono);font-weight:600;color:var(--accent-2);min-width:120px">Spring AI</span>
+      <span class="dim">Java 生态的 AI 框架。Spring 技术栈选它，Python 不适用。</span>
+    </div>
+    <div class="anim-fade-up" data-anim="fade-up" style="animation-delay:.35s;display:flex;align-items:center;gap:16px;padding:14px 20px;background:var(--surface);border-radius:var(--radius);border:1px solid var(--border)">
+      <span style="font-family:var(--font-mono);font-weight:600;color:var(--accent-2);min-width:120px">LlamaIndex</span>
+      <span class="dim">LlamaIndex 生态工作流编排。RAG 场景选它，通用性不如 LangGraph。</span>
+    </div>
+  </div>
+  <div class="deck-footer">
+    <span class="mono">#framework-comparison</span>
+    <span class="slide-number" data-current="5" data-total="15"></span>
+  </div>
+  <div class="notes">
+    不拉踩，只说事实。LangGraph 基于有向图做工作流编排；CrewAI 是角色扮演驱动；Agno 追求轻量极速；AutoGen 是对话驱动；Pydantic AI 是类型安全；Spring AI 是 Java 生态；LlamaIndex 是 RAG 生态。
+    每个框架有自己的最佳场景，关键在于你的需求是什么。
+  </div>
+</section>
+
+<!-- ============ SLIDE 6: 七维度对比表 ============ -->
+<section class="slide" data-title="Comparison Matrix">
+  <p class="kicker anim-fade-up" data-anim="fade-up">诚实的能力对比</p>
+  <h2 class="h2 anim-fade-up" data-anim="fade-up">企业级必备能力矩阵</h2>
+  <div class="table-wrap mt-l anim-fade-up" data-anim="fade-up" style="animation-delay:.1s">
+    <table class="compare-table">
+      <thead>
+        <tr>
+          <th style="width:160px">能力维度</th>
+          <th class="col-lg" style="width:220px">LangGraph</th>
+          <th style="width:200px">Agno</th>
+          <th style="width:220px">CrewAI / AutoGen / PydanticAI</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><b>显式状态管理</b></td>
+          <td class="col-lg">TypedDict 原生定义，节点接收完整状态快照</td>
+          <td class="partial">session_state，非图级显式传递</td>
+          <td class="cross">状态隐式或基础</td>
+        </tr>
+        <tr>
+          <td><b>持久化</b></td>
+          <td class="col-lg">PostgreSQL/Redis 原生 checkpoint，任意节点精确恢复</td>
+          <td class="partial">SQLite/PostgreSQL session 持久化，非流程级</td>
+          <td class="cross">无原生 checkpoint</td>
+        </tr>
+        <tr>
+          <td><b>人机协作</b></td>
+          <td class="col-lg">任意节点精确 interrupt，上下文无缝继续</td>
+          <td class="partial">工具式 HITL + AgentOS Control Plane</td>
+          <td class="cross">暂停粒度粗或回调</td>
+        </tr>
+        <tr>
+          <td><b>循环/条件控制</b></td>
+          <td class="col-lg">条件边/循环边是一等公民，可视化且防死循环</td>
+          <td class="partial">Workflow 支持 Loop/Condition/Router</td>
+          <td class="cross">任务依赖链或路由逻辑</td>
+        </tr>
+        <tr>
+          <td><b>可视化调试</b></td>
+          <td class="col-lg">Mermaid 自动生成 + Studio 交互式状态回放</td>
+          <td class="partial">Playground UI 支持 reasoning traces</td>
+          <td class="cross">均较弱，主要靠日志</td>
+        </tr>
+        <tr>
+          <td><b>多 Agent 协作</b></td>
+          <td class="col-lg">Subgraph/Handoff，状态隔离原生支持</td>
+          <td class="partial">Team 支持 route/coordinate/collaborate</td>
+          <td class="partial">CrewAI 角色协作强；AutoGen 对话协作强</td>
+        </tr>
+        <tr>
+          <td><b>传统业务接入</b></td>
+          <td class="col-lg">任何 Python 函数直接作为节点，零改动接入</td>
+          <td class="cross">需包装为工具/回调</td>
+          <td class="cross">需包装为工具/回调</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="mt-m anim-fade-up" data-anim="fade-up" style="animation-delay:.3s;font-size:14px;color:var(--good);font-weight:500">
+    关键差异："传统业务接入"——LangGraph 是编排层，你的已有代码直接放进去就是节点。其他框架需要包装成 Agent 工具。
+  </p>
+  <div class="deck-footer">
+    <span class="mono">#capability-matrix</span>
+    <span class="slide-number" data-current="6" data-total="15"></span>
+  </div>
+  <div class="notes">
+    注意看这张表的最后一行——"传统业务接入"。这是 LangGraph 和其他框架的本质区别。
+    LangGraph 是编排层，不是封闭的 Agent 黑盒。你已有的数据库查询、支付接口、文件处理代码，直接放进去就是节点。
+  </div>
+</section>
+
+<!-- ============ SLIDE 7: 原因一 - 图级原生深度 ============ -->
+<section class="slide" data-title="Native Graph Depth">
+  <p class="kicker anim-fade-up" data-anim="fade-up">LangGraph 不可替代的原因 · 1 / 2</p>
+  <h2 class="h2 anim-fade-up" data-anim="fade-up">图级别的<span class="gradient-text">原生深度</span></h2>
+  <p class="lede anim-fade-up" data-anim="fade-up" style="animation-delay:.1s">
+    其他框架在单点上并不弱，但企业级需要的是一整套能力的系统性、原生深度集成。
+  </p>
+  <div class="grid g2 mt-l" style="gap:20px;align-items:start">
+    <div class="anim-fade-up" data-anim="fade-up" style="animation-delay:.15s">
+      <div class="stack" style="gap:12px">
+        <div style="display:flex;align-items:flex-start;gap:14px;padding:14px 18px;background:var(--surface);border-radius:var(--radius);border:1px solid var(--border)">
+          <span class="check" style="font-size:20px;flex-shrink:0;margin-top:2px">&#10003;</span>
+          <div>
+            <div style="font-weight:600">状态在节点间显式传递</div>
+            <div class="dim" style="font-size:13px;margin-top:2px">每个节点知道完整上下文，TypedDict 原生定义</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:14px;padding:14px 18px;background:var(--surface);border-radius:var(--radius);border:1px solid var(--border)">
+          <span class="check" style="font-size:20px;flex-shrink:0;margin-top:2px">&#10003;</span>
+          <div>
+            <div style="font-weight:600">Checkpoint 精确到任意节点</div>
+            <div class="dim" style="font-size:13px;margin-top:2px">服务重启后从任意位置恢复，PostgreSQL/Redis 原生支持</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:14px;padding:14px 18px;background:var(--surface);border-radius:var(--radius);border:1px solid var(--border)">
+          <span class="check" style="font-size:20px;flex-shrink:0;margin-top:2px">&#10003;</span>
+          <div>
+            <div style="font-weight:600">循环和条件是图结构本身</div>
+            <div class="dim" style="font-size:13px;margin-top:2px">可视化、可维护、防死循环，不是后期补丁</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="anim-fade-up" data-anim="fade-up" style="animation-delay:.25s">
+      <div style="padding:20px;background:var(--surface);border-radius:var(--radius);border:1px solid var(--border)">
+        <div style="font-size:13px;font-weight:600;color:var(--text-3);margin-bottom:12px;text-transform:uppercase;letter-spacing:.1em">7 项能力 · 全部内建在图的核心层</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px">
+          <span class="pill pill-accent">TypedDict + Reducer</span>
+          <span class="pill pill-accent">Checkpoint</span>
+          <span class="pill pill-accent">Interrupt</span>
+          <span class="pill pill-accent">Stream</span>
+          <span class="pill pill-accent">Studio</span>
+          <span class="pill pill-accent">Subgraph</span>
+          <span class="pill pill-accent">Mermaid 可视化</span>
+        </div>
+        <div style="margin-top:16px;padding:12px;background:var(--bg-soft);border-radius:var(--radius-sm);font-size:13px;color:var(--text-2);border-left:3px solid var(--good)">
+          7 项能力彼此连贯，不是零散插件拼凑，全部内建在图的核心层。
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="deck-footer">
+    <span class="mono">#native-graph #system-design</span>
+    <span class="slide-number" data-current="7" data-total="15"></span>
+  </div>
+  <div class="notes">
+    原因一：图级别的原生深度。其他框架在单点上并不弱，但企业级需要的是一整套能力的系统性、原生深度集成。
+    LangGraph 的状态、Checkpoint、循环条件、人机协作等 7 项能力，全部内建在图的核心层，彼此连贯，不是零散插件拼凑。
+  </div>
+</section>
+
+<!-- ============ SLIDE 8: 原因二 - 编排层 ============ -->
+<section class="slide" data-title="Orchestration Layer">
+  <p class="kicker anim-fade-up" data-anim="fade-up">LangGraph 不可替代的原因 · 2 / 2</p>
+  <h2 class="h2 anim-fade-up" data-anim="fade-up">LangGraph 是<span class="gradient-text">编排层</span><br>不是封闭的 Agent 黑盒</h2>
+  <div class="grid g2 mt-l" style="gap:28px;align-items:start">
+    <div class="anim-fade-up" data-anim="fade-up" style="animation-delay:.1s">
+      <p class="lede" style="font-size:16px;margin-bottom:16px">企业级项目从来不是纯 AI 的。你的系统里已有数据库读写、第三方 API、文件处理——几百万行跑了多年的业务代码。</p>
+      <div class="code-block" style="font-size:12px">
+<span class="cmt"># 你已有的传统业务函数，一行不改</span>
+<span class="kw">def</span> <span class="fn">query_database</span>(user_id: <span class="str">str</span>):
+    <span class="kw">return</span> db.execute(<span class="str">"SELECT * FROM orders WHERE user_id = %s"</span>, user_id)
+
+<span class="kw">def</span> <span class="fn">call_payment_api</span>(amount: <span class="str">float</span>):
+    <span class="kw">return</span> payment_client.charge(amount)
+
+<span class="cmt"># AI 能力节点</span>
+<span class="kw">def</span> <span class="fn">ai_review_order</span>(state):
+    <span class="kw">return</span> {<span class="str">"risk_score"</span>: llm.evaluate(state[<span class="str">"order"</span>])}
+
+<span class="cmt"># 拼成一张图：传统业务 + AI 平等编排</span>
+workflow = StateGraph(OrderState)
+workflow.add_node(<span class="str">"query_db"</span>, query_database)      <span class="cmt"># 传统</span>
+workflow.add_node(<span class="str">"ai_review"</span>, ai_review_order)      <span class="cmt"># AI</span>
+workflow.add_node(<span class="str">"call_payment"</span>, call_payment_api)  <span class="cmt"># 传统</span>
+      </div>
+    </div>
+    <div class="anim-fade-up" data-anim="fade-up" style="animation-delay:.2s">
+      <div style="padding:20px;background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);height:100%">
+        <h4 style="color:var(--good);margin-bottom:16px">意味着三件事</h4>
+        <div class="stack" style="gap:16px">
+          <div style="display:flex;gap:12px;align-items:flex-start">
+            <span style="font-size:24px;flex-shrink:0">&#128200;</span>
+            <div>
+              <div style="font-weight:600">代码复用率极高</div>
+              <div class="dim" style="font-size:13px">已有业务逻辑一行不改，直接成为图的节点</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:12px;align-items:flex-start">
+            <span style="font-size:24px;flex-shrink:0">&#9881;&#65039;</span>
+            <div>
+              <div style="font-weight:600">开发效率高</div>
+              <div class="dim" style="font-size:13px">传统开发和 AI 开发可以并行推进</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:12px;align-items:flex-start">
+            <span style="font-size:24px;flex-shrink:0">&#128161;</span>
+            <div>
+              <div style="font-weight:600">维护成本低</div>
+              <div class="dim" style="font-size:13px">业务逻辑和 AI 逻辑在一张图里清晰可见</div>
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:20px;padding:14px;background:var(--bg-soft);border-radius:var(--radius-sm);font-size:13px;border-left:3px solid var(--accent)">
+          <b>本质区别：</b>CrewAI/AutoGen/Agno 以 Agent 为中心，传统代码只能作为工具硬塞进去。LangGraph 以图为核心，传统代码和 AI 代码是<span style="color:var(--good);font-weight:700">平等的一等公民</span>。
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="deck-footer">
+    <span class="mono">#orchestration #legacy-integration</span>
+    <span class="slide-number" data-current="8" data-total="15"></span>
+  </div>
+  <div class="notes">
+    原因二：LangGraph 是编排层，不是封闭的 Agent 黑盒。
+    企业级项目里已经有几百万行传统业务代码。LangGraph 的节点可以是任何 Python 函数，传统代码和 AI 代码平等编排。
+    CrewAI/AutoGen/Agno 是以 Agent 为中心设计的，传统代码只能作为工具硬塞进去。LangGraph 是以图为核心设计的。
+  </div>
+</section>
+
+<!-- ============ SLIDE 9: 实战演示 - 智能客服路由 ============ -->
+<section class="slide" data-title="Live Demo">
+  <p class="kicker anim-fade-up" data-anim="fade-up">实战演示 · 同一需求，不同写法</p>
+  <h2 class="h2 anim-fade-up" data-anim="fade-up">智能客服路由：<span class="gradient-text">if-else</span> vs <span class="gradient-text">LangGraph</span></h2>
+  <div class="grid g2 mt-l" style="gap:24px;align-items:start">
+    <div class="anim-fade-up" data-anim="fade-up" style="animation-delay:.1s">
+      <div style="padding:14px 16px;background:var(--bad);color:#fff;font-weight:700;font-size:14px;border-radius:var(--radius-sm);margin-bottom:12px">
+        if-else 意大利面条
+      </div>
+      <div class="code-block" style="font-size:11px;line-height:1.6">
+<span class="kw">def</span> <span class="fn">route_customer</span>(msg):
+    intent = classify(msg)
+    <span class="kw">if</span> intent == <span class="str">"order"</span>:
+        <span class="kw">if</span> check_status(msg):
+            <span class="kw">return</span> query_order(msg)
+        <span class="kw">else</span>:
+            <span class="kw">return</span> create_order(msg)
+    <span class="kw">elif</span> intent == <span class="str">"refund"</span>:
+        <span class="kw">if</span> validate_refund(msg):
+            <span class="kw">if</span> need_approval(msg):
+                <span class="cmt"># ??? 人工审核怎么插？</span>
+                <span class="kw">return</span> wait_human(msg)
+            <span class="kw">return</span> process_refund(msg)
+        <span class="kw">return</span> reject(msg)
+    <span class="kw">elif</span> intent == <span class="str">"faq"</span>:
+        <span class="kw">return</span> search_kb(msg)
+    <span class="cmt"># 加新分支 = 重构整个函数</span>
+      </div>
+      <div style="margin-top:10px;font-size:13px;color:var(--bad)">
+        &#10007; 逻辑一复杂就失控 &nbsp; &#10007; 状态不透明 &nbsp; &#10007; 扩展困难
+      </div>
+    </div>
+    <div class="anim-fade-up" data-anim="fade-up" style="animation-delay:.2s">
+      <div style="padding:14px 16px;background:var(--good);color:#1a1b26;font-weight:700;font-size:14px;border-radius:var(--radius-sm);margin-bottom:12px">
+        LangGraph 图编排
+      </div>
+      <div class="code-block" style="font-size:11px;line-height:1.6">
+<span class="kw">from</span> langgraph.graph <span class="kw">import</span> StateGraph
+
+builder = StateGraph(State)
+builder.add_node(<span class="str">"classify"</span>, classify_intent)
+builder.add_node(<span class="str">"query_order"</span>, query_order)
+builder.add_node(<span class="str">"process_refund"</span>, process_refund)
+builder.add_node(<span class="str">"human_approval"</span>, human_approval)
+builder.add_node(<span class="str">"search_kb"</span>, search_kb)
+
+builder.add_edge(START, <span class="str">"classify"</span>)
+builder.add_conditional_edges(<span class="str">"classify"</span>, route_by_intent)
+
+<span class="cmt"># 加"人工审核"分支 = 两行代码</span>
+builder.add_node(<span class="str">"audit"</span>, audit_node)
+builder.add_edge(<span class="str">"process_refund"</span>, <span class="str">"audit"</span>)
+      </div>
+      <div style="margin-top:10px;font-size:13px;color:var(--good)">
+        &#10003; 结构清晰 &nbsp; &#10003; 状态透明 &nbsp; &#10003; 可扩展
+      </div>
+    </div>
+  </div>
+  <div class="deck-footer">
+    <span class="mono">#code-comparison #routing</span>
+    <span class="slide-number" data-current="9" data-total="15"></span>
+  </div>
+  <div class="notes">
+    拿同一个需求对比三种写法。需求是智能客服路由——用户输入，意图识别，路由到不同处理分支。
+    if-else 写法痛点很明显：逻辑一复杂就失控，状态不透明，加一个分支要重构整个函数。
+    LangGraph 写法：State、Node、Edge 定义清晰。加一个新分支就是 add_node + add_edge 两行代码。这个新分支可以是纯传统业务代码，也可以是 AI 代码，图不关心，只负责编排。
+  </div>
+</section>
+
+<!-- ============ SLIDE 10: 电商订单流程图 ============ -->
+<section class="slide" data-title="Workflow Example">
+  <p class="kicker anim-fade-up" data-anim="fade-up">LangGraph 工作流示意</p>
+  <h2 class="h2 anim-fade-up" data-anim="fade-up">一张图里，传统业务 + AI <span class="gradient-text">平等编排</span></h2>
+  <div class="mt-l anim-fade-up" data-anim="fade-up" style="animation-delay:.1s">
+    <div style="display:flex;flex-direction:column;align-items:center;gap:10px;padding:28px;background:var(--surface);border-radius:var(--radius);border:1px solid var(--border)">
+      <div class="graph-row">
+        <span class="graph-node start">用户下单</span>
+        <span class="graph-edge">&#8594;</span>
+        <span class="graph-node">查询库存</span>
+        <span class="graph-edge">&#8594;</span>
+        <span class="graph-node ai">AI 评估风险</span>
+      </div>
+      <div class="graph-row">
+        <span class="graph-edge">&#8595;</span>
+      </div>
+      <div class="graph-row">
+        <span class="graph-node">调用支付 API</span>
+        <span class="graph-edge">&#8594;</span>
+        <span class="graph-node human">人工审核</span>
+        <span class="graph-edge">&#8594;</span>
+        <span class="graph-node">发送通知</span>
+      </div>
+      <div style="margin-top:16px;display:flex;gap:20px;font-size:13px">
+        <div style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;background:var(--good);border-radius:2px"></span> 传统业务</div>
+        <div style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;background:var(--accent);border-radius:2px"></span> AI 能力</div>
+        <div style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;background:var(--warn);border-radius:2px"></span> 人工协作</div>
+      </div>
+    </div>
+    <p class="mt-m tc" style="font-size:14px;color:var(--text-2)">
+      在 LangGraph 里，这 6 个步骤在一张图里平铺直叙。在其他框架里，传统步骤要包装成工具，AI 步骤要定义成 Agent。
+    </p>
+  </div>
+  <div class="deck-footer">
+    <span class="mono">#workflow #ecommerce-example</span>
+    <span class="slide-number" data-current="10" data-total="15"></span>
+  </div>
+  <div class="notes">
+    一个电商订单系统：用户下单、查询库存（传统 SQL）、AI 评估风险、调用支付（传统 API）、高风险时人工审核、发送通知（传统短信接口）。
+    在 LangGraph 里，这 6 个步骤在一张图里平铺直叙。在其他框架里，传统步骤要包装成工具，AI 步骤要定义成 Agent，整个流程的可见性和可控性都大打折扣。
+  </div>
+</section>
+
+<!-- ============ SLIDE 11: 不是银弹 ============ -->
+<section class="slide" data-title="Not Silver Bullet">
+  <p class="kicker anim-fade-up" data-anim="fade-up">诚实边界 · LangGraph 不是银弹</p>
+  <h2 class="h2 anim-fade-up" data-anim="fade-up">这些场景，<span class="gradient-text">不选</span> LangGraph</h2>
+  <div class="grid g3 mt-l" style="gap:16px">
+    <div class="scenario-card anim-fade-up" data-anim="fade-up" style="animation-delay:.05s">
+      <div style="font-size:13px;color:var(--text-3);margin-bottom:6px">场景</div>
+      <div style="font-weight:600;font-size:16px">5 分钟搭个 Demo</div>
+      <div class="rec">推荐：Agno</div>
+      <div class="dim" style="font-size:13px;margin-top:6px">最快上手，代码最少，验证想法首选</div>
+    </div>
+    <div class="scenario-card anim-fade-up" data-anim="fade-up" style="animation-delay:.1s">
+      <div style="font-size:13px;color:var(--text-3);margin-bottom:6px">场景</div>
+      <div style="font-weight:600;font-size:16px">纯角色扮演协作</div>
+      <div class="rec">推荐：CrewAI</div>
+      <div class="dim" style="font-size:13px;margin-top:6px">写报告/文案，角色抽象最自然</div>
+    </div>
+    <div class="scenario-card anim-fade-up" data-anim="fade-up" style="animation-delay:.15s">
+      <div style="font-size:13px;color:var(--text-3);margin-bottom:6px">场景</div>
+      <div style="font-weight:600;font-size:16px">Java 技术栈</div>
+      <div class="rec">推荐：Spring AI</div>
+      <div class="dim" style="font-size:13px;margin-top:6px">生态一致，Spring 开发者首选</div>
+    </div>
+    <div class="scenario-card anim-fade-up" data-anim="fade-up" style="animation-delay:.2s">
+      <div style="font-size:13px;color:var(--text-3);margin-bottom:6px">场景</div>
+      <div style="font-weight:600;font-size:16px">多 Agent 聊天实验</div>
+      <div class="rec">推荐：AutoGen</div>
+      <div class="dim" style="font-size:13px;margin-top:6px">对话模型成熟，微软背书</div>
+    </div>
+    <div class="scenario-card anim-fade-up" data-anim="fade-up" style="animation-delay:.25s">
+      <div style="font-size:13px;color:var(--text-3);margin-bottom:6px">场景</div>
+      <div style="font-weight:600;font-size:16px">强类型偏好</div>
+      <div class="rec">推荐：Pydantic AI</div>
+      <div class="dim" style="font-size:13px;margin-top:6px">类型安全，Pydantic 重度用户</div>
+    </div>
+    <div class="scenario-card anim-fade-up" data-anim="fade-up" style="animation-delay:.3s">
+      <div style="font-size:13px;color:var(--text-3);margin-bottom:6px">场景</div>
+      <div style="font-weight:600;font-size:16px">LlamaIndex RAG</div>
+      <div class="rec">推荐：LlamaIndex Workflows</div>
+      <div class="dim" style="font-size:13px;margin-top:6px">生态内集成，RAG 场景最优</div>
+    </div>
+  </div>
+  <div class="deck-footer">
+    <span class="mono">#when-not-to-use</span>
+    <span class="slide-number" data-current="11" data-total="15"></span>
+  </div>
+  <div class="notes">
+    但是，LangGraph 不是银弹。5 分钟搭 Demo 用 Agno，纯角色扮演用 CrewAI，Java 技术栈用 Spring AI，多 Agent 聊天实验用 AutoGen，强类型用 Pydantic AI，RAG 场景用 LlamaIndex。
+    框架选型看场景，没有最好的框架，只有最合适的框架。
+  </div>
+</section>
+
+<!-- ============ SLIDE 12: 给新手的建议 ============ -->
+<section class="slide" data-title="Advice">
+  <p class="kicker anim-fade-up" data-anim="fade-up">给 AI 新手的务实建议</p>
+  <h2 class="h2 anim-fade-up" data-anim="fade-up">先<span class="gradient-text">落地</span>，再<span class="gradient-text">优化</span></h2>
+  <div class="grid g2 mt-l" style="gap:28px;align-items:start">
+    <div class="anim-fade-up" data-anim="fade-up" style="animation-delay:.1s">
+      <div class="card card-accent" style="padding:24px">
+        <h4 style="color:var(--warn);margin-bottom:12px">&#9888;&#65039; 99% 的公司，框架性能不是瓶颈</h4>
+        <div class="stack" style="gap:10px;font-size:15px;line-height:1.7">
+          <div class="dim">能不能快速上手？</div>
+          <div class="dim">能不能找到解决方案？</div>
+          <div class="dim">团队能不能协同开发？</div>
+          <div style="margin-top:8px;padding:12px;background:var(--bg-soft);border-radius:var(--radius-sm);font-size:14px;color:var(--text-1)">
+            这些才是瓶颈。纠结"哪个更快"不如纠结"<b>哪个能让我这周上线</b>"。
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="anim-fade-up" data-anim="fade-up" style="animation-delay:.2s">
+      <div class="card card-accent" style="padding:24px">
+        <h4 style="color:var(--good);margin-bottom:12px">&#128200; LangChain 生态最成熟</h4>
+        <div class="stack" style="gap:10px;font-size:15px;line-height:1.7">
+          <div class="dim">GitHub 20k+ Stars</div>
+          <div class="dim">StackOverflow 有答案</div>
+          <div class="dim">遇到问题搜得到、问得到</div>
+          <div style="margin-top:8px;padding:12px;background:var(--bg-soft);border-radius:var(--radius-sm);font-size:14px;color:var(--text-1)">
+            先用 LangGraph 把系统搭起来跑通业务，等真有性能瓶颈时再迁移。
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="mt-l anim-fade-up" data-anim="fade-up" style="animation-delay:.3s;padding:18px 24px;background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);text-align:center">
+    <div style="font-size:18px;font-weight:700;color:var(--text-1)">
+      "因为选了个冷门框架，团队卡住半年上不了线"的成本
+      <span style="color:var(--bad)">&#8811;</span>
+      迁移的成本
+    </div>
+  </div>
+  <div class="deck-footer">
+    <span class="mono">#pragmatic-advice</span>
+    <span class="slide-number" data-current="12" data-total="15"></span>
+  </div>
+  <div class="notes">
+    给新手的务实建议：先落地，再优化。对于 99% 的公司来说，框架性能不是瓶颈。
+    LangChain 生态最成熟，GitHub 20k+ Stars，遇到问题搜得到。先用 LangGraph 把系统搭起来，等真有性能瓶颈时再考虑迁移。
+    "因为选冷门框架卡住半年上不了线"的成本，远大于迁移的成本。
+  </div>
+</section>
+
+<!-- ============ SLIDE 13: 阶段小结 ============ -->
+<section class="slide" data-title="Summary">
+  <p class="kicker anim-fade-up" data-anim="fade-up">阶段小结</p>
+  <h2 class="h2 anim-fade-up" data-anim="fade-up">今天带走的 <span class="gradient-text">4 件事</span></h2>
+  <div class="stack mt-l" style="gap:16px">
+    <div class="anim-fade-up" data-anim="fade-up" style="animation-delay:.05s;display:flex;align-items:center;gap:20px;padding:18px 24px;background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);border-left:3px solid var(--accent)">
+      <span style="font-size:36px;font-weight:800;color:var(--accent);opacity:.4;line-height:1;min-width:48px">01</span>
+      <div>
+        <div style="font-size:18px;font-weight:600">框架选型看场景</div>
+        <div class="dim" style="font-size:14px;margin-top:2px">没有最好的框架，只有最合适的框架</div>
+      </div>
+    </div>
+    <div class="anim-fade-up" data-anim="fade-up" style="animation-delay:.1s;display:flex;align-items:center;gap:20px;padding:18px 24px;background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);border-left:3px solid var(--accent)">
+      <span style="font-size:36px;font-weight:800;color:var(--accent);opacity:.4;line-height:1;min-width:48px">02</span>
+      <div>
+        <div style="font-size:18px;font-weight:600">LangGraph 的核心优势</div>
+        <div class="dim" style="font-size:14px;margin-top:2px">图级原生深度 + 传统业务零改动接入 + 最成熟的生态</div>
+      </div>
+    </div>
+    <div class="anim-fade-up" data-anim="fade-up" style="animation-delay:.15s;display:flex;align-items:center;gap:20px;padding:18px 24px;background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);border-left:3px solid var(--accent)">
+      <span style="font-size:36px;font-weight:800;color:var(--accent);opacity:.4;line-height:1;min-width:48px">03</span>
+      <div>
+        <div style="font-size:18px;font-weight:600">适用场景</div>
+        <div class="dim" style="font-size:14px;margin-top:2px">复杂工作流、精确控制、生产级部署、已有业务系统升级</div>
+      </div>
+    </div>
+    <div class="anim-fade-up" data-anim="fade-up" style="animation-delay:.2s;display:flex;align-items:center;gap:20px;padding:18px 24px;background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);border-left:3px solid var(--accent)">
+      <span style="font-size:36px;font-weight:800;color:var(--accent);opacity:.4;line-height:1;min-width:48px">04</span>
+      <div>
+        <div style="font-size:18px;font-weight:600">务实策略</div>
+        <div class="dim" style="font-size:14px;margin-top:2px">先选生态最成熟的框架跑起来，纠结"哪个更快"不如纠结"这周能不能上线"</div>
+      </div>
+    </div>
+  </div>
+  <div class="deck-footer">
+    <span class="mono">#summary</span>
+    <span class="slide-number" data-current="13" data-total="15"></span>
+  </div>
+  <div class="notes">
+    小结一下今天的四个要点：框架选型看场景；LangGraph 的核心优势是图级原生深度加传统业务零改动接入；适用场景是复杂工作流和生产级部署；务实策略是先跑起来再说。
+  </div>
+</section>
+
+<!-- ============ SLIDE 14: 口诀 + LG-01 预告 ============ -->
+<section class="slide" data-title="Closing">
+  <div class="cover-bg"></div>
+  <div class="cover-content" style="text-align:center">
+    <p class="kicker anim-fade-up" data-anim="fade-up">记忆口诀</p>
+    <div class="closing-verse mt-l anim-fade-up" data-anim="fade-up" style="animation-delay:.1s">
+      <span class="anim-neon-glow">链太线，图更全；</span>
+      <span class="anim-neon-glow" style="animation-delay:.5s">要可控，LangGraph 行；</span>
+      <span class="anim-neon-glow" style="animation-delay:1s">状态明，循环轻；</span>
+      <span class="anim-neon-glow" style="animation-delay:1.5s">人机能，生产顶；</span>
+      <span class="anim-neon-glow" style="animation-delay:2s">老代码，直接进；</span>
+      <span class="anim-neon-glow" style="animation-delay:2.5s">编排层，最省心。</span>
+    </div>
+    <div class="divider" style="margin:32px auto;width:120px"></div>
+    <div class="anim-fade-up" data-anim="fade-up" style="animation-delay:.3s">
+      <p class="lede" style="margin:0 auto;font-size:20px">下一节课：LG-01 <span style="color:var(--accent);font-weight:700">State · Node · Edge</span></p>
+      <p class="dim" style="font-size:14px;margin-top:8px">3 小时后能独立写出 WeatherBot · 真正理解"状态驱动"</p>
+    </div>
+  </div>
+  <div class="deck-footer">
+    <span class="mono">#closing · see you in LG-01</span>
+    <span class="slide-number" data-current="14" data-total="15"></span>
+  </div>
+  <div class="notes">
+    记住这个口诀：链太线，图更全；要可控，LangGraph 行；状态明，循环轻；人机能，生产顶；老代码，直接进；编排层，最省心。
+    下一节课 LG-01，我们从最基本的图开始——什么是 State、Node、Edge，以及怎么把它们拼成一个能跑的 Agent。准备好你的键盘，LG-01 见。
+  </div>
+</section>
+
+<!-- ============ SLIDE 15: THANKS ============ -->
+<section class="slide center tc" data-title="Thanks">
+  <div class="cover-bg"></div>
+  <div style="position:relative;z-index:1">
+    <div class="anim-fade-up" data-anim="fade-up">
+      <div style="font-size:140px;font-weight:900;line-height:1;letter-spacing:-.04em">
+        <span class="gradient-text">Thanks</span>
+      </div>
+      <p class="lede mt-m" style="font-size:22px">LG-00 · 为什么选择 LangGraph？</p>
+    </div>
+    <div class="mt-l anim-fade-up" data-anim="fade-up" style="animation-delay:.2s">
+      <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+        <span class="pill">LangGraph 渐进式课程</span>
+        <span class="pill pill-accent">github.com/langchain-ai/langgraph</span>
+      </div>
+    </div>
+    <div class="mt-m anim-fade-up" data-anim="fade-up" style="animation-delay:.35s">
+      <p class="dim" style="font-size:14px">按 <span class="mono">S</span> 进入演讲者视图 · <span class="mono">T</span> 切换主题 · <span class="mono">&#8592; &#8594;</span> 翻页 · <span class="mono">O</span> 概览</p>
+    </div>
+  </div>
+  <div class="deck-footer">
+    <span class="mono">#langgraph #ai-agent</span>
+    <span class="slide-number" data-current="15" data-total="15"></span>
+  </div>
+  <div class="notes">
+    感谢收听。有问题随时交流。记得去实践——把今天学的选型思路应用到你自己的项目中。
+  </div>
+</section>
+
+</div>
+
+<!-- Keyboard hint -->
+<div style="position:fixed;bottom:12px;left:12px;font-size:11px;color:var(--text-3);z-index:100;pointer-events:none;opacity:.6">
+  &#8592; &#8594; 翻页 · T 切换主题 · F 全屏 · O 概览 · S 演讲者视图
+</div>
+
+<script src="assets/runtime.js"></script>
+</body>
+</html>
