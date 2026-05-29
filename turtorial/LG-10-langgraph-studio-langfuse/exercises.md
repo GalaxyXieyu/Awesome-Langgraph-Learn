@@ -133,7 +133,7 @@ queries = [
 **问题**：
 1. 在 Langfuse Trace 列表页，三条 Trace 的耗时分别是多少？哪条最长？为什么？
 2. 点击天气分支的 Trace，查看瀑布图：`parse_intent` → `extract_city` → `query_weather` → `format_weather_reply`，哪个节点耗时最长？
-3. 如果 `query_weather` 实际调用了外部 LLM（而非本示例中的 mock 数据），Token 用量信息会出现在哪里？
+3. 如果 `query_weather` 调用了外部 LLM，Token 用量信息会出现在哪里？
 4. 给这三次运行分别打上不同的标签（如 `branch:weather`、`branch:time`、`branch:fallback`），在 Langfuse 中如何按标签筛选？
 
 <details>

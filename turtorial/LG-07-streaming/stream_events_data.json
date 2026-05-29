@@ -1,0 +1,103 @@
+{
+  "message_tokens": [
+    "我",
+    "来",
+    "为",
+    "你",
+    "介",
+    "绍",
+    "LangGraph",
+    "的",
+    "流",
+    "式",
+    "输",
+    "出",
+    "..."
+  ],
+  "namespace_events": [
+    {
+      "type": "values",
+      "ns": [],
+      "data": {
+        "msg": "顶层图事件"
+      }
+    },
+    {
+      "type": "values",
+      "ns": [
+        "writer"
+      ],
+      "data": {
+        "msg": "writer 子图事件"
+      }
+    },
+    {
+      "type": "values",
+      "ns": [
+        "supervisor",
+        "weather_expert"
+      ],
+      "data": {
+        "msg": "嵌套子图事件"
+      }
+    }
+  ],
+  "nested_events": [
+    {
+      "type": "messages",
+      "ns": [],
+      "content": "我",
+      "metadata": {}
+    },
+    {
+      "type": "tasks",
+      "ns": [
+        "weather_expert"
+      ],
+      "data": {
+        "id": "agent-xyz",
+        "name": "agent",
+        "input": {},
+        "triggers": []
+      }
+    },
+    {
+      "type": "messages",
+      "ns": [
+        "weather_expert"
+      ],
+      "content": "北",
+      "metadata": {}
+    },
+    {
+      "type": "tasks",
+      "ns": [
+        "weather_expert"
+      ],
+      "data": {
+        "id": "tools-abc",
+        "name": "tools",
+        "error": null,
+        "result": {}
+      }
+    },
+    {
+      "type": "tasks",
+      "ns": [
+        "weather_expert"
+      ],
+      "data": {
+        "id": "agent-xyz",
+        "name": "agent",
+        "error": null,
+        "result": {}
+      }
+    },
+    {
+      "type": "messages",
+      "ns": [],
+      "content": "北",
+      "metadata": {}
+    }
+  ]
+}

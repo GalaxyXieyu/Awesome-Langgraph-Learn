@@ -1,0 +1,92 @@
+{
+  "meta": {
+    "description": "本地脱敏内容发布审批数据，用于演示 Human-in-the-loop 中断、恢复和发布前审批。",
+    "request_count": 4,
+    "policy_rule_count": 4,
+    "privacy": "人员、渠道和内容均为本地演示数据。"
+  },
+  "policy_rules": [
+    {
+      "rule_id": "ad_high_001",
+      "level": "high",
+      "terms": [
+        "全网最低",
+        "保本收益",
+        "永久有效"
+      ],
+      "description": "绝对化或收益承诺表达需要人工审批。"
+    },
+    {
+      "rule_id": "ad_high_002",
+      "level": "high",
+      "terms": [
+        "百分百治愈",
+        "官方唯一",
+        "无条件退全款"
+      ],
+      "description": "医疗、唯一性和退款承诺表达需要人工审批。"
+    },
+    {
+      "rule_id": "ad_medium_001",
+      "level": "medium",
+      "terms": [
+        "限时",
+        "错过再等一年",
+        "免费送"
+      ],
+      "description": "强促销表达需要复核风险。"
+    },
+    {
+      "rule_id": "ad_low_001",
+      "level": "low",
+      "terms": [
+        "新品",
+        "体验",
+        "预约"
+      ],
+      "description": "常规营销表达只记录，不触发人工审批。"
+    }
+  ],
+  "requests": [
+    {
+      "request_id": "campaign_high_001",
+      "topic": "618 智能空调促销",
+      "channel": "公众号",
+      "owner_id": "operator_demo_001",
+      "draft_seed": "618 智能空调全网最低，限时下单再享保本收益，错过再等一年。"
+    },
+    {
+      "request_id": "campaign_low_001",
+      "topic": "空气净化器新品预约",
+      "channel": "App Push",
+      "owner_id": "operator_demo_002",
+      "draft_seed": "空气净化器新品预约开启，支持到店体验和线上咨询。"
+    },
+    {
+      "request_id": "campaign_high_002",
+      "topic": "睡眠健康产品推广",
+      "channel": "小程序",
+      "owner_id": "operator_demo_003",
+      "draft_seed": "睡眠健康产品官方唯一推荐，体验后百分百治愈睡眠问题。"
+    },
+    {
+      "request_id": "campaign_medium_001",
+      "topic": "会员日活动提醒",
+      "channel": "短信",
+      "owner_id": "operator_demo_004",
+      "draft_seed": "会员日限时活动开启，预约到店可领取体验礼包。"
+    }
+  ],
+  "reviewer_examples": [
+    {
+      "reviewer_id": "reviewer_demo_001",
+      "decision": "edit_and_approve",
+      "comment": "删除绝对化和收益承诺表达后发布。"
+    },
+    {
+      "reviewer_id": "reviewer_demo_002",
+      "decision": "reject",
+      "comment": "内容包含医疗效果承诺，不能发布。"
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+<defs>
+  <marker id="arrow" markerWidth="14" markerHeight="14" refX="10" refY="5" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L10,5 L0,10 z" fill="#64748b"/></marker>
+</defs>
+<rect width="1600" height="900" fill="#0f172a"/>
+<text x="80" y="86" text-anchor="start" font-size="46" font-weight="800" fill="#e2e8f0" font-family="Inter, Noto Sans SC, PingFang SC, Microsoft YaHei, sans-serif">父子图状态映射</text>
+<text x="80" y="126" text-anchor="start" font-size="20" font-weight="500" fill="#94a3b8" font-family="Inter, Noto Sans SC, PingFang SC, Microsoft YaHei, sans-serif">LangGraph 教程图解</text>
+<rect x="110" y="260" width="420" height="250" rx="12" fill="#1e293b" stroke="#38bdf8" stroke-width="3"/><text x="320" y="308" text-anchor="middle" font-size="28" font-weight="700" fill="#e2e8f0" font-family="Inter, Noto Sans SC, PingFang SC, Microsoft YaHei, sans-serif">父图 State</text><text x="320" y="352" text-anchor="middle" font-size="22" font-weight="500" fill="#94a3b8" font-family="Inter, Noto Sans SC, PingFang SC, Microsoft YaHei, sans-serif">topic</text><text x="320" y="386" text-anchor="middle" font-size="22" font-weight="500" fill="#94a3b8" font-family="Inter, Noto Sans SC, PingFang SC, Microsoft YaHei, sans-serif">user_id</text><text x="320" y="420" text-anchor="middle" font-size="22" font-weight="500" fill="#94a3b8" font-family="Inter, Noto Sans SC, PingFang SC, Microsoft YaHei, sans-serif">reports[]</text>
+<line x1="540" y1="385" x2="705" y2="385" stroke="#64748b" stroke-width="4" marker-end="url(#arrow)"/>
+<circle cx="800" cy="385" r="90" fill="#1e293b" stroke="#e0a068" stroke-width="4"/>
+<text x="800" y="395" text-anchor="middle" font-size="28" font-weight="800" fill="#e0a068" font-family="Inter, Noto Sans SC, PingFang SC, Microsoft YaHei, sans-serif">输入/输出映射</text>
+<line x1="895" y1="385" x2="1060" y2="385" stroke="#64748b" stroke-width="4" marker-end="url(#arrow)"/>
+<rect x="1070" y="260" width="420" height="250" rx="12" fill="#1e293b" stroke="#9ece6a" stroke-width="3"/><text x="1280" y="308" text-anchor="middle" font-size="28" font-weight="700" fill="#e2e8f0" font-family="Inter, Noto Sans SC, PingFang SC, Microsoft YaHei, sans-serif">子图 State</text><text x="1280" y="352" text-anchor="middle" font-size="22" font-weight="500" fill="#94a3b8" font-family="Inter, Noto Sans SC, PingFang SC, Microsoft YaHei, sans-serif">company</text><text x="1280" y="386" text-anchor="middle" font-size="22" font-weight="500" fill="#94a3b8" font-family="Inter, Noto Sans SC, PingFang SC, Microsoft YaHei, sans-serif">context</text><text x="1280" y="420" text-anchor="middle" font-size="22" font-weight="500" fill="#94a3b8" font-family="Inter, Noto Sans SC, PingFang SC, Microsoft YaHei, sans-serif">result</text>
+<text x="800" y="700" text-anchor="middle" font-size="28" font-weight="500" fill="#94a3b8" font-family="Inter, Noto Sans SC, PingFang SC, Microsoft YaHei, sans-serif">状态通过节点返回值增量更新，并在图中持续传递</text>
+</svg>

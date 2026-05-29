@@ -1,0 +1,31 @@
+{
+  "records": [
+    {
+      "query": "分析新能源汽车行业趋势",
+      "response": "新能源汽车行业 2024 年呈现快速增长态势...",
+      "user_feedback": "positive",
+      "metadata": {
+        "agent": "deep_research",
+        "model": "gpt-4"
+      }
+    },
+    {
+      "query": "查询比亚迪最新财报",
+      "response": "比亚迪 2024 年 Q3 营收...",
+      "user_feedback": "negative",
+      "metadata": {
+        "agent": "deep_research",
+        "model": "gpt-4"
+      }
+    },
+    {
+      "query": "推荐几只新能源股票",
+      "response": "根据分析，以下几只新能源股票值得关注...",
+      "user_feedback": null,
+      "metadata": {
+        "agent": "deep_research",
+        "model": "gpt-4"
+      }
+    }
+  ]
+}
