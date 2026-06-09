@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
+  <title id="title">LangGraph 记忆三层机制图</title>
+  <desc id="desc">展示 State、Checkpoint 和 Store 在一节记忆课程中的分工。</desc>
+  <defs>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="11" flood-color="#4e5f68" flood-opacity="0.12"/>
+    </filter>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="9" refY="6" orient="auto" markerUnits="strokeWidth">
+      <path d="M2,2 L10,6 L2,10 Z" fill="#6f7f89"/>
+    </marker>
+    <style>
+      .bg { fill: #fbf7ef; }
+      .title { font: 700 40px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", sans-serif; fill: #27343b; }
+      .subtitle { font: 400 20px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", sans-serif; fill: #65717a; }
+      .layer { filter: url(#shadow); stroke-width: 1.5; }
+      .h { font: 700 28px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", sans-serif; fill: #2c3940; }
+      .p { font: 400 20px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", sans-serif; fill: #43525a; }
+      .api { font: 600 17px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #748089; }
+      .line { stroke: #70818a; stroke-width: 2.5; fill: none; marker-end: url(#arrow); }
+      .muted { font: 400 17px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", sans-serif; fill: #73808a; }
+    </style>
+  </defs>
+  <rect class="bg" width="1280" height="720"/>
+  <text class="title" x="640" y="74" text-anchor="middle">图的记忆不是一层，而是三种位置</text>
+  <text class="subtitle" x="640" y="110" text-anchor="middle">当前工作台、聊天窗口存档、用户长期笔记本，各自解决不同问题</text>
+
+  <rect class="layer" x="88" y="226" width="300" height="240" rx="30" fill="#eef3ef" stroke="#9db4aa"/>
+  <text class="h" x="238" y="286" text-anchor="middle">当前工作台</text>
+  <text class="api" x="238" y="318" text-anchor="middle">state</text>
+  <text class="p" x="128" y="368">这一轮节点能看到什么</text>
+  <text class="p" x="128" y="402">节点返回什么更新</text>
+  <text class="muted" x="128" y="438">生命周期：当前运行</text>
+
+  <rect class="layer" x="490" y="190" width="300" height="312" rx="30" fill="#e9eff7" stroke="#9fb2c9"/>
+  <text class="h" x="640" y="250" text-anchor="middle">聊天窗口存档</text>
+  <text class="api" x="640" y="282" text-anchor="middle">checkpointer + thread_id</text>
+  <text class="p" x="530" y="338">同一窗口自动续接</text>
+  <text class="p" x="530" y="372">中断后能找回现场</text>
+  <text class="p" x="530" y="406">换窗口就是新会话</text>
+  <text class="muted" x="530" y="454">隔离方式：thread_id</text>
+
+  <rect class="layer" x="892" y="226" width="300" height="240" rx="30" fill="#f3ece4" stroke="#d0b79b"/>
+  <text class="h" x="1042" y="286" text-anchor="middle">用户笔记本</text>
+  <text class="api" x="1042" y="318" text-anchor="middle">store</text>
+  <text class="p" x="932" y="368">跨窗口保存偏好</text>
+  <text class="p" x="932" y="402">按用户隔离资料</text>
+  <text class="muted" x="932" y="438">隔离方式：namespace + user_id</text>
+
+  <path class="line" d="M388 346 C424 346, 450 346, 486 346"/>
+  <path class="line" d="M790 346 C826 346, 852 346, 888 346"/>
+
+  <rect x="250" y="570" width="780" height="54" rx="27" fill="#ffffff" stroke="#d8cec1"/>
+  <text class="p" x="640" y="604" text-anchor="middle">判断存哪里：当前处理放 state，会话现场放 checkpoint，长期偏好放 store</text>
+</svg>

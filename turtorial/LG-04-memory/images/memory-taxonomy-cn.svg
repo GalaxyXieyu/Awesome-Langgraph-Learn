@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
+  <title id="title">人类记忆分类到 Graph 记忆机制的映射</title>
+  <desc id="desc">用紧凑的 16:9 横向布局展示短期记忆、长期资料、用户偏好和事实知识如何映射到 State、Checkpoint、Store 和 Summary。</desc>
+  <defs>
+    <filter id="shadow" x="-15%" y="-15%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="5" stdDeviation="8" flood-color="#4e5f68" flood-opacity="0.11"/>
+    </filter>
+    <marker id="arrow" markerWidth="11" markerHeight="11" refX="9" refY="5.5" orient="auto" markerUnits="strokeWidth">
+      <path d="M2,2 L9,5.5 L2,9 Z" fill="#7d8d94"/>
+    </marker>
+    <style>
+      .bg { fill: #fbf7ef; }
+      .title { font: 700 36px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", sans-serif; fill: #1f2b31; }
+      .subtitle { font: 400 18px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", sans-serif; fill: #64717a; }
+      .section { font: 700 22px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", sans-serif; fill: #32424a; }
+      .card-title { font: 700 22px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", sans-serif; fill: #27343b; }
+      .card-text { font: 400 16px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", sans-serif; fill: #45545d; }
+      .example { font: italic 400 14px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", sans-serif; fill: #75838b; }
+      .api { font: 600 15px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #5f6f78; }
+      .hint { font: 400 15px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", sans-serif; fill: #60707a; }
+      .arrow { stroke: #7d8d94; stroke-width: 2.2; fill: none; marker-end: url(#arrow); }
+      .divider { stroke: #d9cfc2; stroke-width: 1.2; stroke-dasharray: 5 7; }
+    </style>
+  </defs>
+
+  <rect class="bg" width="1280" height="720"/>
+
+  <text class="title" x="640" y="56" text-anchor="middle">记忆不是一层：不同信息要放到不同位置</text>
+  <text class="subtitle" x="640" y="88" text-anchor="middle">人会自然区分短期上下文、长期资料、偏好和事实；Graph 需要显式设计存放位置和找回方式</text>
+
+  <text class="section" x="92" y="142">人类会自然分层</text>
+  <text class="section" x="1010" y="142">Graph 需要机制</text>
+  <line class="divider" x1="640" y1="122" x2="640" y2="602"/>
+
+  <!-- Row 1 -->
+  <rect x="68" y="168" width="420" height="86" rx="18" fill="#eef3ef" stroke="#9db4aa" filter="url(#shadow)"/>
+  <text class="card-title" x="100" y="205">短期记忆</text>
+  <text class="card-text" x="100" y="231">刚才聊到哪、当前窗口里的上下文</text>
+  <text class="example" x="328" y="205">例："我叫张伟"</text>
+
+  <rect x="792" y="168" width="420" height="86" rx="18" fill="#eef3ef" stroke="#9db4aa" filter="url(#shadow)"/>
+  <text class="card-title" x="824" y="205">当前工作台 + 窗口存档</text>
+  <text class="api" x="824" y="230">state + checkpointer + thread_id</text>
+  <text class="hint" x="1060" y="230">同一窗口自动续接</text>
+  <path class="arrow" d="M500 211 C600 211, 682 211, 780 211"/>
+
+  <!-- Row 2 -->
+  <rect x="68" y="282" width="420" height="86" rx="18" fill="#e9eff7" stroke="#9fb2c9" filter="url(#shadow)"/>
+  <text class="card-title" x="100" y="319">长期资料</text>
+  <text class="card-text" x="100" y="345">换窗口后仍属于这个用户的信息</text>
+  <text class="example" x="328" y="319">例：年龄、过敏史</text>
+
+  <rect x="792" y="282" width="420" height="86" rx="18" fill="#e9eff7" stroke="#9fb2c9" filter="url(#shadow)"/>
+  <text class="card-title" x="824" y="319">用户笔记本</text>
+  <text class="api" x="824" y="344">store + namespace + user_id</text>
+  <text class="hint" x="1060" y="344">跨窗口可读取</text>
+  <path class="arrow" d="M500 325 C600 325, 682 325, 780 325"/>
+
+  <!-- Row 3 -->
+  <rect x="68" y="396" width="420" height="86" rx="18" fill="#f3ece4" stroke="#d0b79b" filter="url(#shadow)"/>
+  <text class="card-title" x="100" y="433">偏好与习惯</text>
+  <text class="card-text" x="100" y="459">影响以后怎么回答、用什么格式</text>
+  <text class="example" x="328" y="433">例："请用表格"</text>
+
+  <rect x="792" y="396" width="420" height="86" rx="18" fill="#f3ece4" stroke="#d0b79b" filter="url(#shadow)"/>
+  <text class="card-title" x="824" y="433">偏好存储</text>
+  <text class="api" x="824" y="458">store.put(("用户偏好", user_id), ...)</text>
+  <text class="hint" x="1060" y="458">按用户隔离</text>
+  <path class="arrow" d="M500 439 C600 439, 682 439, 780 439"/>
+
+  <!-- Row 4 -->
+  <rect x="68" y="510" width="420" height="86" rx="18" fill="#f1e8e4" stroke="#c9a99d" filter="url(#shadow)"/>
+  <text class="card-title" x="100" y="547">事实与长历史</text>
+  <text class="card-text" x="100" y="573">客观知识、长对话里的关键要点</text>
+  <text class="example" x="328" y="547">例：会议摘要</text>
+
+  <rect x="792" y="510" width="420" height="86" rx="18" fill="#f1e8e4" stroke="#c9a99d" filter="url(#shadow)"/>
+  <text class="card-title" x="824" y="547">知识库 / 摘要</text>
+  <text class="api" x="824" y="572">store / summary / trim</text>
+  <text class="hint" x="1060" y="572">压缩但保留重点</text>
+  <path class="arrow" d="M500 553 C600 553, 682 553, 780 553"/>
+
+  <!-- Bottom summary -->
+  <rect x="188" y="636" width="904" height="48" rx="24" fill="#ffffff" stroke="#d8cec1"/>
+  <text class="hint" x="640" y="666" text-anchor="middle">判断存哪里：当前处理放 state，会话现场放 checkpoint，长期资料和偏好放 store，太长的历史做 summary</text>
+</svg>

@@ -3,19 +3,14 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
-from pydantic import BaseModel, Field
-
-from langchain.agents import create_agent
 from langchain.chat_models import init_chat_model
-from langchain_core.messages import HumanMessage
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.tools import tool
 
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
-from langgraph.types import Command, interrupt
+from langgraph.store.memory import InMemoryStore
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -30,11 +25,6 @@ if ENV_PATH.exists():
             key, value = line.split("=", 1)
             os.environ[key.strip()] = value.strip().strip('"').strip("'")
 
-DATA_PATH = Path("content_review_data.json")
-if not DATA_PATH.exists():
-    DATA_PATH = PROJECT_ROOT / "turtorial/LG-03-human-in-the-loop/content_review_data.json"
-
-CONTENT_DATA = json.loads(DATA_PATH.read_text(encoding="utf-8"))
 
 # 模型配置必须显式提供。教学代码优先清晰，不做多层 fallback。
 OPENAI_MODEL = os.environ["OPENAI_MODEL"]
@@ -74,31 +64,11 @@ def parse_json_message(message: Any) -> dict[str, Any]:
         raise ValueError(f"模型没有返回可解析的 JSON：{text}")
 
 
-def find_publish_request(request_id: str) -> dict[str, Any]:
-    return next(item for item in CONTENT_DATA["requests"] if item["request_id"] == request_id)
-
-
-def policy_text() -> str:
-    return json.dumps(CONTENT_DATA["policy_rules"], ensure_ascii=False, indent=2)
-
-
 def display(value: Any) -> Any:
-    labels = {
-        "high": "高",
-        "medium": "中",
-        "low": "低",
-        "none": "无",
-        "approve": "通过",
-        "edit_and_approve": "修改后通过",
-        "reject": "拒绝",
-        "published": "已发布",
-        "published_after_edit": "修改后发布",
-        "rejected": "已拒绝",
-    }
     if isinstance(value, bool):
         return "是" if value else "否"
     if isinstance(value, tuple):
         return [display(item) for item in value]
     if isinstance(value, list):
         return [display(item) for item in value]
-    return labels.get(value, value)
+    return value

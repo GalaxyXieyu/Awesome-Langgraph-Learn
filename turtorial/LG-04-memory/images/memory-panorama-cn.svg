@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
+  <title id="title">LangGraph 记忆全景图</title>
+  <desc id="desc">展示短期记忆、长期记忆、持久化记忆和长历史整理的存储位置、生命周期与隔离方式。</desc>
+  <defs>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#43525a" flood-opacity="0.11"/>
+    </filter>
+    <linearGradient id="header" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#dce9e1"/>
+      <stop offset="0.5" stop-color="#e6edf6"/>
+      <stop offset="1" stop-color="#f2e7d7"/>
+    </linearGradient>
+    <style>
+      .bg { fill: #fbf7ef; }
+      .title { font: 700 42px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", sans-serif; fill: #26343b; }
+      .subtitle { font: 400 20px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", sans-serif; fill: #65717a; }
+      .card { fill: #ffffff; stroke: #d8d1c7; stroke-width: 1.4; filter: url(#shadow); }
+      .headerText { font: 700 20px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", sans-serif; fill: #304047; }
+      .cellStrong { font: 700 22px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", sans-serif; fill: #28363d; }
+      .cell { font: 400 18px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", sans-serif; fill: #43525a; }
+      .api { font: 600 16px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #66737c; }
+      .muted { font: 400 16px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", sans-serif; fill: #748089; }
+      .line { stroke: #e2dbd1; stroke-width: 1.2; }
+      .pill { fill: #f5f1ea; stroke: #ded4c7; }
+      .foot { font: 500 18px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", sans-serif; fill: #415057; }
+    </style>
+  </defs>
+
+  <rect class="bg" width="1280" height="720"/>
+  <text class="title" x="640" y="70" text-anchor="middle">本节小结：图的记忆要分开放</text>
+  <text class="subtitle" x="640" y="108" text-anchor="middle">先判断信息属于哪种生命周期，再决定写到 state、checkpoint、store 还是摘要里</text>
+
+  <rect class="card" x="58" y="150" width="1164" height="438" rx="28"/>
+  <rect x="58" y="150" width="1164" height="70" rx="28" fill="url(#header)"/>
+  <path d="M58 194 H1222" class="line"/>
+
+  <text class="headerText" x="116" y="194">记忆类型</text>
+  <text class="headerText" x="318" y="194">人类类比</text>
+  <text class="headerText" x="568" y="194">Graph 机制</text>
+  <text class="headerText" x="820" y="194">生命周期</text>
+  <text class="headerText" x="1032" y="194">隔离方式</text>
+
+  <path d="M58 294 H1222" class="line"/>
+  <path d="M58 368 H1222" class="line"/>
+  <path d="M58 442 H1222" class="line"/>
+  <path d="M58 516 H1222" class="line"/>
+  <path d="M250 150 V588" class="line"/>
+  <path d="M486 150 V588" class="line"/>
+  <path d="M740 150 V588" class="line"/>
+  <path d="M948 150 V588" class="line"/>
+
+  <text class="cellStrong" x="116" y="263">短期 / 会话</text>
+  <text class="cell" x="318" y="263">刚才聊了什么</text>
+  <text class="api" x="568" y="254">State + Checkpoint</text>
+  <text class="muted" x="568" y="281">thread_id 找回现场</text>
+  <text class="cell" x="820" y="263">同一 thread</text>
+  <text class="api" x="1032" y="263">thread_id</text>
+
+  <text class="cellStrong" x="116" y="337">长期 / 偏好</text>
+  <text class="cell" x="318" y="337">这个用户喜欢什么</text>
+  <text class="api" x="568" y="337">Store</text>
+  <text class="cell" x="820" y="337">跨会话</text>
+  <text class="api" x="1032" y="328">user_id</text>
+  <text class="api" x="1032" y="353">+ namespace</text>
+
+  <text class="cellStrong" x="116" y="411">事实 / 知识</text>
+  <text class="cell" x="318" y="411">产品政策是什么</text>
+  <text class="api" x="568" y="411">Store（知识）</text>
+  <text class="cell" x="820" y="411">跨用户 / 全局</text>
+  <text class="api" x="1032" y="411">namespace</text>
+
+  <text class="cellStrong" x="116" y="485">历史整理</text>
+  <text class="cell" x="318" y="485">会议纪要不要全文</text>
+  <text class="api" x="568" y="485">Summary / Trim</text>
+  <text class="cell" x="820" y="485">当前会话</text>
+  <text class="cell" x="1032" y="485">按需触发</text>
+
+  <text class="cellStrong" x="116" y="559">持久化记忆</text>
+  <text class="cell" x="318" y="559">电脑关机后还能记住</text>
+  <text class="api" x="568" y="550">PostgresSaver</text>
+  <text class="api" x="568" y="575">PostgresStore</text>
+  <text class="cell" x="820" y="559">数据库生命周期</text>
+  <text class="cell" x="1032" y="559">沿用上面隔离</text>
+
+  <rect class="pill" x="170" y="626" width="940" height="52" rx="26"/>
+  <text class="foot" x="640" y="659" text-anchor="middle">一句话：图的定义不变；不同记忆换不同后端，并用正确的 ID 找回。</text>
+</svg>
