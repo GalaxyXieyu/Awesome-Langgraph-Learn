@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
+  <title id="title">Node 并行与 Reducer 合并</title>
+  <desc id="desc">展示一个主题输入如何 fan-out 到四个研究节点，多个节点写入 findings 后通过 reducer 合并，再 fan-in 到报告节点。</desc>
+  <defs>
+    <filter id="shadow" x="-16%" y="-16%" width="132%" height="132%">
+      <feDropShadow dx="0" dy="7" stdDeviation="10" flood-color="#40515a" flood-opacity="0.11"/>
+    </filter>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="9" refY="6" orient="auto" markerUnits="strokeWidth">
+      <path d="M2,2 L10,6 L2,10 Z" fill="#74838a"/>
+    </marker>
+    <style>
+      .bg { fill: #fbf7ef; }
+      .title { font: 700 39px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", sans-serif; fill: #27343b; }
+      .subtitle { font: 400 19px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", sans-serif; fill: #65717a; }
+      .box { filter: url(#shadow); stroke-width: 1.4; }
+      .h { font: 700 22px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", sans-serif; fill: #2c3940; }
+      .p { font: 400 17px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", sans-serif; fill: #43525a; }
+      .api { font: 600 14px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #6e7a82; }
+      .small { font: 400 14px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", sans-serif; fill: #748089; }
+      .line { stroke: #71818a; stroke-width: 2.3; fill: none; marker-end: url(#arrow); }
+      .soft { stroke: #aeb9bf; stroke-width: 1.6; fill: none; marker-end: url(#arrow); }
+      .foot { font: 600 18px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", sans-serif; fill: #35464e; }
+    </style>
+  </defs>
+
+  <rect class="bg" width="1280" height="720"/>
+  <text class="title" x="640" y="64" text-anchor="middle">职责解构：Node 并行以后，必须设计合并协议</text>
+  <text class="subtitle" x="640" y="100" text-anchor="middle">Fan-out 同时派活，Fan-in 等齐，Reducer 让并行写入不丢结果</text>
+
+  <rect class="box" x="62" y="322" width="170" height="88" rx="24" fill="#ffffff" stroke="#d8d1c7"/>
+  <text class="h" x="147" y="356" text-anchor="middle">主题输入</text>
+  <text class="api" x="147" y="384" text-anchor="middle">topic</text>
+
+  <rect class="box" x="350" y="152" width="188" height="76" rx="22" fill="#eef3ef" stroke="#9db4aa"/>
+  <text class="h" x="444" y="183" text-anchor="middle">查财报</text>
+  <text class="api" x="444" y="209" text-anchor="middle">finance_node</text>
+
+  <rect class="box" x="350" y="266" width="188" height="76" rx="22" fill="#e9eff7" stroke="#9fb2c9"/>
+  <text class="h" x="444" y="297" text-anchor="middle">查新闻</text>
+  <text class="api" x="444" y="323" text-anchor="middle">news_node</text>
+
+  <rect class="box" x="350" y="380" width="188" height="76" rx="22" fill="#f3ece4" stroke="#d0b79b"/>
+  <text class="h" x="444" y="411" text-anchor="middle">查竞品</text>
+  <text class="api" x="444" y="437" text-anchor="middle">competitor</text>
+
+  <rect class="box" x="350" y="494" width="188" height="76" rx="22" fill="#f5e7e4" stroke="#d7aba3"/>
+  <text class="h" x="444" y="525" text-anchor="middle">查专家</text>
+  <text class="api" x="444" y="551" text-anchor="middle">expert_node</text>
+
+  <path class="line" d="M234 366 C292 244, 304 191, 345 190"/>
+  <path class="line" d="M234 366 C292 324, 306 305, 345 304"/>
+  <path class="line" d="M234 366 C292 408, 306 419, 345 418"/>
+  <path class="line" d="M234 366 C292 492, 304 533, 345 532"/>
+  <text class="api" x="265" y="300">Fan-out</text>
+
+  <rect class="box" x="675" y="262" width="250" height="208" rx="28" fill="#ffffff" stroke="#d8d1c7"/>
+  <text class="h" x="800" y="304" text-anchor="middle">Reducer 合并</text>
+  <text class="api" x="800" y="334" text-anchor="middle">findings: Annotated[list, add]</text>
+  <text class="p" x="715" y="374">4 个分支都写入</text>
+  <text class="p" x="715" y="406">同一个 findings</text>
+  <text class="small" x="715" y="438">无 reducer：冲突或丢结果</text>
+
+  <path class="soft" d="M540 190 C610 210, 640 270, 670 315"/>
+  <path class="soft" d="M540 304 C604 318, 632 338, 670 352"/>
+  <path class="soft" d="M540 418 C604 408, 632 394, 670 380"/>
+  <path class="soft" d="M540 532 C610 515, 640 462, 670 420"/>
+
+  <rect class="box" x="1042" y="322" width="176" height="88" rx="24" fill="#ffffff" stroke="#d8d1c7"/>
+  <text class="h" x="1130" y="356" text-anchor="middle">汇总报告</text>
+  <text class="api" x="1130" y="384" text-anchor="middle">compile</text>
+  <path class="line" d="M928 366 C974 366, 994 366, 1037 366"/>
+  <text class="api" x="958" y="340">Fan-in</text>
+
+  <rect x="220" y="628" width="840" height="50" rx="25" fill="#ffffff" stroke="#d8cec1"/>
+  <text class="foot" x="640" y="660" text-anchor="middle">职责拆开以后，速度来自并行；结果正确来自 Fan-in 和 Reducer。</text>
+</svg>

@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
+  <title id="title">Supervisor 与 Swarm 的区别</title>
+  <desc id="desc">对比 supervisor 中心调度和 swarm 平级交接两种多 Agent 预构建模式。</desc>
+  <defs><filter id="shadow" x="-12%" y="-12%" width="124%" height="124%"><feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#3f4d55" flood-opacity="0.10"/></filter><marker id="arrow" markerWidth="12" markerHeight="12" refX="9" refY="6" orient="auto"><path d="M2,2 L10,6 L2,10 Z" fill="#74838a"/></marker><style>.bg{fill:#fbf7ef}.title{font:700 40px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#27343b}.sub{font:400 19px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#66737b}.panel{fill:#fffdf8;stroke:#ded6ca;stroke-width:1.4;filter:url(#shadow)}.node{filter:url(#shadow);stroke-width:1.3}.h{font:700 23px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#2c3940}.p{font:400 16px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#43525a}.api{font:600 14px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;fill:#687781}.line{stroke:#74838a;stroke-width:2;fill:none;marker-end:url(#arrow)}.footer{font:700 18px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#34454d}</style></defs>
+  <rect class="bg" width="1280" height="720"/>
+  <text class="title" x="640" y="60" text-anchor="middle">多 Agent 预构建：一个是主管调度，一个是平级交接</text>
+  <text class="sub" x="640" y="96" text-anchor="middle">两者都在把专家能力原子化，只是路由权放在不同位置</text>
+  <rect class="panel" x="70" y="140" width="540" height="470" rx="30"/>
+  <text class="h" x="340" y="190" text-anchor="middle">Supervisor：中心调度</text>
+  <rect class="node" x="250" y="235" width="180" height="70" rx="22" fill="#edf3ef" stroke="#9fb5aa"/>
+  <text class="h" x="340" y="264" text-anchor="middle">主管 Agent</text><text class="api" x="340" y="288" text-anchor="middle">supervisor</text>
+  <rect class="node" x="120" y="400" width="130" height="62" rx="20" fill="#e9eff7" stroke="#a1b3c8"/><text class="p" x="185" y="437" text-anchor="middle">订单专员</text>
+  <rect class="node" x="275" y="400" width="130" height="62" rx="20" fill="#f3ece4" stroke="#cfb79d"/><text class="p" x="340" y="437" text-anchor="middle">退款专员</text>
+  <rect class="node" x="430" y="400" width="130" height="62" rx="20" fill="#f5e7e4" stroke="#d5aba3"/><text class="p" x="495" y="437" text-anchor="middle">技术专员</text>
+  <path class="line" d="M300 306 C250 345, 215 365, 190 394"/><path class="line" d="M340 306 V394"/><path class="line" d="M380 306 C430 345, 465 365, 490 394"/>
+  <text class="api" x="150" y="540">handoff 后回到 supervisor</text>
+
+  <rect class="panel" x="670" y="140" width="540" height="470" rx="30"/>
+  <text class="h" x="940" y="190" text-anchor="middle">Swarm：平级交接</text>
+  <rect class="node" x="770" y="300" width="140" height="68" rx="22" fill="#e9eff7" stroke="#a1b3c8"/><text class="p" x="840" y="340" text-anchor="middle">Alice</text>
+  <rect class="node" x="970" y="300" width="140" height="68" rx="22" fill="#f3ece4" stroke="#cfb79d"/><text class="p" x="1040" y="340" text-anchor="middle">Bob</text>
+  <rect class="node" x="870" y="430" width="140" height="68" rx="22" fill="#f5e7e4" stroke="#d5aba3"/><text class="p" x="940" y="470" text-anchor="middle">Carol</text>
+  <path class="line" d="M912 333 H964"/><path class="line" d="M1030 370 C1005 405, 980 418, 960 426"/><path class="line" d="M900 430 C872 405, 850 386, 840 372"/>
+  <text class="api" x="760" y="540">active_agent 记录当前专员</text>
+
+  <rect x="210" y="636" width="860" height="48" rx="24" fill="#ffffff" stroke="#d8cec1"/>
+  <text class="footer" x="640" y="667" text-anchor="middle">判断：任务分发用 supervisor；连续转接和平级协作用 swarm。</text>
+</svg>

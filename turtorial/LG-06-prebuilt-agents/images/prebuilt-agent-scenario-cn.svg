@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
+  <title id="title">为什么需要预构建 Agent</title>
+  <desc id="desc">展示 OpsBot 场景中标准 ReAct 循环、快速原型、黑盒代价和迁移边界。</desc>
+  <defs>
+    <filter id="shadow" x="-12%" y="-12%" width="124%" height="124%"><feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#3f4d55" flood-opacity="0.10"/></filter>
+    <style>
+      .bg{fill:#fbf7ef}.title{font:700 40px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#27343b}.sub{font:400 19px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#66737b}.panel{fill:#fffdf8;stroke:#ded6ca;stroke-width:1.4;filter:url(#shadow)}.h{font:700 23px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#2c3940}.p{font:400 16px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#43525a}.small{font:400 14px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#738089}.api{font:600 14px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;fill:#687781}.footer{font:700 18px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#34454d}
+    </style>
+  </defs>
+  <rect class="bg" width="1280" height="720"/>
+  <text class="title" x="640" y="60" text-anchor="middle">预构建 Agent 解决的不是“更高级”，而是标准循环太常见</text>
+  <text class="sub" x="640" y="96" text-anchor="middle">当需求就是 LLM → tools → LLM，先用预构建快速验证；需要控制时再迁移自定义图</text>
+
+  <rect class="panel" x="70" y="150" width="1140" height="430" rx="30"/>
+  <text class="h" x="150" y="205">OpsBot 场景</text>
+  <text class="p" x="150" y="242">用户：查订单、算退款、问政策</text>
+  <text class="p" x="150" y="274">Agent：判断需要哪些工具</text>
+  <text class="p" x="150" y="306">工具：订单库 / 政策库 / 计算器</text>
+
+  <rect x="470" y="188" width="250" height="74" rx="20" fill="#edf3ef" stroke="#9fb5aa"/>
+  <text class="h" x="595" y="218" text-anchor="middle">标准 ReAct</text>
+  <text class="api" x="595" y="244" text-anchor="middle">LLM → tools → LLM</text>
+  <rect x="470" y="298" width="250" height="74" rx="20" fill="#e9eff7" stroke="#a1b3c8"/>
+  <text class="h" x="595" y="328" text-anchor="middle">快速原型</text>
+  <text class="api" x="595" y="354" text-anchor="middle">create_react_agent</text>
+  <rect x="470" y="408" width="250" height="74" rx="20" fill="#f3ece4" stroke="#cfb79d"/>
+  <text class="h" x="595" y="438" text-anchor="middle">能力原子化</text>
+  <text class="api" x="595" y="464" text-anchor="middle">tools / agents</text>
+
+  <text class="h" x="865" y="205">什么时候别用</text>
+  <text class="p" x="865" y="242">需要人工审批</text>
+  <text class="p" x="865" y="274">需要复杂业务路由</text>
+  <text class="p" x="865" y="306">需要自定义 State 字段</text>
+  <text class="p" x="865" y="338">需要完整过程审计</text>
+  <text class="small" x="865" y="388">这些场景要迁移到自定义 StateGraph</text>
+
+  <rect x="220" y="628" width="840" height="50" rx="25" fill="#ffffff" stroke="#d8cec1"/>
+  <text class="footer" x="640" y="660" text-anchor="middle">判断规则：标准循环求快用预构建；业务控制求稳用自定义图。</text>
+</svg>

@@ -1,0 +1,108 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
+  <title id="title">复杂任务的四层解构</title>
+  <desc id="desc">用三列四行展示研究报告任务如何从人类自然动作，转换为 Graph 和 Agent 需要显式设计的四层解构机制。</desc>
+  <defs>
+    <filter id="softShadow" x="-12%" y="-12%" width="124%" height="124%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#3f4d55" flood-opacity="0.10"/>
+    </filter>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="9" refY="6" orient="auto" markerUnits="strokeWidth">
+      <path d="M2,2 L10,6 L2,10 Z" fill="#7b8b92"/>
+    </marker>
+    <style>
+      .bg { fill: #fbf7ef; }
+      .title { font: 700 40px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", sans-serif; fill: #27343b; }
+      .subtitle { font: 400 19px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", sans-serif; fill: #66737b; }
+      .panel { fill: #fffdf8; stroke: #ded6ca; stroke-width: 1.4; filter: url(#softShadow); }
+      .columnTitle { font: 700 20px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", sans-serif; fill: #314148; }
+      .columnHint { font: 400 14px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", sans-serif; fill: #7a858c; }
+      .layerTitle { font: 700 21px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", sans-serif; fill: #26343b; }
+      .text { font: 400 16px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", sans-serif; fill: #45555d; }
+      .small { font: 400 14px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", sans-serif; fill: #738089; }
+      .api { font: 600 14px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #687781; }
+      .arrow { stroke: #7b8b92; stroke-width: 1.8; fill: none; marker-end: url(#arrow); }
+      .divider { stroke: #e3dacd; stroke-width: 1.1; }
+      .footer { font: 700 18px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", sans-serif; fill: #34454d; }
+      .footerSmall { font: 400 15px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", sans-serif; fill: #65737b; }
+    </style>
+  </defs>
+
+  <rect class="bg" width="1280" height="720"/>
+  <text class="title" x="640" y="58" text-anchor="middle">复杂任务不是一层拆，而是分层解构</text>
+  <text class="subtitle" x="640" y="94" text-anchor="middle">先判断复杂度来自哪里，再选择 node、async、tools、subgraph、Send 或 reducer</text>
+
+  <rect class="panel" x="58" y="126" width="1164" height="512" rx="30"/>
+
+  <text class="columnTitle" x="210" y="171" text-anchor="middle">人类自然动作</text>
+  <text class="columnHint" x="210" y="194" text-anchor="middle">研究团队会隐式拆开</text>
+  <text class="columnTitle" x="640" y="171" text-anchor="middle">关键判断问题</text>
+  <text class="columnHint" x="640" y="194" text-anchor="middle">这部分到底该拆在哪一层？</text>
+  <text class="columnTitle" x="1060" y="171" text-anchor="middle">Graph / Agent 机制</text>
+  <text class="columnHint" x="1060" y="194" text-anchor="middle">机器必须显式设计边界</text>
+
+  <line class="divider" x1="360" y1="146" x2="360" y2="598"/>
+  <line class="divider" x1="920" y1="146" x2="920" y2="598"/>
+
+  <!-- Layer 1 -->
+  <rect x="96" y="224" width="260" height="78" rx="20" fill="#edf3ef" stroke="#9fb5aa" stroke-width="1.3"/>
+  <text class="layerTitle" x="122" y="255">职责解构</text>
+  <text class="text" x="122" y="281">财经、新闻、竞品、专家分工</text>
+
+  <path class="arrow" d="M374 263 H458"/>
+  <rect x="474" y="224" width="344" height="78" rx="20" fill="#ffffff" stroke="#d8d1c7" stroke-width="1.2"/>
+  <text class="text" x="500" y="255">是不是不同职责可以同时推进？</text>
+  <text class="small" x="500" y="281">如果是，让父图显式画出多条分支</text>
+
+  <path class="arrow" d="M834 263 H918"/>
+  <rect x="936" y="224" width="258" height="78" rx="20" fill="#edf3ef" stroke="#9fb5aa" stroke-width="1.3"/>
+  <text class="layerTitle" x="962" y="255">Node 并行</text>
+  <text class="api" x="962" y="281">Fan-out / Fan-in</text>
+
+  <!-- Layer 2 -->
+  <rect x="96" y="324" width="260" height="78" rx="20" fill="#e9eff7" stroke="#a1b3c8" stroke-width="1.3"/>
+  <text class="layerTitle" x="122" y="355">批量 I/O 解构</text>
+  <text class="text" x="122" y="381">一个研究员同时打开多个页面</text>
+
+  <path class="arrow" d="M374 363 H458"/>
+  <rect x="474" y="324" width="344" height="78" rx="20" fill="#ffffff" stroke="#d8d1c7" stroke-width="1.2"/>
+  <text class="text" x="500" y="355">是不是同一职责里的重复请求？</text>
+  <text class="small" x="500" y="381">如果是，不要把父图打碎成很多节点</text>
+
+  <path class="arrow" d="M834 363 H918"/>
+  <rect x="936" y="324" width="258" height="78" rx="20" fill="#e9eff7" stroke="#a1b3c8" stroke-width="1.3"/>
+  <text class="layerTitle" x="962" y="355">节点内部并发</text>
+  <text class="api" x="962" y="381">asyncio.gather</text>
+
+  <!-- Layer 3 -->
+  <rect x="96" y="424" width="260" height="78" rx="20" fill="#f3ece4" stroke="#cfb79d" stroke-width="1.3"/>
+  <text class="layerTitle" x="122" y="455">能力解构</text>
+  <text class="text" x="122" y="481">助理同时搜索、查库、计算</text>
+
+  <path class="arrow" d="M374 463 H458"/>
+  <rect x="474" y="424" width="344" height="78" rx="20" fill="#ffffff" stroke="#d8d1c7" stroke-width="1.2"/>
+  <text class="text" x="500" y="455">是不是模型临场需要多个外部能力？</text>
+  <text class="small" x="500" y="481">如果是，让工具执行层并行返回结果</text>
+
+  <path class="arrow" d="M834 463 H918"/>
+  <rect x="936" y="424" width="258" height="78" rx="20" fill="#f3ece4" stroke="#cfb79d" stroke-width="1.3"/>
+  <text class="layerTitle" x="962" y="455">Tools 并行</text>
+  <text class="api" x="962" y="481">tool_calls / ToolNode</text>
+
+  <!-- Layer 4 -->
+  <rect x="96" y="524" width="260" height="78" rx="20" fill="#f5e7e4" stroke="#d5aba3" stroke-width="1.3"/>
+  <text class="layerTitle" x="122" y="555">流程解构</text>
+  <text class="text" x="122" y="581">财经研究内部还有稳定小流程</text>
+
+  <path class="arrow" d="M374 563 H458"/>
+  <rect x="474" y="524" width="344" height="78" rx="20" fill="#ffffff" stroke="#d8d1c7" stroke-width="1.2"/>
+  <text class="text" x="500" y="555">是不是复杂到值得封装和复用？</text>
+  <text class="small" x="500" y="581">如果是，把内部状态隔离成一个子图</text>
+
+  <path class="arrow" d="M834 563 H918"/>
+  <rect x="936" y="524" width="258" height="78" rx="20" fill="#f5e7e4" stroke="#d5aba3" stroke-width="1.3"/>
+  <text class="layerTitle" x="962" y="555">Subgraph</text>
+  <text class="api" x="962" y="581">StateGraph as node</text>
+
+  <rect x="226" y="658" width="828" height="48" rx="24" fill="#ffffff" stroke="#d8cec1" stroke-width="1.2"/>
+  <text class="footer" x="640" y="681" text-anchor="middle">拆开之后还要等齐、合并、动态分发</text>
+  <text class="footerSmall" x="640" y="701" text-anchor="middle">Fan-in 等齐 · reducer 合并 · Send 处理运行时才知道的 N 个任务</text>
+</svg>

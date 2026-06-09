@@ -157,7 +157,7 @@ body.responsive-deck-enabled .deck {
   <div style="margin-top:28px;font-size:13px;color:#64748b;">目标：3 小时后独立写出带路由判断的 TravelPlannerBot</div>
   <div class="deck-footer">
     <span>LangGraph 教程</span>
-    <span>1 / 10</span>
+    <span>1 / 11</span>
   </div>
   <div class="notes">
     这节课是整个课程的基石。后面的循环、并行、多智能体、持久化，都是在这节课的概念上长出来的。LangChain 的 Chain 写法很优雅，但业务逻辑一复杂就开始失控。LangGraph 的思路很简单：把工作流从"一条直线"变成"一张图"。
@@ -201,14 +201,38 @@ body.responsive-deck-enabled .deck {
   </div>
   <div class="deck-footer">
     <span>LangGraph 教程</span>
-    <span>2 / 10</span>
+    <span>2 / 11</span>
   </div>
   <div class="notes">
     这一页先建立整体场景：TravelPlannerBot 接收输入后，先判断用户意图，再分成新建计划、查询历史、澄清信息三条路径。等观众看懂这张流程图，再进入下一页讲 State、Reducer 和 Edge，会更自然。
   </div>
 </section>
 
-<!-- Slide 3: 五个核心概念 -->
+<!-- Slide 3: 胰腺癌辅助问诊迁移图 -->
+<section class="slide" data-title="胰腺癌辅助问诊迁移图">
+  <div class="kicker">Transfer</div>
+  <div class="h2">同一套 Graph 机制，换到胰腺癌辅助问诊怎么理解？</div>
+  <div style="display:grid;grid-template-columns:1.25fr 0.75fr;gap:18px;align-items:center;flex:1;margin-top:10px;">
+    <div class="card" style="padding:10px;background:rgba(248,250,252,0.96);">
+      <img src="images/pancreatic-cancer-graph-basics.svg" alt="胰腺癌辅助问诊中的 LangGraph 基础角色" style="display:block;width:100%;height:auto;border-radius:6px;">
+    </div>
+    <div class="concept-list">
+      <div class="concept-item"><h4>State</h4><p>从旅行计划列表迁移成病例共享工作台，保存症状、病史、检查线索和风险提示。</p></div>
+      <div class="concept-item"><h4>Node</h4><p>每个节点只做一步：提取症状、整理危险因素、判断信息是否足够。</p></div>
+      <div class="concept-item"><h4>Edge / Router</h4><p>根据状态分流：信息完整继续判断，信息不足先追问，高风险提示就医。</p></div>
+      <div class="concept-item"><h4>Reducer</h4><p>把新证据追加进证据列表，避免后一次线索覆盖前一次线索。</p></div>
+    </div>
+  </div>
+  <div class="deck-footer">
+    <span>LangGraph 教程</span>
+    <span>3 / 11</span>
+  </div>
+  <div class="notes">
+    这一页的目的不是把旅行助手改成医疗系统，而是帮助学生把基础机制迁移到更严肃的场景：人类医生会在脑中隐式整合病例，Graph 必须把共享病例、处理单元、分支规则和证据累积显式拆开。教学示意，不构成诊疗建议。
+  </div>
+</section>
+
+<!-- Slide 4: 五个核心概念 -->
 <section class="slide" data-title="五个核心概念">
   <div class="kicker">Core Concepts</div>
   <div class="h2">五个核心概念一句话说清关系</div>
@@ -255,14 +279,14 @@ body.responsive-deck-enabled .deck {
   </div>
   <div class="deck-footer">
     <span>LangGraph 教程</span>
-    <span>3 / 10</span>
+    <span>4 / 11</span>
   </div>
   <div class="notes">
     用户输入先落到 State，再进 parse_request 节点，经由条件边分成 create_plan、show_history 和 clarify 三条路径。右侧五条概念分别对应图里的共享数据、处理函数、流转规则、编译过程和运行方式。
   </div>
 </section>
 
-<!-- Slide 4: State -->
+<!-- Slide 5: State -->
 <section class="slide" data-title="State —— 图里的共享数据">
   <div class="kicker">State</div>
   <div class="h2">State —— 图里的共享数据</div>
@@ -314,7 +338,7 @@ body.responsive-deck-enabled .deck {
   </div>
   <div class="deck-footer">
     <span>LangGraph 教程</span>
-    <span>4 / 10</span>
+    <span>5 / 11</span>
   </div>
   <div class="notes">
     这页要讲三个问题。第一，State 不只有 TypedDict，还可以用 Pydantic 和 dataclass，但入门课先用 TypedDict，因为它最贴近 dict 心智模型。第二，Annotated 的作用是挂 reducer，决定字段怎么合并。第三，reducer 不只有 add_messages：单值字段默认覆盖，列表常用 operator.add，消息字段优先 add_messages，复杂业务再自定义 reducer。
@@ -337,7 +361,7 @@ body.responsive-deck-enabled .deck {
   </div>
 </section>
 
-<!-- Slide 5: Node -->
+<!-- Slide 6: Node -->
 <section class="slide" data-title="Node —— 图里的处理单元">
   <div class="kicker">Node</div>
   <div class="h2">Node —— 图里的处理单元</div>
@@ -363,14 +387,14 @@ body.responsive-deck-enabled .deck {
   </div>
   <div class="deck-footer">
     <span>LangGraph 教程</span>
-    <span>5 / 10</span>
+    <span>6 / 11</span>
   </div>
   <div class="notes">
     Node 就是一个函数，接收 state，返回一个 dict。看这三个例子：parse_request 解析用户意图，build_plan 生成当前旅行计划，save_plan 把本次计划追加进 travel_plans。Node 的本质很简单：可以是任何 Python 函数，不限于 AI 调用。唯一约束是返回值必须是 dict。
   </div>
 </section>
 
-<!-- Slide 6: Edge -->
+<!-- Slide 7: Edge -->
 <section class="slide" data-title="Edge —— 普通边与条件边">
   <div class="kicker">Edge</div>
   <div class="h2">Edge —— 普通边与条件边</div>
@@ -404,14 +428,14 @@ builder.add_conditional_edges(<br>
   </div>
   <div class="deck-footer">
     <span>LangGraph 教程</span>
-    <span>6 / 10</span>
+    <span>7 / 11</span>
   </div>
   <div class="notes">
     边分两种。普通边是确定性连接。条件边让图能根据 State 内容动态决定下一步走哪个节点。Router 函数接收 state，返回目标节点的名字字符串。add_conditional_edges 的第三个参数写上目标节点映射后，Mermaid 可视化会更清晰。关键约束：一个节点的出边只能是普通边或条件边，二选一。
   </div>
 </section>
 
-<!-- Slide 7: 构建与运行 -->
+<!-- Slide 8: 构建与运行 -->
 <section class="slide" data-title="五步构建 + 两种运行">
   <div class="kicker">Build & Run</div>
   <div class="h2">五步构建 + 两种运行方式</div>
@@ -447,7 +471,7 @@ result = graph.invoke({<span class="str">"messages"</span>: [HumanMessage(<span 
   </div>
   <div class="deck-footer">
     <span>LangGraph 教程</span>
-    <span>7 / 10</span>
+    <span>8 / 11</span>
   </div>
   <div class="notes">
     构建图的五步走：定义 StateSchema、添加 Node、连接普通边、连接条件边、compile 编译。compile 会做类型检查、边验证、生成可执行对象。不 compile 直接 invoke 会报错。invoke 直接给最终结果；stream 逐个节点输出中间状态，用于调试和实时反馈。
@@ -470,7 +494,7 @@ result = graph.invoke({<span class="str">"messages"</span>: [HumanMessage(<span 
   </div>
 </section>
 
-<!-- Slide 8: TravelPlannerBot 完整案例 -->
+<!-- Slide 9: TravelPlannerBot 完整案例 -->
 <section class="slide" data-title="完整案例：TravelPlannerBot">
   <div class="kicker">TravelPlannerBot</div>
   <div class="h2">完整案例：带路由的 TravelPlannerBot</div>
@@ -511,7 +535,7 @@ display(Image(graph.get_graph().draw_mermaid_png()))<br><br>
   </div>
   <div class="deck-footer">
     <span>LangGraph 教程</span>
-    <span>8 / 10</span>
+    <span>9 / 11</span>
   </div>
   <div class="notes">
     TravelPlannerBot 的完整效果：用户输入一句话，先判断意图。建计划就走提取需求、生成计划、保存计划、回复用户这条固定流水线；查询历史就直接读取 travel_plans；信息不完整则进入澄清分支。可视化有三种方式：Jupyter 直接显示、保存 PNG、输出 Mermaid 文本粘贴到 mermaid.live 查看。
@@ -534,7 +558,7 @@ display(Image(graph.get_graph().draw_mermaid_png()))<br><br>
   </div>
 </section>
 
-<!-- Slide 9: 纯函数 vs LangGraph -->
+<!-- Slide 10: 纯函数 vs LangGraph -->
 <section class="slide" data-title="纯函数 vs LangGraph 对比实验">
   <div class="kicker">Comparison</div>
   <div class="h2">需求升级时，代码量怎么变？</div>
@@ -588,14 +612,14 @@ display(Image(graph.get_graph().draw_mermaid_png()))<br><br>
   <div class="quote mt-m">"纯函数做'一次性的事'，LangGraph 做'有状态、可编排、可恢复的事'。"</div>
   <div class="deck-footer">
     <span>LangGraph 教程</span>
-    <span>9 / 10</span>
+    <span>10 / 11</span>
   </div>
   <div class="notes">
     这是今天最重要的一张对比图。纯函数的复杂度是指数级爆炸，每加一个需求就要重构已有代码。LangGraph 的复杂度是线性增长，加需求就是加节点加边，不影响已有结构。纯函数做一次性的事，LangGraph 做有状态、可编排、可恢复的事。
   </div>
 </section>
 
-<!-- Slide 10: 总结 -->
+<!-- Slide 11: 总结 -->
 <section class="slide" data-title="总结">
   <div class="kicker">Summary</div>
   <div class="h2">阶段小结</div>
@@ -631,7 +655,7 @@ display(Image(graph.get_graph().draw_mermaid_png()))<br><br>
   </div>
   <div class="deck-footer">
     <span>LangGraph 教程</span>
-    <span>10 / 10</span>
+    <span>11 / 11</span>
   </div>
   <div class="notes">
     阶段小结：今天学了五个核心概念和构建流程。下节课 LG-02，我们要让图更聪明：循环让图能够重试和迭代，工具让 AI 能够调用外部 API，Human-in-the-loop 让人在流程中间介入审核。这些都是让 TravelPlannerBot 变成生产级系统的关键能力。

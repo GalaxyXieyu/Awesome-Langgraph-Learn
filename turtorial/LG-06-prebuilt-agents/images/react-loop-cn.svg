@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
+  <title id="title">create_react_agent 的循环</title>
+  <desc id="desc">展示 create_react_agent 内部的 agent 节点、tools 节点、tool_calls 路由和结束条件。</desc>
+  <defs>
+    <filter id="shadow" x="-12%" y="-12%" width="124%" height="124%"><feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#3f4d55" flood-opacity="0.10"/></filter>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="9" refY="6" orient="auto"><path d="M2,2 L10,6 L2,10 Z" fill="#74838a"/></marker>
+    <style>.bg{fill:#fbf7ef}.title{font:700 40px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#27343b}.sub{font:400 19px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#66737b}.box{filter:url(#shadow);stroke-width:1.4}.h{font:700 23px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#2c3940}.p{font:400 16px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#43525a}.api{font:600 14px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;fill:#687781}.line{stroke:#74838a;stroke-width:2.2;fill:none;marker-end:url(#arrow)}.footer{font:700 18px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#34454d}</style>
+  </defs>
+  <rect class="bg" width="1280" height="720"/>
+  <text class="title" x="640" y="62" text-anchor="middle">预构建不是魔法：它帮你搭好 ReAct 循环</text>
+  <text class="sub" x="640" y="98" text-anchor="middle">循环是否继续，不看模型“说结束”，而看最后一条 AIMessage 是否还有 tool_calls</text>
+
+  <rect class="box" x="72" y="320" width="150" height="78" rx="22" fill="#ffffff" stroke="#d8d1c7"/>
+  <text class="h" x="147" y="352" text-anchor="middle">用户输入</text>
+  <text class="api" x="147" y="378" text-anchor="middle">HumanMessage</text>
+
+  <rect class="box" x="330" y="285" width="210" height="148" rx="28" fill="#edf3ef" stroke="#9fb5aa"/>
+  <text class="h" x="435" y="330" text-anchor="middle">agent 节点</text>
+  <text class="api" x="435" y="360" text-anchor="middle">call_model</text>
+  <text class="p" x="362" y="394">调用 LLM</text>
+
+  <rect class="box" x="668" y="285" width="220" height="148" rx="28" fill="#e9eff7" stroke="#a1b3c8"/>
+  <text class="h" x="778" y="330" text-anchor="middle">tools 节点</text>
+  <text class="api" x="778" y="360" text-anchor="middle">ToolNode</text>
+  <text class="p" x="706" y="394">执行工具调用</text>
+
+  <rect class="box" x="1028" y="320" width="170" height="78" rx="22" fill="#ffffff" stroke="#d8d1c7"/>
+  <text class="h" x="1113" y="352" text-anchor="middle">最终回复</text>
+  <text class="api" x="1113" y="378" text-anchor="middle">END</text>
+
+  <path class="line" d="M224 359 H324"/>
+  <path class="line" d="M542 332 C585 300, 620 300, 662 332"/>
+  <text class="api" x="602" y="282" text-anchor="middle">有 tool_calls</text>
+  <path class="line" d="M778 435 C760 520, 455 520, 435 438"/>
+  <text class="api" x="610" y="545" text-anchor="middle">ToolMessage 回到 LLM</text>
+  <path class="line" d="M542 386 C720 470, 900 470, 1024 382"/>
+  <text class="api" x="810" y="488" text-anchor="middle">无 tool_calls → 结束</text>
+
+  <rect x="222" y="626" width="836" height="50" rx="25" fill="#ffffff" stroke="#d8cec1"/>
+  <text class="footer" x="640" y="658" text-anchor="middle">create_react_agent = agent 节点 + tools 节点 + 条件路由 + 循环边。</text>
+</svg>

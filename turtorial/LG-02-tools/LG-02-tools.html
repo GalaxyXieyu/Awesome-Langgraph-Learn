@@ -187,7 +187,30 @@ body.responsive-deck-enabled .deck {
   </div>
 </section>
 
-<!-- Slide 3: Tool 五种定义方式 -->
+<!-- Slide 3: 胰腺癌辅助问诊里的 Tool 边界 -->
+<section class="slide" data-title="胰腺癌 Tool 边界">
+  <div class="kicker">Transfer</div>
+  <div class="h2">Tool 不是让模型猜事实，而是接入可靠外部系统</div>
+  <div style="display:grid;grid-template-columns:1.25fr 0.75fr;gap:18px;align-items:center;flex:1;margin-top:10px;">
+    <div class="card" style="padding:10px;background:rgba(248,250,252,0.96);">
+      <img src="images/pancreatic-cancer-tools-boundary.svg" alt="胰腺癌辅助问诊中的 Tool 边界" style="display:block;width:100%;height:auto;border-radius:6px;">
+    </div>
+    <div class="grid" style="gap:12px;">
+      <div class="card"><h4>事实来源</h4><p>模型不能编造检验、影像或指南结果，必须通过 Tool 读取外部系统。</p></div>
+      <div class="card"><h4>结果去向</h4><p>短摘要进入 LLM 消息流，完整结构化数据留在 State / runtime 旁路。</p></div>
+      <div class="card"><h4>可恢复错误</h4><p>缺参数、查不到、系统异常时返回可继续处理的信息，而不是直接中断图。</p></div>
+    </div>
+  </div>
+  <div class="deck-footer">
+    <span>LangGraph 渐进式教程</span>
+    <span>LG-02</span>
+  </div>
+  <div class="notes">
+    这一页把书房预约的 Tool 机制迁移到医疗辅助场景：Tool 是事实边界和安全边界，不是装饰性函数。教学示意，不构成诊疗建议。
+  </div>
+</section>
+
+<!-- Slide 4: Tool 五种定义方式 -->
 <section class="slide" data-title="Tool 五种定义方式">
   <div class="kicker">TOOL DEFINITION</div>
   <div class="h2">Tool 的五种定义方式</div>
@@ -262,7 +285,7 @@ def query_availability(room_name: str, booking_date: str, start_after: str | Non
   </div>
 </section>
 
-<!-- Slide 4: return_direct -->
+<!-- Slide 5: return_direct -->
 <section class="slide" data-title="return_direct">
   <div class="kicker">RESULT FLOW CONTROL</div>
   <div class="h2">return_direct：控制结果流向</div>
@@ -300,7 +323,7 @@ def calculate_booking_duration(start_time: str, end_time: str) -> str:
   </div>
 </section>
 
-<!-- Slide 5: 生产级 Tool 五层设计 -->
+<!-- Slide 6: 生产级 Tool 五层设计 -->
 <section class="slide" data-title="生产级 Tool 设计">
   <div class="kicker">PRODUCTION-READY PATTERN</div>
   <div class="h2">生产级 Tool 五层兜底设计</div>
@@ -373,7 +396,7 @@ def calculate_booking_duration(start_time: str, end_time: str) -> str:
   </div>
 </section>
 
-<!-- Slide 6: Tool 缓存机制 -->
+<!-- Slide 7: Tool 缓存机制 -->
 <section class="slide" data-title="Tool 缓存">
   <div class="kicker">CACHING STRATEGIES</div>
   <div class="h2">Tool 缓存机制：省钱利器</div>
@@ -434,7 +457,7 @@ def query_room_rules(room_name: str) -> str:
   </div>
 </section>
 
-<!-- Slide 7: Tool 直接作为 Node -->
+<!-- Slide 8: Tool 直接作为 Node -->
 <section class="slide" data-title="Tool 作为 Node">
   <div class="kicker">TOOL AS FIRST-CLASS NODE</div>
   <div class="h2">Tool 直接作为 Node：定义一次，到处复用</div>
@@ -474,7 +497,7 @@ builder.add_conditional_edges("llm", tools_condition)
   </div>
 </section>
 
-<!-- Slide 8: 上下文管理 -->
+<!-- Slide 9: 上下文管理 -->
 <section class="slide" data-title="上下文管理">
   <div class="kicker">CONTEXT MANAGEMENT</div>
   <div class="h2">防止 Tool 结果撑爆上下文窗口</div>
@@ -534,7 +557,7 @@ async def query_availability(room_name: str, booking_date: str) -> str:
   </div>
 </section>
 
-<!-- Slide 9: MCP 协议 -->
+<!-- Slide 10: MCP 协议 -->
 <section class="slide" data-title="MCP 协议">
   <div class="kicker">MODEL CONTEXT PROTOCOL</div>
   <div class="h2">MCP：标准化工具协议</div>
@@ -604,7 +627,7 @@ async with MultiServerMCPClient({...}) as client:
   </div>
 </section>
 
-<!-- Slide 10: Prompt 与 Skills 管理 -->
+<!-- Slide 11: Prompt 与 Skills 管理 -->
 <section class="slide" data-title="Prompt 与 Skills">
   <div class="kicker">PROMPT & SKILLS MANAGEMENT</div>
   <div class="h2">Prompt 集中管理 + Skills 动态加载</div>
@@ -659,7 +682,7 @@ agent = create_react_agent(model, tools)
   </div>
 </section>
 
-<!-- Slide 11: 总结 -->
+<!-- Slide 12: 总结 -->
 <section class="slide" data-title="总结">
   <div class="kicker">SUMMARY</div>
   <div class="h2">核心要点回顾</div>

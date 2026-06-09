@@ -53,7 +53,7 @@
 | LG-03 | 人机协作 | 中断、审批、Hook，实现安全可控的系统 |
 | LG-04 | 记忆与持久化 | Checkpoint / Store / Postgres / Redis 混合架构 |
 | LG-05 | 子图与并行 | Subgraph、Fan-out/Fan-in、Send/Map-Reduce |
-| LG-06 | 预构建 Agent | create_react_agent / supervisor / swarm 的选型与实战 |
+| LG-06 | 预构建 Agent | create_agent / supervisor / swarm 的选型与实战 |
 | LG-07 | 流式输出 | 实时推送进度到前端，掌握 SSE 和多 Agent 嵌套流式 |
 | LG-08 | 多智能体系统 | DeepResearch Agent：模式路由、计划路由、任务跟踪 |
 | LG-09 | 生产部署 | Docker、RAG、Langfuse 全链路监控、Prompt 生命周期管理 |

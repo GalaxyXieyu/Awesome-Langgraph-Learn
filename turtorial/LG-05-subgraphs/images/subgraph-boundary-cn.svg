@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
+  <title id="title">Subgraph 状态边界与映射</title>
+  <desc id="desc">展示父图 state 和子图 state 的隔离，以及 input mapper 与 output mapper 如何在边界处翻译字段。</desc>
+  <defs>
+    <filter id="shadow" x="-16%" y="-16%" width="132%" height="132%">
+      <feDropShadow dx="0" dy="7" stdDeviation="10" flood-color="#40515a" flood-opacity="0.11"/>
+    </filter>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="9" refY="6" orient="auto" markerUnits="strokeWidth">
+      <path d="M2,2 L10,6 L2,10 Z" fill="#74838a"/>
+    </marker>
+    <style>
+      .bg { fill: #fbf7ef; }
+      .title { font: 700 40px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", sans-serif; fill: #27343b; }
+      .subtitle { font: 400 19px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", sans-serif; fill: #65717a; }
+      .panel { filter: url(#shadow); stroke-width: 1.4; fill: #ffffff; stroke: #d8d1c7; }
+      .box { filter: url(#shadow); stroke-width: 1.35; }
+      .h { font: 700 23px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", sans-serif; fill: #2c3940; }
+      .p { font: 400 17px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", sans-serif; fill: #43525a; }
+      .api { font: 600 14px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #6e7a82; }
+      .small { font: 400 14px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", sans-serif; fill: #748089; }
+      .line { stroke: #71818a; stroke-width: 2.2; fill: none; marker-end: url(#arrow); }
+      .soft { stroke: #aeb9bf; stroke-width: 1.5; fill: none; marker-end: url(#arrow); }
+      .foot { font: 600 18px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", sans-serif; fill: #35464e; }
+    </style>
+  </defs>
+
+  <rect class="bg" width="1280" height="720"/>
+  <text class="title" x="640" y="64" text-anchor="middle">流程解构：复杂职责升级成 Subgraph</text>
+  <text class="subtitle" x="640" y="100" text-anchor="middle">父图只看见一个节点；子图内部有自己的 state、节点和边</text>
+
+  <rect class="panel" x="58" y="168" width="310" height="390" rx="30"/>
+  <text class="h" x="213" y="216" text-anchor="middle">父图 State</text>
+  <text class="api" x="104" y="268">topic</text>
+  <text class="small" x="104" y="292">研究主题</text>
+  <text class="api" x="104" y="340">findings</text>
+  <text class="small" x="104" y="364">最终发现列表</text>
+  <text class="api" x="104" y="412">final_report</text>
+  <text class="small" x="104" y="436">汇总报告</text>
+  <path class="soft" d="M96 474 H330"/>
+  <text class="small" x="104" y="508">父图不关心子图中间状态</text>
+
+  <rect class="box" x="452" y="190" width="150" height="86" rx="22" fill="#eef3ef" stroke="#9db4aa"/>
+  <text class="h" x="527" y="224" text-anchor="middle">输入翻译</text>
+  <text class="api" x="527" y="250" text-anchor="middle">input mapper</text>
+  <text class="small" x="527" y="270" text-anchor="middle">topic → query</text>
+
+  <rect class="panel" x="690" y="152" width="360" height="430" rx="30"/>
+  <text class="h" x="870" y="200" text-anchor="middle">财经子图</text>
+  <text class="api" x="870" y="228" text-anchor="middle">finance_subgraph</text>
+
+  <rect class="box" x="746" y="262" width="248" height="58" rx="18" fill="#e9eff7" stroke="#9fb2c9"/>
+  <text class="p" x="870" y="296" text-anchor="middle">抓取财务数据</text>
+  <rect class="box" x="746" y="350" width="248" height="58" rx="18" fill="#f3ece4" stroke="#d0b79b"/>
+  <text class="p" x="870" y="384" text-anchor="middle">计算关键指标</text>
+  <rect class="box" x="746" y="438" width="248" height="58" rx="18" fill="#f5e7e4" stroke="#d7aba3"/>
+  <text class="p" x="870" y="472" text-anchor="middle">生成财经摘要</text>
+
+  <text class="api" x="724" y="536">query / raw_data / metrics / summary</text>
+
+  <rect class="box" x="1090" y="404" width="150" height="86" rx="22" fill="#eef3ef" stroke="#9db4aa"/>
+  <text class="h" x="1165" y="438" text-anchor="middle">输出翻译</text>
+  <text class="api" x="1165" y="464" text-anchor="middle">output mapper</text>
+  <text class="small" x="1165" y="484" text-anchor="middle">summary → findings</text>
+
+  <path class="line" d="M370 246 C402 246, 420 236, 448 232"/>
+  <path class="line" d="M604 232 C638 232, 658 232, 686 232"/>
+  <path class="line" d="M1052 448 C1064 448, 1074 448, 1086 448"/>
+  <path class="line" d="M1165 492 C1155 592, 378 592, 276 452"/>
+
+  <rect x="208" y="632" width="864" height="50" rx="25" fill="#ffffff" stroke="#d8cec1"/>
+  <text class="foot" x="640" y="660" text-anchor="middle">判断：一个职责内部已有稳定多步流程时，升级成子图；边界处显式翻译字段。</text>
+</svg>

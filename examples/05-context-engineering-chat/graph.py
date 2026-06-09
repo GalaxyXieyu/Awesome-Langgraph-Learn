@@ -8,7 +8,7 @@ from langchain_core.messages import BaseMessage, SystemMessage, AIMessage, Human
 from langchain_core.messages.utils import count_tokens_approximately
 from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
-from langgraph.prebuilt import create_react_agent
+from langchain.agents import create_agent
 from langgraph.types import CachePolicy
 
 
@@ -327,10 +327,10 @@ def react_agent():
 
     tools_list = [web_tool, inject_memory, search_memory]
 
-    agent = create_react_agent(
+    agent = create_agent(
         model=get_llm(0.2),
         tools=tools_list,
-        prompt=(
+        system_prompt=(
             "你是一个能够调用工具的助手。\n"
             "当需要外部信息时，先使用 web_search 检索，再进行回答。\n"
             "当你需要用户的历史信息（如姓名/偏好）来更好地回答时，请调用 inject_memory。\n"

@@ -7,7 +7,7 @@ Multi-Agent Handoff图实现
 from typing import Literal
 from langchain_openai import ChatOpenAI
 from langgraph.graph import StateGraph, START, END
-from langgraph.prebuilt import create_react_agent
+from langchain.agents import create_agent
 from langgraph.checkpoint.memory import MemorySaver
 
 from state import MultiAgentState, create_initial_state
@@ -165,10 +165,10 @@ class MultiAgentSystem:
 当所有子任务完成后，请提供一个完整的总结报告。
 """
         
-        return create_react_agent(
+        return create_agent(
             self.llm,
             supervisor_tools,
-            prompt=supervisor_prompt
+            system_prompt=supervisor_prompt
         )
     
     def _create_researcher_agent(self):
@@ -197,10 +197,10 @@ class MultiAgentSystem:
 请始终保持客观、严谨的研究态度，确保信息的准确性和可靠性。
 """
         
-        return create_react_agent(
+        return create_agent(
             self.llm,
             researcher_tools,
-            prompt=researcher_prompt
+            system_prompt=researcher_prompt
         )
     
     def _create_analyst_agent(self):
@@ -229,10 +229,10 @@ class MultiAgentSystem:
 请确保你的分析结果准确、客观，并提供明确的见解和建议。
 """
         
-        return create_react_agent(
+        return create_agent(
             self.llm,
             analyst_tools,
-            prompt=analyst_prompt
+            system_prompt=analyst_prompt
         )
     
     def _create_writer_agent(self):
@@ -260,10 +260,10 @@ class MultiAgentSystem:
 请确保你的内容结构清晰、表达准确、风格适合目标受众。
 """
         
-        return create_react_agent(
+        return create_agent(
             self.llm,
             writer_tools,
-            prompt=writer_prompt
+            system_prompt=writer_prompt
         )
     
     def run(self, user_input: str, config: dict = None):
