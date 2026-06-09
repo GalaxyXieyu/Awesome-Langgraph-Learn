@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="760" viewBox="0 0 1280 760">
+  <defs>
+    <style>
+      .bg { fill: #fbfbf7; }
+      .panel { fill: #ffffff; stroke: #dedbd2; stroke-width: 2; }
+      .title { font: 700 34px -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; fill: #232323; }
+      .subtitle { font: 500 20px -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; fill: #5b5b5b; }
+      .label { font: 600 24px -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; fill: #232323; }
+      .small { font: 500 18px -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; fill: #555; }
+      .tiny { font: 500 15px -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; fill: #666; }
+      .code { font: 600 17px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; fill: #394b59; }
+      .danger { fill: #fff1f0; stroke: #ff7875; stroke-width: 2; }
+      .ok { fill: #f6ffed; stroke: #95de64; stroke-width: 2; }
+      .wait { fill: #e6f4ff; stroke: #69b1ff; stroke-width: 2; }
+      .node { fill: #f8f9fb; stroke: #c7cbd1; stroke-width: 2; }
+      .arrow { stroke: #6f7782; stroke-width: 3; fill: none; marker-end: url(#arrow); }
+      .redArrow { stroke: #d4380d; stroke-width: 3; fill: none; marker-end: url(#redArrow); }
+      .blueArrow { stroke: #1677ff; stroke-width: 3; fill: none; marker-end: url(#blueArrow); }
+      .dash { stroke-dasharray: 8 7; }
+    </style>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#6f7782" />
+    </marker>
+    <marker id="redArrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#d4380d" />
+    </marker>
+    <marker id="blueArrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#1677ff" />
+    </marker>
+  </defs>
+
+  <rect class="bg" width="1280" height="760" rx="28" />
+  <text x="640" y="58" text-anchor="middle" class="title">人会问，图不会</text>
+  <text x="640" y="92" text-anchor="middle" class="subtitle">自动流程发现风险以后，必须有机制让它停下来等人决定</text>
+
+  <rect x="52" y="128" width="554" height="330" rx="24" class="panel" />
+  <text x="88" y="178" class="label">人类世界：看到风险会问人</text>
+  <rect x="88" y="214" width="214" height="78" rx="16" class="danger" />
+  <text x="108" y="246" class="small">高风险文案</text>
+  <text x="108" y="272" class="tiny">全网最低 / 保本收益</text>
+
+  <path d="M312 252 C350 252 356 252 394 252" class="blueArrow" />
+  <rect x="404" y="214" width="160" height="78" rx="16" class="wait" />
+  <text x="434" y="246" class="small">问主管</text>
+  <text x="426" y="272" class="tiny">这个能发吗？</text>
+
+  <path d="M484 304 C484 340 350 340 250 340" class="blueArrow dash" />
+  <rect x="88" y="360" width="476" height="60" rx="16" class="ok" />
+  <text x="112" y="397" class="small">主管决定：改掉收益承诺，再发布</text>
+
+  <rect x="674" y="128" width="554" height="330" rx="24" class="panel" />
+  <text x="710" y="178" class="label">Graph 世界：边连上就继续走</text>
+  <rect x="720" y="220" width="128" height="64" rx="14" class="node" />
+  <text x="750" y="259" class="small">生成文案</text>
+  <path d="M858 252 L910 252" class="arrow" />
+  <rect x="920" y="220" width="128" height="64" rx="14" class="danger" />
+  <text x="950" y="249" class="small">自动审核</text>
+  <text x="950" y="272" class="tiny">发现风险</text>
+  <path d="M1058 252 L1110 252" class="redArrow" />
+  <rect x="1120" y="220" width="82" height="64" rx="14" class="danger" />
+  <text x="1143" y="259" class="small">发布</text>
+  <text x="722" y="338" class="small">如果没有“停下来等人”的机制，</text>
+  <text x="722" y="368" class="small">流程可能还是会走到发布节点。</text>
+
+  <rect x="120" y="500" width="1040" height="188" rx="24" fill="#ffffff" stroke="#b7d9ff" stroke-width="2" />
+  <text x="640" y="544" text-anchor="middle" class="label">把“问一下主管”拆成图能理解的动作</text>
+
+  <g transform="translate(158 584)">
+    <rect width="124" height="54" rx="14" class="danger" />
+    <text x="62" y="34" text-anchor="middle" class="small">发现风险</text>
+  </g>
+  <path d="M292 611 L360 611" class="arrow" />
+  <g transform="translate(370 584)">
+    <rect width="124" height="54" rx="14" class="wait" />
+    <text x="62" y="34" text-anchor="middle" class="small">生成待办</text>
+    <text x="62" y="78" text-anchor="middle" class="code">interrupt(payload)</text>
+  </g>
+  <path d="M504 611 L572 611" class="arrow" />
+  <g transform="translate(582 584)">
+    <rect width="124" height="54" rx="14" class="wait" />
+    <text x="62" y="34" text-anchor="middle" class="small">保存现场</text>
+    <text x="62" y="78" text-anchor="middle" class="code">checkpointer</text>
+  </g>
+  <path d="M716 611 L784 611" class="arrow" />
+  <g transform="translate(794 584)">
+    <rect width="124" height="54" rx="14" class="ok" />
+    <text x="62" y="34" text-anchor="middle" class="small">人处理</text>
+  </g>
+  <path d="M928 611 L996 611" class="arrow" />
+  <g transform="translate(1006 584)">
+    <rect width="124" height="54" rx="14" class="ok" />
+    <text x="62" y="34" text-anchor="middle" class="small">继续执行</text>
+    <text x="62" y="78" text-anchor="middle" class="code">Command(resume)</text>
+  </g>
+</svg>

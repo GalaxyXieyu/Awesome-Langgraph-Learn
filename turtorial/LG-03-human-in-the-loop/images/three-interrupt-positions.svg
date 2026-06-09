@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+  <defs>
+    <style>
+      .bg { fill: #fbfbf7; }
+      .title { font: 700 34px -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; fill: #232323; }
+      .subtitle { font: 500 20px -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; fill: #5b5b5b; }
+      .card { fill: #fff; stroke: #ddd8ce; stroke-width: 2; }
+      .cardTitle { font: 700 25px -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; fill: #222; }
+      .text { font: 500 18px -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; fill: #555; }
+      .code { font: 600 17px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; fill: #44515f; }
+      .node { fill: #f8f9fb; stroke: #c7cbd1; stroke-width: 2; }
+      .wait { fill: #e6f4ff; stroke: #69b1ff; stroke-width: 2; }
+      .risk { fill: #fff1f0; stroke: #ff7875; stroke-width: 2; }
+      .ok { fill: #f6ffed; stroke: #95de64; stroke-width: 2; }
+      .arrow { stroke: #6f7782; stroke-width: 3; fill: none; marker-end: url(#arrow); }
+      .blueArrow { stroke: #1677ff; stroke-width: 3; fill: none; marker-end: url(#blueArrow); }
+      .dash { stroke-dasharray: 8 7; }
+    </style>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#6f7782" />
+    </marker>
+    <marker id="blueArrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#1677ff" />
+    </marker>
+  </defs>
+
+  <rect class="bg" width="1280" height="720" rx="28" />
+  <text x="640" y="58" text-anchor="middle" class="title">三种“等人”的位置</text>
+  <text x="640" y="92" text-anchor="middle" class="subtitle">不是所有人工介入都发生在同一个地方：看你想拦住什么</text>
+
+  <rect x="54" y="132" width="362" height="500" rx="24" class="card" />
+  <text x="235" y="178" text-anchor="middle" class="cardTitle">节点里面等人</text>
+  <text x="235" y="210" text-anchor="middle" class="text">运行到某一行代码时，主动问人</text>
+  <g transform="translate(96 258)">
+    <rect width="116" height="56" rx="14" class="node" />
+    <text x="58" y="35" text-anchor="middle" class="text">自动审核</text>
+    <path d="M126 28 L190 28" class="arrow" />
+    <rect x="200" width="116" height="56" rx="14" class="wait" />
+    <text x="258" y="34" text-anchor="middle" class="text">问审核员</text>
+    <path d="M258 70 L258 126" class="blueArrow dash" />
+    <rect x="72" y="138" width="224" height="62" rx="14" class="ok" />
+    <text x="184" y="176" text-anchor="middle" class="text">收到决定后继续</text>
+  </g>
+  <text x="96" y="526" class="text">适合：</text>
+  <text x="96" y="558" class="text">高风险内容审批、工具调用确认</text>
+  <text x="96" y="592" class="code">interrupt(payload)</text>
+
+  <rect x="459" y="132" width="362" height="500" rx="24" class="card" />
+  <text x="640" y="178" text-anchor="middle" class="cardTitle">执行前先拦住</text>
+  <text x="640" y="210" text-anchor="middle" class="text">按钮还没按下，先等人确认</text>
+  <g transform="translate(504 258)">
+    <rect width="116" height="56" rx="14" class="node" />
+    <text x="58" y="35" text-anchor="middle" class="text">准备发布</text>
+    <path d="M126 28 L184 28" class="blueArrow" />
+    <rect x="194" width="80" height="56" rx="14" class="wait" />
+    <text x="234" y="35" text-anchor="middle" class="text">停住</text>
+    <path d="M234 70 L234 126" class="blueArrow dash" />
+    <rect x="76" y="138" width="232" height="62" rx="14" class="risk" />
+    <text x="192" y="176" text-anchor="middle" class="text">确认后才执行发布</text>
+  </g>
+  <text x="501" y="526" class="text">适合：</text>
+  <text x="501" y="558" class="text">发布、扣款、发短信、删数据</text>
+  <text x="501" y="592" class="code">interrupt_before=[...]</text>
+
+  <rect x="864" y="132" width="362" height="500" rx="24" class="card" />
+  <text x="1045" y="178" text-anchor="middle" class="cardTitle">生成后给人看</text>
+  <text x="1045" y="210" text-anchor="middle" class="text">结果已经生成，后续动作先别继续</text>
+  <g transform="translate(909 258)">
+    <rect width="116" height="56" rx="14" class="node" />
+    <text x="58" y="35" text-anchor="middle" class="text">生成文案</text>
+    <path d="M126 28 L184 28" class="blueArrow" />
+    <rect x="194" width="80" height="56" rx="14" class="wait" />
+    <text x="234" y="35" text-anchor="middle" class="text">审查</text>
+    <path d="M234 70 L234 126" class="blueArrow dash" />
+    <rect x="72" y="138" width="232" height="62" rx="14" class="ok" />
+    <text x="188" y="176" text-anchor="middle" class="text">通过后继续发布</text>
+  </g>
+  <text x="906" y="526" class="text">适合：</text>
+  <text x="906" y="558" class="text">审查草稿、证据、计划、摘要</text>
+  <text x="906" y="592" class="code">interrupt_after=[...]</text>
+</svg>
