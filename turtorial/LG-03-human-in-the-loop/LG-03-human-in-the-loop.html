@@ -144,6 +144,21 @@ td { color: #dbeafe; background: rgba(15,23,42,0.38); }
   line-height: 1.55;
   font-size: 14px;
 }
+
+.figure-card {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(248,250,252,0.96);
+  border: 1px solid rgba(226,232,240,0.62);
+  border-radius: 16px;
+  padding: 12px;
+  overflow: hidden;
+}
+.figure-card img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 10px; }
+.compact li { font-size: 13px; line-height: 1.48; }
 body.responsive-deck-enabled {
   min-height: 100vh;
   display: flex;
@@ -195,297 +210,309 @@ body.responsive-deck-enabled {
     <div>
       <div class="kicker">LANGGRAPH TUTORIAL · LG-03</div>
       <h1 class="h1">Human-in-the-loop<br>人工介入</h1>
-      <p class="lede">不是“加一个暂停按钮”，而是让图在高风险业务动作前停住、等人处理、再根据人工回复改变后续路径。</p>
+      <p class="lede">不是让模型少做事，而是让模型生成、判断、准备动作之后，危险动作必须等人确认。</p>
       <div style="margin-top:26px;">
-        <span class="badge">interrupt()</span>
-        <span class="badge">Command(resume=...)</span>
-        <span class="badge">checkpointer</span>
-        <span class="badge">router</span>
+        <span class="badge">Node 级 HITL</span>
+        <span class="badge">Agent 级 HITL</span>
+        <span class="badge">Wrapper 级 HITL</span>
       </div>
     </div>
   </div>
   <div class="footer"><span>LangGraph 渐进式教程</span><span>LG-03</span></div>
 </section>
 
-<section class="slide" data-title="业务问题">
-  <div class="kicker">BUSINESS FIRST</div>
-  <h2 class="h2">为什么需要中断？因为“识别风险”不等于“拦截风险”</h2>
-  <div class="split" style="margin-top:12px;">
-    <div class="card">
-      <h4>没有中断的自动化</h4>
-      <div class="flow">
-        <span class="node">生成文案</span><span class="arrow">→</span>
-        <span class="node">自动审核</span><span class="arrow">→</span>
-        <span class="node" style="border-color:rgba(248,113,113,.45);background:rgba(248,113,113,.12);">直接发布</span>
-      </div>
-      <div class="warnbox" style="margin-top:18px;">系统可能已经算出高风险，但流程仍然继续执行写操作。</div>
-    </div>
-    <div class="card">
-      <h4>HITL 自动化</h4>
-      <div class="flow">
-        <span class="node">生成文案</span><span class="arrow">→</span>
-        <span class="node">自动审核</span><span class="arrow">→</span>
-        <span class="node" style="border-color:rgba(251,191,36,.45);background:rgba(251,191,36,.12);color:#fde68a;">暂停审批</span><span class="arrow">→</span>
-        <span class="node">发布 / 拒绝</span>
-      </div>
-      <p style="margin-top:18px;">HITL 的核心价值：把不可逆动作变成可审查动作，把人的判断写回流程状态。</p>
-    </div>
+<section class="slide" data-title="人会问，图不会">
+  <div class="kicker">INTUITION FIRST</div>
+  <h2 class="h2">先记住：人会问，图不会</h2>
+  <div class="figure-card" style="margin-top:10px;">
+    <img src="images/human-vs-graph-approval-cn-premium.png" alt="让自动流程等人审批：人会问，图不会">
   </div>
-  <div class="footer"><span>业务视角</span><span>2 / 15</span></div>
+  <p class="small" style="margin-top:10px;">人看到风险会停下来找负责人；Graph 默认只会沿着边继续走。HITL 要把“问一下人”拆成可恢复的机器动作。</p>
+  <div class="footer"><span>直觉图</span><span>2 / 15</span></div>
 </section>
 
-<section class="slide" data-title="业务场景">
-  <div class="kicker">SCENARIO</div>
-  <h2 class="h2">本节案例：内容发布审批</h2>
-  <div class="grid g3" style="margin-top:16px;">
-    <div class="card"><h4>外部影响</h4><p>公众号、短信、App Push 一旦发出去，就会触达用户，不能只靠模型自动决定。</p></div>
-    <div class="card"><h4>自动判断有限</h4><p>规则能命中“全网最低”“百分百治愈”，但是否允许发布仍需要业务责任人确认。</p></div>
-    <div class="card"><h4>责任需要记录</h4><p>审批人、审批意见、是否修改、最终发布内容，都应该进入审计链路。</p></div>
-  </div>
-  <div class="card" style="margin-top:18px;">
-    <h4>课程主线</h4>
-    <pre>运营请求 → 读取草稿 → 自动审核 → 高风险中断 → 人工回复 → router 选择 → 发布 / 拒绝</pre>
-  </div>
-  <div class="footer"><span>案例背景</span><span>3 / 15</span></div>
-</section>
-
-<section class="slide" data-title="中断三角色">
-  <div class="kicker">CORE MODEL</div>
-  <h2 class="h2">LangGraph 中断恢复的三个角色</h2>
-  <div class="grid g3" style="margin-top:18px;">
-    <div class="card" style="border-top:3px solid var(--blue);"><h4>interrupt(payload)</h4><p>在节点内部暂停，把人工处理需要的上下文交出去。</p></div>
-    <div class="card" style="border-top:3px solid var(--green);"><h4>checkpointer</h4><p>保存暂停点、state、thread 信息，让之后可以恢复。</p></div>
-    <div class="card" style="border-top:3px solid var(--violet);"><h4>Command(resume=value)</h4><p>把人工回复交回图，成为 `interrupt(...)` 的返回值。</p></div>
-  </div>
-  <div class="card" style="margin-top:18px;">
-    <pre>第一次执行到 interrupt(payload)：暂停，返回 __interrupt__
-恢复时传入 Command(resume=value)：interrupt(...) 得到 value，节点继续完成</pre>
-  </div>
-  <div class="notes">
-    讲师备注：这里的“保存现场”要多解释一句。生产系统通常不会让一个请求、一个进程一直挂着等人审批。审批可能几分钟后回来，也可能第二天才回来；如果每个等待中的任务都占着线程、连接、内存和运行上下文，堆多了机器就会被拖垮。所以遇到人工审批时，系统会先把这次运行断开：生成待办，同时把 thread_id、暂停点和当时的 state 写进 checkpoint。等人处理完，再用 Command(resume=...) 从这个现场接着跑。
-  </div>
-  <div class="footer"><span>中断语义</span><span>4 / 15</span></div>
-</section>
-
-<section class="slide" data-title="用户能做什么">
-  <div class="kicker">HUMAN ACTIONS</div>
-  <h2 class="h2">中断后用户可以做什么？</h2>
+<section class="slide" data-title="三种落地方式">
+  <div class="kicker">COURSE MAP</div>
+  <h2 class="h2">本节只讲三种真正常用的位置</h2>
   <table>
-    <tr><th>用户动作</th><th>回复内容</th><th>业务含义</th><th>后续结果</th></tr>
-    <tr><td class="ok">通过</td><td><code>decision=approve</code></td><td>原文可以继续发布</td><td>发布原始草稿</td></tr>
-    <tr><td class="hl">修改后通过</td><td><code>decision=edit_and_approve</code><br><code>revised_draft=...</code></td><td>人类修正文案风险</td><td>发布人工修改稿</td></tr>
-    <tr><td class="danger">拒绝</td><td><code>decision=reject</code></td><td>不允许发布</td><td>进入拒绝分支，结束</td></tr>
+    <tr><th>场景</th><th>人在哪里介入</th><th>适合什么时候用</th></tr>
+    <tr><td>Node 级 HITL</td><td>自定义 <code>StateGraph</code> 的某个节点里 <code>interrupt()</code></td><td>你需要完整控制 state、router、审计日志</td></tr>
+    <tr><td>Agent 级 HITL</td><td>Agent 准备调用 tools 前 <code>interrupt_before=["tools"]</code></td><td>你用预构建 Agent，但要拦住危险工具调用</td></tr>
+    <tr><td>Wrapper 级 HITL</td><td>把危险 tool 包一层，在 wrapper 里 <code>interrupt()</code></td><td>多个 Agent / Graph 都会调用同一个危险能力</td></tr>
   </table>
-  <div class="warnbox" style="margin-top:18px;">中断 payload 不能只写“是否继续”。它应该明确给出上下文、风险证据和可选操作。</div>
-  <div class="footer"><span>人工动作</span><span>5 / 15</span></div>
+  <div class="warnbox" style="margin-top:18px;">核心判断：业务流程要精细控制，用 Node；工具调用要统一拦截，用 Agent；危险能力要全局安全，用 Wrapper。</div>
+  <div class="footer"><span>课程结构</span><span>3 / 15</span></div>
 </section>
 
-<section class="slide" data-title="中断 payload">
-  <div class="kicker">INTERRUPT PAYLOAD</div>
-  <h2 class="h2">中断时要把什么交给用户？</h2>
+<section class="slide" data-title="Node 级主线">
+  <div class="kicker">NODE LEVEL HITL</div>
+  <h2 class="h2">Node 级：LLM 生成内容，节点里决定要不要等人</h2>
   <div class="split" style="margin-top:12px;">
     <div class="card">
-      <h4>人工判断需要的信息</h4>
-      <ul>
-        <li>当前动作：内容发布审批</li>
-        <li>发布渠道：公众号 / 短信 / App Push</li>
-        <li>草稿内容</li>
-        <li>风险评分和风险等级</li>
-        <li>命中的审核规则</li>
-        <li>允许的处理选项</li>
+      <h4>为什么先讲它</h4>
+      <p>这是最白盒的做法。你自己写 <code>StateGraph</code>，所以 state、节点、router 和审计日志都能被学生逐行看见。</p>
+      <div class="warnbox" style="margin-top:16px;">这里要讲清楚：风险识别不等于风险拦截。</div>
+    </div>
+    <div class="card">
+      <h4>Notebook 主线</h4>
+      <pre>输入发布请求
+→ LLM 生成文案
+→ LLM / 规则做风险审查
+→ 高风险暂停给人
+→ 人回复
+→ 继续发布或拒绝</pre>
+    </div>
+  </div>
+  <div class="footer"><span>Node 级 HITL</span><span>4 / 15</span></div>
+</section>
+
+<section class="slide" data-title="Node 状态和提示词">
+  <div class="kicker">STATE & PROMPTS</div>
+  <h2 class="h2">教学重点：让状态和 prompt 都被学生看见</h2>
+  <div class="grid g2" style="margin-top:14px;">
+    <div class="card">
+      <h4>State 保存业务事实</h4>
+      <ul class="compact">
+        <li><code>generated_draft</code>：LLM 生成的文案</li>
+        <li><code>risk_level</code> / <code>risk_score</code>：审查结果</li>
+        <li><code>review_decision</code>：人工回复</li>
+        <li><code>final_content</code> / <code>publish_status</code>：最终结果</li>
+        <li><code>audit_log</code>：节点动作链路</li>
       </ul>
     </div>
-    <div>
+    <div class="card">
+      <h4>Prompt 是课程材料</h4>
+      <pre>文案生成提示词
+→ 只负责生成 draft
+
+风险审查提示词
+→ 只负责返回 risk_level、risk_score、risk_reasons、needs_human_review</pre>
+    </div>
+  </div>
+  <div class="footer"><span>教学代码</span><span>5 / 15</span></div>
+</section>
+
+<section class="slide" data-title="Node 第一次执行">
+  <div class="kicker">FIRST INVOKE</div>
+  <h2 class="h2">第一次执行：输出不是发布结果，而是待审批任务</h2>
+  <div class="grid g2" style="margin-top:14px;">
+    <div class="card">
+      <h4>输入给 graph</h4>
       <pre>{
-  "action": "content_review_required",
-  "request_id": "campaign_high_001",
-  "channel": "公众号",
-  "risk_score": 0.9,
-  "risk_level": "high",
-  "options": ["approve", "edit_and_approve", "reject"]
+  "request_id": "campaign_high_001"
+}</pre>
+    </div>
+    <div class="card">
+      <h4>第一次输出</h4>
+      <pre>{
+  "任务类型": "内容发布审批",
+  "风险等级": "高风险",
+  "审核员可以选择": [
+    "approve",
+    "edit_and_approve",
+    "reject"
+  ]
 }</pre>
     </div>
   </div>
-  <div class="footer"><span>中断上下文</span><span>6 / 15</span></div>
+  <p class="lede" style="font-size:16px;">Graph 没有失败，它停在 <code>human_review</code>，等待审核员提交决定。</p>
+  <div class="footer"><span>运行证据</span><span>6 / 15</span></div>
 </section>
 
-<section class="slide" data-title="用户怎么回复">
-  <div class="kicker">RESUME PROTOCOL</div>
-  <h2 class="h2">用户怎么回复？用 `Command(resume=...)`</h2>
+<section class="slide" data-title="Node 恢复">
+  <div class="kicker">RESUME</div>
+  <h2 class="h2">人处理的是待办，Graph 接收的是恢复值</h2>
   <div class="split" style="margin-top:12px;">
     <div class="card">
-      <h4>回复会变成业务事实</h4>
-      <p>人工回复不应该只停留在前端按钮里。恢复后，它会写入 state，成为后续 router 的判断依据。</p>
-      <div class="warnbox" style="margin-top:16px;">`resume` 的值会成为暂停位置里 `interrupt(...)` 的返回值。</div>
-    </div>
-    <pre>Command(resume={
+      <h4>人工输入</h4>
+      <pre>Command(resume={
   "decision": "edit_and_approve",
   "reviewer_id": "reviewer_demo_001",
   "comment": "删除绝对化和收益承诺表达后发布。",
   "revised_draft": "618 智能空调活动开启..."
 })</pre>
+    </div>
+    <div class="card">
+      <h4>恢复后结果</h4>
+      <pre>{
+  "发布状态": "修改后发布",
+  "审核决定": "修改后通过",
+  "最终发布文案": "618 智能空调活动开启..."
+}</pre>
+      <p style="margin-top:12px;">人工回复写入 state，router 再选择发布或拒绝。</p>
+    </div>
   </div>
-  <div class="footer"><span>恢复协议</span><span>7 / 15</span></div>
+  <div class="footer"><span>Command(resume=...)</span><span>7 / 15</span></div>
 </section>
 
-<section class="slide" data-title="router 影响">
-  <div class="kicker">ROUTING</div>
-  <h2 class="h2">回复后如何影响 router 走向？</h2>
-  <div class="card" style="margin-top:14px;">
-    <pre>review_decision = approve
-  → publish_content：发布原文
-
-review_decision = edit_and_approve
-  → publish_content：发布 revised_draft
-
-review_decision = reject
-  → reject_content：不发布，流程结束</pre>
-  </div>
-  <div class="flow" style="margin-top:22px;">
-    <span class="node">human_review</span><span class="arrow">→</span>
-    <span class="node" style="background:rgba(167,139,250,.14);border-color:rgba(167,139,250,.34);">route_after_review</span><span class="arrow">→</span>
-    <span class="node">publish_content</span>
-    <span class="node" style="background:rgba(248,113,113,.12);border-color:rgba(248,113,113,.36);color:#fecaca;">reject_content</span>
-  </div>
-  <p class="lede" style="font-size:16px;">人不是在流程外“点了个按钮”，而是把一个新的业务事实写回 state。</p>
-  <div class="footer"><span>路由状态</span><span>8 / 15</span></div>
-</section>
-
-<section class="slide" data-title="为什么需要 checkpointer">
-  <div class="kicker">CHECKPOINT</div>
-  <h2 class="h2">为什么中断恢复必须配置 checkpointer？</h2>
+<section class="slide" data-title="Agent 级主线">
+  <div class="kicker">AGENT LEVEL HITL</div>
+  <h2 class="h2">Agent 级：Agent 想调用工具前，先停下来给人看</h2>
   <div class="split" style="margin-top:12px;">
     <div class="card">
-      <h4>恢复时必须知道</h4>
+      <h4>人类场景</h4>
+      <pre>用户说：帮我发布这条内容
+Agent 思考：我需要调用 publish_to_channel
+系统暂停：这个工具会真的发布，先给人确认
+人确认后：工具才执行</pre>
+    </div>
+    <div class="card">
+      <h4>落地方式</h4>
+      <pre>create_agent(
+  model=agent_model,
+  tools=[publish_to_channel],
+  checkpointer=MemorySaver(),
+  interrupt_before=["tools"],
+)</pre>
+      <p style="margin-top:12px;">这种方式拦的是 Agent 即将调用工具这个动作。</p>
+    </div>
+  </div>
+  <div class="footer"><span>Agent 级 HITL</span><span>8 / 15</span></div>
+</section>
+
+<section class="slide" data-title="Agent 运行证据">
+  <div class="kicker">AGENT EVIDENCE</div>
+  <h2 class="h2">Agent 停住时，人看到的是 tool name 和 tool args</h2>
+  <div class="grid g2" style="margin-top:14px;">
+    <div class="card">
+      <h4>Agent 想做什么</h4>
+      <pre>{
+  "name": "publish_to_channel",
+  "args": {
+    "content": "...",
+    "channel": "公众号"
+  }
+}</pre>
+    </div>
+    <div class="card">
+      <h4>为什么停住</h4>
       <ul>
-        <li>哪个 thread 停住了</li>
-        <li>停在哪个节点</li>
-        <li>当时的 state 是什么</li>
-        <li>resume 值交还给哪次 interrupt</li>
-        <li>恢复后从哪里继续</li>
+        <li><code>tools</code> 节点会执行真实发布动作。</li>
+        <li><code>interrupt_before</code> 让工具调用前先暂停。</li>
+        <li>人要判断是否允许这个 <code>tool_call</code> 执行。</li>
       </ul>
     </div>
+  </div>
+  <div class="warnbox" style="margin-top:18px;">适合预构建 Agent：你不想重写整张图，只想统一拦住工具调用。</div>
+  <div class="footer"><span>运行证据</span><span>9 / 15</span></div>
+</section>
+
+<section class="slide" data-title="Wrapper 级主线">
+  <div class="kicker">WRAPPER LEVEL HITL</div>
+  <h2 class="h2">Wrapper 级：危险能力自己带审批</h2>
+  <div class="split" style="margin-top:12px;">
     <div class="card">
-      <h4>为什么不能只靠调用栈</h4>
-      <p>真实审批可能几分钟后才发生，甚至第二天才发生。系统不能让请求、线程或进程一直挂在那里等人，否则大量待审批任务会占住线程、连接和内存，机器会被拖垮。</p>
-      <p style="margin-top:10px;">所以中断时要先断开这次运行，只留下待办和 checkpoint。人处理完，再从保存的现场恢复。</p>
+      <h4>为什么需要 wrapper</h4>
+      <p>Agent 级拦截依赖调用方真的进入 tools 节点。生产里更稳的做法是：危险能力自己先请求人工确认。</p>
+      <div class="warnbox" style="margin-top:16px;">同一个发布能力被多个 Agent / Graph 复用时，审批边界应该放在能力入口。</div>
+    </div>
+    <div class="card">
+      <h4>执行模型</h4>
+      <pre>调用方准备发布参数
+→ wrapper 先 interrupt
+→ 人看 tool args
+→ approve 后才调用真实 publish_service</pre>
     </div>
   </div>
-  <table>
-    <tr><th>类型</th><th>适合</th><th>限制</th></tr>
-    <tr><td>MemorySaver</td><td>Notebook、demo、单元测试</td><td>进程重启后状态丢失</td></tr>
-    <tr><td>SQLite</td><td>本地服务、小型应用</td><td>并发和运维能力有限</td></tr>
-    <tr><td>Postgres / Redis</td><td>生产服务、多实例、长期等待审批</td><td>需要额外基础设施</td></tr>
-  </table>
-  <div class="footer"><span>恢复基础设施</span><span>9 / 15</span></div>
+  <div class="footer"><span>Wrapper 级 HITL</span><span>10 / 15</span></div>
 </section>
 
-<section class="slide" data-title="三种中断方式">
-  <div class="kicker">INTERRUPT TYPES</div>
-  <h2 class="h2">执行前、执行后、节点内中断分别适合什么？</h2>
-  <table>
-    <tr><th>类型</th><th>暂停时机</th><th>节点是否已执行</th><th>恢复后发生什么</th><th>常见场景</th></tr>
-    <tr><td><code>interrupt_before</code></td><td>节点执行前</td><td class="danger">否</td><td>节点第一次执行</td><td>发布、扣款、发短信、删除数据前拦截</td></tr>
-    <tr><td><code>interrupt_after</code></td><td>节点执行后</td><td class="ok">是</td><td>进入后续节点</td><td>生成文案后审查、检索后选证据、计划后确认</td></tr>
-    <tr><td><code>interrupt()</code></td><td>节点内部</td><td>取决于写法</td><td>同一节点拿到 resume 后继续</td><td>根据风险评分、金额、权限等运行态动态审批</td></tr>
-  </table>
-  <div class="warnbox" style="margin-top:18px;">选择逻辑：运行时数据决定是否暂停 → 节点内 `interrupt()`；固定写操作前拦截 → `interrupt_before`；固定产物后审查 → `interrupt_after`。</div>
-  <div class="footer"><span>中断类型</span><span>10 / 15</span></div>
-</section>
-
-<section class="slide" data-title="Notebook 证据一">
-  <div class="kicker">NOTEBOOK EVIDENCE</div>
-  <h2 class="h2">跑通证据 1：朴素流程会误发布，高风险流程会停住</h2>
-  <div class="grid g2" style="margin-top:16px;">
+<section class="slide" data-title="Wrapper 运行证据">
+  <div class="kicker">WRAPPER EVIDENCE</div>
+  <h2 class="h2">课堂演示不赌模型调不调工具，而是让 wrapper 必然拦截</h2>
+  <div class="grid g2" style="margin-top:14px;">
     <div class="card">
-      <h4>朴素实现输出</h4>
-      <pre>publish_status: published
-risk_score: 0.9
-risk_level: high
-matched_terms: ['全网最低', '保本收益', '限时', '错过再等一年']</pre>
+      <h4>真实发布前暂停</h4>
+      <pre>{
+  "action": "approve_tool_call",
+  "tool": "publish_with_human_gate",
+  "channel": "短信",
+  "content": "会员日活动提醒...",
+  "options": ["approve", "edit_and_approve", "reject"]
+}</pre>
     </div>
     <div class="card">
-      <h4>HITL 第一次执行输出</h4>
-      <pre>interrupt action: content_review_required
-interrupt options: ['approve', 'edit_and_approve', 'reject']
-interrupt risk_score: 0.9
-snapshot next: ('human_review',)</pre>
+      <h4>恢复后发布结果</h4>
+      <pre>{
+  "status": "published",
+  "channel": "短信",
+  "content": "会员日活动开启...",
+  "human_decision": "edit_and_approve"
+}</pre>
     </div>
   </div>
-  <p class="lede" style="font-size:16px;">这说明图不是失败了，而是有意停在人工审批节点，等待 `Command(resume=...)`。</p>
-  <div class="footer"><span>运行结果</span><span>11 / 15</span></div>
+  <div class="footer"><span>运行证据</span><span>11 / 15</span></div>
 </section>
 
-<section class="slide" data-title="Notebook 证据二">
-  <div class="kicker">NOTEBOOK EVIDENCE</div>
-  <h2 class="h2">跑通证据 2：人工回复会改变结果和 router</h2>
-  <div class="grid g2" style="margin-top:16px;">
+<section class="slide" data-title="Checkpointer">
+  <div class="kicker">CHECKPOINT</div>
+  <h2 class="h2">为什么 checkpointer 还是必须存在</h2>
+  <div class="split" style="margin-top:12px;">
     <div class="card">
-      <h4>修改后通过</h4>
-      <pre>publish_status: published_after_edit
-review_decision: edit_and_approve
-reviewer_id: reviewer_demo_001
-final_content: 618 智能空调活动开启...</pre>
+      <h4>真实审批不会一直挂着调用栈</h4>
+      <p>审批可能几分钟后回来，也可能第二天才回来。系统不能让请求、线程、连接和进程一直占着资源等人。</p>
     </div>
     <div class="card">
-      <h4>拒绝发布</h4>
-      <pre>reject_review_decision: reject
-reject_publish_status: rejected
-reject_final_content: ''
-reject_audit_tail: ['人工审批: reject', '发布结果: rejected']</pre>
+      <h4>更合理的机器动作</h4>
+      <pre>运行到风险点
+→ 生成待办
+→ checkpoint 保存 thread、暂停点、state/messages
+→ 当前请求结束，释放资源
+→ 人提交决定
+→ Command(resume=...) 恢复</pre>
     </div>
   </div>
-  <p class="lede" style="font-size:16px;">同一张图，因为人工回复不同，后续路径不同：修改后发布或进入拒绝分支。</p>
-  <div class="footer"><span>运行结果</span><span>12 / 15</span></div>
+  <div class="warnbox" style="margin-top:18px;">checkpoint 不是个性化记忆，而是保存可恢复现场，让流程可以断开后再继续。</div>
+  <div class="footer"><span>恢复基础设施</span><span>12 / 15</span></div>
 </section>
 
-<section class="slide" data-title="Notebook 证据三">
-  <div class="kicker">NOTEBOOK EVIDENCE</div>
-  <h2 class="h2">跑通证据 3：before 拦截副作用，after 审查产物</h2>
-  <div class="grid g2" style="margin-top:16px;">
-    <div class="card">
-      <h4>interrupt_before</h4>
-      <pre>snapshot next: ('publish_without_review',)
-publish_status exists before resume: False
-publish_status after resume: published_without_review</pre>
+<section class="slide" data-title="薄节点原则">
+  <div class="kicker">PITFALL</div>
+  <h2 class="h2">不要把 <code>interrupt()</code> 塞进一个大节点里</h2>
+  <div class="grid g2" style="margin-top:14px;">
+    <div class="card" style="border-top:3px solid var(--red);">
+      <h4>危险写法</h4>
+      <pre>生成文案
+→ 调外部 API
+→ 写数据库
+→ interrupt 等人
+→ 发布</pre>
+      <p style="margin-top:12px;">恢复时，LangGraph 会从当前节点开头重新执行。</p>
     </div>
-    <div class="card">
-      <h4>interrupt_after</h4>
-      <pre>after_snapshot next: ('publish_generated',)
-draft exists after generate: True
-publish_status exists before resume: False
-publish_status after resume: published_after_generation_review</pre>
+    <div class="card" style="border-top:3px solid var(--green);">
+      <h4>课程推荐拆法</h4>
+      <pre>生成文案节点
+→ 风险审查节点
+→ 人工审批节点
+→ 发布节点</pre>
+      <p style="margin-top:12px;">人工审批节点只准备 payload、接收 resume、写回 state。</p>
     </div>
   </div>
-  <div class="footer"><span>运行结果</span><span>13 / 15</span></div>
+  <div class="footer"><span>恢复语义</span><span>13 / 15</span></div>
 </section>
 
-<section class="slide" data-title="常见误区">
-  <div class="kicker">PITFALLS</div>
-  <h2 class="h2">这节课最容易讲漏的点</h2>
-  <table>
-    <tr><th>误区</th><th>正确讲法</th></tr>
-    <tr><td>只讲 `interrupt()` API</td><td>先讲业务为什么必须暂停，再讲 API 如何承载这个暂停。</td></tr>
-    <tr><td>中断后不知道用户能干什么</td><td>明确 approve / edit_and_approve / reject 及其业务后果。</td></tr>
-    <tr><td>没讲回复如何影响路由</td><td>人工回复写回 state，router 根据 `review_decision` 选择路径。</td></tr>
-    <tr><td>没讲 checkpointer</td><td>没有 checkpoint，就不知道暂停点、state 和 thread，无法可靠恢复。</td></tr>
-    <tr><td>混淆 before / after</td><td>before 拦截副作用；after 审查已生成产物。</td></tr>
-  </table>
-  <div class="footer"><span>教学重点</span><span>14 / 15</span></div>
+<section class="slide" data-title="三种位置图">
+  <div class="kicker">FULL PICTURE</div>
+  <h2 class="h2">三种 HITL 放在一张图里看</h2>
+  <div class="figure-card" style="margin-top:10px;">
+    <img src="images/three-interrupt-positions.svg" alt="三种人工介入位置">
+  </div>
+  <p class="small" style="margin-top:10px;">这三种方式不是谁替代谁，而是拦截位置不同。</p>
+  <div class="footer"><span>机制全景</span><span>14 / 15</span></div>
 </section>
 
 <section class="slide" data-title="总结">
   <div class="kicker">SUMMARY</div>
-  <h2 class="h2">一句话总结</h2>
+  <h2 class="h2">这节课真正要记住什么</h2>
   <div class="big-center">
     <div class="card" style="max-width:760px; text-align:left;">
-      <p style="font-size:22px; line-height:1.65; color:var(--strong); margin:0;">HITL 的核心不是暂停，而是：<span class="hl">在关键业务动作前保留状态</span>，把上下文交给人，拿到人工回复后<span class="ok">写回 state</span>，再让 router 选择新的执行路径。</p>
-      <div class="flow" style="margin-top:22px;">
-        <span class="node">interrupt</span><span class="arrow">→</span>
-        <span class="node">checkpointer</span><span class="arrow">→</span>
-        <span class="node">Command(resume)</span><span class="arrow">→</span>
-        <span class="node">router</span>
-      </div>
+      <p style="font-size:21px; line-height:1.65; color:var(--strong); margin:0;">Human-in-the-loop 是给 Agent 系统加一条安全边界：模型可以生成、判断、计划、准备 <code>tool_call</code>，但高风险动作真正发生前，必须有人确认。</p>
+      <table style="margin-top:18px;">
+        <tr><th>你需要</th><th>选择</th></tr>
+        <tr><td>完整业务状态和路由</td><td>Node 级 HITL</td></tr>
+        <tr><td>拦住预构建 Agent 的工具调用</td><td>Agent 级 HITL</td></tr>
+        <tr><td>让危险工具全局不漏审</td><td>Wrapper 级 HITL</td></tr>
+      </table>
     </div>
   </div>
   <div class="footer"><span>下一节：LG-04 持久化与记忆系统</span><span>15 / 15</span></div>

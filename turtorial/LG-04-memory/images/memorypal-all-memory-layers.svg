@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
+  <title id="title">MemoryPal 综合记忆层示意图</title>
+  <desc id="desc">展示 State、Checkpoint、Store、Summary 和 Redis Cache 在 MemoryPal 综合案例中的分工。</desc>
+  <defs>
+    <style>
+      .bg { fill: #fbfaf6; }
+      .title { font: 700 34px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", sans-serif; fill: #263238; }
+      .subtitle { font: 400 18px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", sans-serif; fill: #5f6f6a; }
+      .card { fill: #ffffff; stroke: #d8ded9; stroke-width: 1.5; rx: 20; filter: url(#shadow); }
+      .center { fill: #eef5f1; stroke: #8fb3a3; stroke-width: 2; rx: 24; filter: url(#shadow); }
+      .h { font: 700 23px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", sans-serif; fill: #2f3f3a; }
+      .p { font: 400 17px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", sans-serif; fill: #52615d; }
+      .api { font: 600 15px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #6f7f7a; }
+      .tag { font: 700 15px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", sans-serif; fill: #ffffff; }
+      .arrow { fill: none; stroke: #8aa19a; stroke-width: 2.2; marker-end: url(#arrow); }
+      .softArrow { fill: none; stroke: #c59684; stroke-width: 2.2; stroke-dasharray: 7 7; marker-end: url(#softArrow); }
+      .note { font: 600 16px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", sans-serif; fill: #7b5f4f; }
+    </style>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#6b766f" flood-opacity="0.12"/>
+    </filter>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M2,2 L10,6 L2,10 Z" fill="#8aa19a"/>
+    </marker>
+    <marker id="softArrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M2,2 L10,6 L2,10 Z" fill="#c59684"/>
+    </marker>
+  </defs>
+
+  <rect class="bg" width="1280" height="720"/>
+  <text class="title" x="640" y="58" text-anchor="middle">MemoryPal：五种记忆各管不同生命周期</text>
+  <text class="subtitle" x="640" y="91" text-anchor="middle">不是所有信息都塞进 messages；先判断生命周期，再选择 State / Checkpoint / Store / Summary / Redis Cache</text>
+
+  <rect class="center" x="455" y="274" width="370" height="160"/>
+  <text class="h" x="640" y="318" text-anchor="middle">MemoryPal Graph</text>
+  <text class="p" x="640" y="354" text-anchor="middle">检索记忆 → 读缓存 → 压缩上下文 → 生成回复</text>
+  <text class="api" x="640" y="388" text-anchor="middle">StateGraph + PostgresSaver</text>
+
+  <rect class="card" x="68" y="152" width="300" height="126"/>
+  <rect x="92" y="176" width="86" height="26" rx="13" fill="#8aa99c"/>
+  <text class="tag" x="135" y="195" text-anchor="middle">State</text>
+  <text class="h" x="92" y="232">本轮工作台</text>
+  <text class="p" x="92" y="260">保存输入、检索结果、回复草稿</text>
+  <text class="api" x="92" y="286">user_input / retrieved_memories</text>
+
+  <rect class="card" x="68" y="442" width="300" height="126"/>
+  <rect x="92" y="466" width="126" height="26" rx="13" fill="#7e9fbd"/>
+  <text class="tag" x="155" y="485" text-anchor="middle">Checkpoint</text>
+  <text class="h" x="92" y="522">同一窗口续接</text>
+  <text class="p" x="92" y="550">Postgres 按 thread_id 保存现场</text>
+  <text class="api" x="92" y="576">PostgresSaver + thread_id</text>
+
+  <rect class="card" x="912" y="142" width="300" height="142"/>
+  <rect x="936" y="166" width="86" height="26" rx="13" fill="#9ba978"/>
+  <text class="tag" x="979" y="185" text-anchor="middle">Store</text>
+  <text class="h" x="936" y="222">长期用户资料</text>
+  <text class="p" x="936" y="250">偏好和身份按 namespace 隔离</text>
+  <text class="api" x="936" y="276">PostgresStore + pgvector</text>
+  <text class="api" x="936" y="300">("用户偏好", user_id)</text>
+
+  <rect class="card" x="912" y="444" width="300" height="126"/>
+  <rect x="936" y="468" width="104" height="26" rx="13" fill="#c79883"/>
+  <text class="tag" x="988" y="487" text-anchor="middle">Summary</text>
+  <text class="h" x="936" y="524">长上下文压缩</text>
+  <text class="p" x="936" y="552">保留最近原文，早期变摘要</text>
+  <text class="api" x="936" y="578">summary node / hook / reducer</text>
+
+  <rect class="card" x="490" y="560" width="300" height="104"/>
+  <rect x="514" y="584" width="104" height="26" rx="13" fill="#b99d65"/>
+  <text class="tag" x="566" y="603" text-anchor="middle">Redis</text>
+  <text class="h" x="514" y="638">短期可复用结果</text>
+  <text class="p" x="514" y="666">政策查询命中缓存，减少重复成本</text>
+
+  <path class="arrow" d="M368 220 C420 230, 430 288, 455 322"/>
+  <path class="arrow" d="M368 506 C420 494, 430 420, 455 386"/>
+  <path class="arrow" d="M825 322 C862 286, 882 244, 912 220"/>
+  <path class="arrow" d="M825 386 C862 420, 882 494, 912 508"/>
+  <path class="arrow" d="M640 434 L640 560"/>
+
+  <path class="softArrow" d="M1036 142 C1000 104, 770 108, 694 274"/>
+  <text class="note" x="766" y="138">回答前检索长期偏好</text>
+  <path class="softArrow" d="M1036 570 C1000 630, 808 626, 790 626"/>
+  <text class="note" x="828" y="654">缓存命中后少查一次</text>
+
+  <text class="subtitle" x="640" y="700" text-anchor="middle">判断规则：当前处理放 State，同一窗口放 Checkpoint，跨窗口资料放 Store，长历史做 Summary，重复外部结果放 Redis Cache</text>
+</svg>

@@ -49,33 +49,15 @@ docker compose logs -f langfuse-web
 | PostgreSQL | localhost:5432 | 数据库连接端口 |
 | Redis | localhost:6379 | 缓存连接端口 |
 | MinIO Console | http://localhost:9091 | 对象存储管理界面 |
-| Jupyter | http://localhost:8888 | 浏览器内直接运行 Notebook |
 
-### 5. Notebook 中使用 Docker 服务
+### 5. 本地 Notebook 中使用 Docker 服务
 
-容器内运行的 Notebook 已通过环境变量注入连接信息，直接使用即可：
-
-```python
-import os
-
-# PostgreSQL 连接
-postgres_url = f"postgresql://{os.getenv('POSTGRES_USER')}:{os.getenv('POSTGRES_PASSWORD')}@postgres:5432/{os.getenv('POSTGRES_DB')}"
-
-# Redis 连接
-redis_host = os.getenv('REDIS_HOST', 'redis')
-redis_port = os.getenv('REDIS_PORT', 6379)
-redis_password = os.getenv('REDIS_PASSWORD')
-
-# Langfuse 连接
-langfuse_host = os.getenv('LANGFUSE_HOST', 'http://langfuse-web:3000')
-```
-
-如果你在宿主机直接运行 Python（不通过 Jupyter 容器），连接地址用 `localhost`：
+课程默认在宿主机本地运行 Python / Jupyter，Docker 只提供数据库、缓存和观测服务。连接地址使用 `localhost`：
 
 ```python
-# 宿主机运行时使用 localhost
 postgres_url = "postgresql://langgraph:langgraph@localhost:5432/langgraph"
 redis_url = "redis://:redis@localhost:6379/0"
+langfuse_host = "http://localhost:3000"
 ```
 
 ## 服务说明
@@ -94,11 +76,6 @@ redis_url = "redis://:redis@localhost:6379/0"
 - 首次访问 http://localhost:3000 需创建组织/项目
 - 创建项目后获取 Public Key / Secret Key，填入 `.env`
 - 重启容器生效: `docker compose restart langfuse-web langfuse-worker`
-
-### Jupyter
-- 工作目录挂载到 `./turtorial`
-- 无需 Token，直接访问 http://localhost:8888
-- 已预装常见数据科学包
 
 ## 常用命令
 
@@ -128,5 +105,4 @@ docker compose logs langfuse-web | grep "API keys"
 |------|------|
 | Langfuse 启动慢 | ClickHouse 首次初始化需要时间，等待 healthcheck 通过 |
 | 端口冲突 | 修改 `.env` 或 `docker-compose.yml` 中的端口映射 |
-| Jupyter 包缺失 | `docker exec langgraph_jupyter pip install xxx` |
 | 数据丢失 | 检查 `docker-compose down` 是否误加了 `-v` |

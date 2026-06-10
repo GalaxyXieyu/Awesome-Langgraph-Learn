@@ -1,0 +1,179 @@
+# LG-09: 生产部署、可观测性与 Prompt 工程> **阶段**: LG-09 | **难度**: 进阶 | **预计时长**: 7-8 小时> **前置要求**: 已完成 LG-01 ~ LG-08## 学习目标- 掌握生产部署最佳实践- 深度集成 Langfuse 可观测性- 实现 Prompt 生命周期管理- 设计生产级降级策略---> **开场白**：假设你花了两个月做了一个 DeepResearch Agent，本地跑得很好。老板让你明天上线。> 这就是生产部署的现实。今天的主题是：**从「能跑」到「能上线」**。
+
+## 1. 环境准备安装本节课所需的依赖包。
+
+```python
+# 安装依赖# !pip install langgraph langchain langfuse pyyamlimport sysprint(f"Python: {sys.version}")try:    import langgraph    print(f"langgraph: {import importlib.metadata; importlib.metadata.version("langgraph")}")except ImportError:    print("langgraph: 未安装")try:    import langfuse    print("langfuse: 已安装")except ImportError:    print("langfuse: 未安装")
+```
+
+## 2. Langfuse 配置初始化### 2.1 用户项目配置（真实环境变量）> **注意**：生产环境请通过环境变量注入，不要硬编码。
+
+```python
+import os# Langfuse 环境变量配置（教学演示）os.environ["OBSERVATION_PROVIDER"] = "langfuse"os.environ["LANGFUSE_ENABLED"] = "true"os.environ["LANGFUSE_SECRET_KEY"] = "sk-lf-93b17b96-2324-4dd0-814f-0531b16fb945"os.environ["LANGFUSE_PUBLIC_KEY"] = "pk-lf-8969da1a-c681-44fa-a3f1-d1dba9f9cdfb"os.environ["LANGFUSE_BASE_URL"] = "http://192.168.10.189:3000"os.environ["LANGFUSE_WEB_URL"] = "http://192.168.10.189:3000"os.environ["LANGFUSE_BASE_TAGS"] = "nanshantongv3_dev"print("[OK] Langfuse 环境变量已配置")print(f"  BASE_URL: {os.getenv("LANGFUSE_BASE_URL")}")print(f"  ENABLED: {os.getenv("LANGFUSE_ENABLED")}")print(f"  BASE_TAGS: {os.getenv("LANGFUSE_BASE_TAGS")}")
+```
+
+## 3. Langfuse 可观测性初始化### 3.1 init_langfuse_observability() -- 真实项目实现改编自 src/infrastructure/monitoring/langfuse_init.py**设计要点**：1. 显式开关控制2. 环境变量优先3. 优雅降级4. 多平台兼容
+
+```python
+import os# ============================================# init_langfuse_observability() 生产级实现# ============================================from typing import List, Optional, Dict, Anyimport inspectdef _is_true(v):    if v is None:        return False    return v.lower() in {"1", "true", "yes", "on"}def _is_langfuse_tracing_enabled():    return _is_true(os.getenv("LANGFUSE_ENABLED"))def get_observation_platform():    return os.getenv("OBSERVATION_PROVIDER", "langfuse").lower()def init_langfuse_observability(process="api"):    provider = get_observation_platform()        if provider == "langsmith":        print("[INFO] 观测平台为 LangSmith，跳过初始化")        return None        if not _is_langfuse_tracing_enabled():        print("[INFO] LANGFUSE_ENABLED 未开启")        return None        public_key = os.getenv("LANGFUSE_PUBLIC_KEY")    secret_key = os.getenv("LANGFUSE_SECRET_KEY")        if not public_key or not secret_key:        print("[WARN] 缺少密钥")        return None        base_url = os.getenv("LANGFUSE_BASE_URL", "https://cloud.langfuse.com")        try:        from langfuse import Langfuse    except ImportError:        print("[WARN] langfuse 包未安装")        return None        try:        client = Langfuse(            public_key=public_key,            secret_key=secret_key,            host=base_url,            debug=os.getenv("DEBUG", "false").lower() == "true",        )        os.environ.setdefault("LAGP_PROCESS", process)        print(f"[OK] Langfuse 初始化成功")        return client    except Exception as e:        print(f"[ERROR] 初始化失败: {e}")        return Nonelangfuse_client = init_langfuse_observability(process="api")print(f"客户端: {type(langfuse_client).__name__ if langfuse_client else 'None'}")
+```
+
+## 4. CallbackHandler 与 Trace 追踪### 4.1 create_callback_handler() -- 为每次执行创建追踪实例CallbackHandler 是 LangGraph 与 Langfuse 之间的桥梁。每次 `graph.invoke()` 时传入 handler，LangGraph 会自动上报每个节点的执行、LLM 调用、工具调用、Token 用量等。**Trace 链路示例**：```Trace: 用户查询 "新能源汽车分析"├── Node: intent_classifier  (23ms)├── Node: mode_router        (15ms)│   └── LLM Call             (312ms)├── Node: task_planner       (45ms)│   └── LLM Call             (456ms)├── Node: search_parallel    (1203ms)│   ├── Subgraph: finance    (800ms)│   ├── Subgraph: news       (600ms)│   └── Subgraph: competitor (750ms)├── Node: plan_router        (18ms)└── Node: report_generator   (2345ms)    └── LLM Call             (2300ms)```
+
+```python
+import os# ============================================# create_callback_handler() 生产级实现# 改编自: src/infrastructure/monitoring/langfuse_init.py# ============================================import uuiddef create_callback_handler(    trace_name=None,    user_id=None,    session_id=None,    tags=None,    metadata=None,    trace_id=None,):    if get_observation_platform() == "langsmith":        return None    if not _is_langfuse_tracing_enabled():        return None    public_key = os.getenv("LANGFUSE_PUBLIC_KEY")    secret_key = os.getenv("LANGFUSE_SECRET_KEY")    base_url = os.getenv("LANGFUSE_BASE_URL", "https://cloud.langfuse.com")    if not public_key or not secret_key:        return None    os.environ["LANGFUSE_PUBLIC_KEY"] = public_key    os.environ["LANGFUSE_SECRET_KEY"] = secret_key    os.environ["LANGFUSE_BASE_URL"] = base_url    try:        from langfuse import Langfuse        try:            from langfuse.langchain import CallbackHandler        except Exception:            from langfuse.callback import CallbackHandler        _ = Langfuse(public_key=public_key, secret_key=secret_key, host=base_url)    except ImportError:        return None    def _filter_kwargs(func, kwargs):        try:            sig = inspect.signature(func)        except Exception:            return kwargs        return {k: v for k, v in kwargs.items() if k in sig.parameters and v is not None}    try:        handler_kwargs = _filter_kwargs(            CallbackHandler.__init__,            {                "public_key": public_key,                "secret_key": secret_key,                "host": base_url,                "debug": os.getenv("DEBUG", "false").lower() == "true",                "trace_name": trace_name,                "user_id": user_id,                "session_id": session_id,                "tags": tags,                "metadata": metadata,                "trace_id": trace_id,            },        )        handler = CallbackHandler(**handler_kwargs)        return handler    except Exception as e:        print(f"[ERROR] 创建 CallbackHandler 失败: {e}")        return Nonehandler = create_callback_handler(    trace_name="tutorial-demo",    user_id="student-01",    session_id=str(uuid.uuid4()),    tags=["env:dev", "tutorial:lg-09"],)if handler:    print(f"[OK] CallbackHandler 创建成功")    print(f"  类型: {type(handler).__name__}")else:    print("[INFO] CallbackHandler 未创建（Langfuse 未启用或配置缺失）")
+```
+
+### 4.2 get_langfuse_config() -- 一键获取配置字典封装了 create_callback_handler() + build_langfuse_metadata()，返回可直接传给 ainvoke/astream 的 config 参数。
+
+```python
+import os# ============================================# get_langfuse_config() -- 一键配置# ============================================def build_default_tags(*extra):    env_name = "dev" if os.getenv("APP_ENV", "development").lower() in ["dev", "development"] else "prod"    tags = [        "lagp",        f"env:{env_name}",        f"proc:{os.getenv('LAGP_PROCESS', 'api')}",    ]    base = os.getenv("LANGFUSE_BASE_TAGS")    if base:        for t in str(base).split(","):            t = t.strip()            if t:                tags.append(t)    if extra:        tags.extend(extra)    return tagsdef build_langfuse_metadata(user_id=None, session_id=None, tags=None, custom_metadata=None):    metadata = custom_metadata.copy() if custom_metadata else {}    if user_id:        metadata["langfuse_user_id"] = user_id    if session_id:        metadata["langfuse_session_id"] = session_id    if tags:        default_tags = build_default_tags()        all_tags = list(set(default_tags + tags))        metadata["langfuse_tags"] = all_tags    return metadatadef get_langfuse_config(session_id=None, user_id=None, tags=None, metadata=None):    trace_name = None    if isinstance(metadata, dict):        trace_name = metadata.get("trace_name")    handler = create_callback_handler(        trace_name=trace_name,        user_id=user_id,        session_id=session_id,        tags=tags,        metadata=metadata,    )    if not handler:        return {}    lf_metadata = build_langfuse_metadata(        user_id=user_id,        session_id=session_id,        tags=tags,        custom_metadata=metadata    )    return {        "callbacks": [handler],        "metadata": lf_metadata    }config = get_langfuse_config(    user_id="user-123",    session_id="session-456",    tags=["agent:deepresearch", "feature:cache"],    metadata={"trace_name": "deepresearch-query", "query_id": "q-789"})print("Langfuse Config:")if config:    print(f"  callbacks: {len(config.get('callbacks', []))} 个 handler")    print(f"  metadata keys: {list(config.get('metadata', {}).keys())}")    print(f"  tags: {config['metadata'].get('langfuse_tags', [])}")else:    print("  （Langfuse 未启用）")
+```
+
+## 5. Tags 标签系统Tags 是 Langfuse 中最重要的组织维度之一。通过标准化标签，你可以按环境、服务、Agent 类型、功能模块筛选。**标签格式规范**：`category:value`，便于 Langfuse 界面筛选和分组。
+
+```python
+import os# ============================================# Tags 标签系统演示# ============================================def build_default_tags(agent_type=None, feature=None, environment=None, region=None, version=None, custom_tags=None):    tags = [        f"env:{environment or os.getenv('APP_ENV', 'dev')}",        f"proc:{os.getenv('LAGP_PROCESS', 'api')}",        f"region:{region or os.getenv('REGION', 'ap-east-1')}",    ]    if agent_type:        tags.append(f"agent:{agent_type}")    if feature:        tags.append(f"feature:{feature}")    if version:        tags.append(f"version:{version}")    if custom_tags:        tags.extend([t for t in custom_tags if ":" in t])    return tagsprint("=" * 60)print("场景 1: 生产环境 DeepResearch Agent")tags_prod = build_default_tags(    agent_type="deep_research",    feature="cache",    environment="prod",    region="ap-east-1",    version="1.2.0")for tag in tags_prod:    print(f"  {tag}")print("场景 2: 开发环境新闻搜索 Agent")tags_dev = build_default_tags(    agent_type="news_search",    feature="streaming",    environment="dev",    version="1.2.0-dev")for tag in tags_dev:    print(f"  {tag}")print("场景 3: Worker 进程（异步任务）")os.environ["LAGP_PROCESS"] = "worker"tags_worker = build_default_tags(    agent_type="deep_research",    feature="celery_task",    environment="prod",)for tag in tags_worker:    print(f"  {tag}")os.environ["LAGP_PROCESS"] = "api"print("场景 4: 带用户项目基础标签")os.environ["LANGFUSE_BASE_TAGS"] = "nanshantongv3_dev"tags_base = build_default_tags(    agent_type="deep_research",    environment="prod",)for tag in tags_base:    print(f"  {tag}")print("" + "=" * 60)print("Langfuse 筛选示例:")print("  只看生产环境:   tags CONTAINS 'env:prod'")print("  只看缓存功能:   tags CONTAINS 'feature:cache'")print("  只看某个 Agent: tags CONTAINS 'agent:deep_research'")print("  组合筛选:       tags CONTAINS 'env:prod' AND tags CONTAINS 'agent:deep_research'")
+```
+
+## 6. Score 评分系统Score 不只是「技术监控」，更是「业务指标」：- 缓存命中率 85% = 省了 85% 的 API 费用- 响应时间 P99 < 2s = 用户体验达标- 输出质量评分下降 = Prompt 需要优化### 6.1 缓存命中率上报`report_cache_hit_rate()` 将缓存命中率作为 Score 附加到指定 Trace 上。
+
+```python
+import os# ============================================# Score 评分系统# 改编自: src/infrastructure/monitoring/langfuse_init.py# ============================================def report_cache_hit_rate(trace_id, hit_rate, cached_tokens=0, total_input_tokens=0, metadata=None):    try:        from langfuse import Langfuse        public_key = os.getenv("LANGFUSE_PUBLIC_KEY")        secret_key = os.getenv("LANGFUSE_SECRET_KEY")        base_url = os.getenv("LANGFUSE_BASE_URL", "https://cloud.langfuse.com")        if not public_key or not secret_key:            print("[WARN] Langfuse 密钥未配置，跳过 Score 上报")            return        langfuse = Langfuse(public_key=public_key, secret_key=secret_key, host=base_url)        langfuse.score(            trace_id=trace_id,            name="cache_hit_rate",            value=hit_rate,            comment=f"cached_tokens={cached_tokens}, total_input={total_input_tokens}",        )        langfuse.score(            trace_id=trace_id,            name="cached_tokens_count",            value=cached_tokens,        )        print(f"[OK] Score 上报成功: cache_hit_rate={hit_rate:.1%}")    except Exception as e:        print(f"[WARN] Score 上报失败: {e}")def report_response_time(trace_id, node_name, duration_ms):    try:        from langfuse import Langfuse        public_key = os.getenv("LANGFUSE_PUBLIC_KEY")        secret_key = os.getenv("LANGFUSE_SECRET_KEY")        base_url = os.getenv("LANGFUSE_BASE_URL", "https://cloud.langfuse.com")        if not public_key or not secret_key:            return        langfuse = Langfuse(public_key=public_key, secret_key=secret_key, host=base_url)        langfuse.score(            trace_id=trace_id,            name=f"response_time_{node_name}",            value=duration_ms,            comment=f"duration_ms={duration_ms}",        )        print(f"[OK] Score 上报成功: response_time_{node_name}={duration_ms}ms")    except Exception as e:        print(f"[WARN] 响应时间上报失败: {e}")def report_output_quality(trace_id, score, evaluator="human", comment=""):    try:        from langfuse import Langfuse        public_key = os.getenv("LANGFUSE_PUBLIC_KEY")        secret_key = os.getenv("LANGFUSE_SECRET_KEY")        base_url = os.getenv("LANGFUSE_BASE_URL", "https://cloud.langfuse.com")        if not public_key or not secret_key:            return        langfuse = Langfuse(public_key=public_key, secret_key=secret_key, host=base_url)        langfuse.score(            trace_id=trace_id,            name="output_quality",            value=score,            comment=f"evaluator={evaluator}, {comment}",        )        print(f"[OK] Score 上报成功: output_quality={score} (evaluator={evaluator})")    except Exception as e:        print(f"[WARN] 质量评分上报失败: {e}")print("=== Score 评分系统演示 ===")demo_trace_id = f"demo-trace-{uuid.uuid4().hex[:8]}"print(f"模拟 Trace ID: {demo_trace_id}")report_cache_hit_rate(    trace_id=demo_trace_id,    hit_rate=0.85,    cached_tokens=2048,    total_input_tokens=2400,)report_response_time(    trace_id=demo_trace_id,    node_name="report_generator",    duration_ms=2345.0,)report_output_quality(    trace_id=demo_trace_id,    score=0.92,    evaluator="gpt-4",    comment="结构完整，逻辑清晰，引用准确",)print("" + "=" * 60)print("Score 业务意义:")print("  cache_hit_rate=85%    -> 省了 85% 的 API 费用")print("  response_time=2345ms  -> 需要优化（目标 P99 < 2000ms）")print("  output_quality=0.92   -> 质量优秀（阈值 0.80）")
+```
+
+## 7. Dataset 管理：QA CaptureDataset 是 Langfuse 中用于结构化数据收集和回归测试的功能。每次用户查询 + 系统回答 + 用户反馈自动保存，可用于：- 定期评估 Prompt 效果- 回归测试（改了 Prompt 后，同样的输入输出质量有没有提升）- Bad Case 收集和分析
+
+```python
+# ============================================
+# Dataset QA Capture
+# ============================================
+
+from pathlib import Path
+import json
+from datetime import datetime
+
+class QACapture:
+    def __init__(self, dataset_name="opsmate_qa_v1", langfuse_client=None):
+        self.dataset_name = dataset_name
+        self.client = langfuse_client
+        self._local_buffer = []
+
+    def capture(self, query, response, trace_id=None, expected=None, metadata=None, user_feedback=None):
+        record = {
+            "input": {"query": query},
+            "expected_output": {"response": expected or response},
+            "source_trace_id": trace_id,
+            "metadata": {
+                "captured_at": datetime.now().isoformat(),
+                "user_feedback": user_feedback,
+                **(metadata or {})
+            }
+        }
+
+        try:
+            if self.client:
+                dataset = self.client.get_dataset(self.dataset_name)
+                dataset.create_item(**record)
+                record["sync_status"] = "synced"
+                print(f"[OK] QA 记录已同步到 Dataset '{self.dataset_name}'")
+            else:
+                self._local_buffer.append(record)
+                record["sync_status"] = "buffered"
+                print(f"[WARN] Langfuse 未连接，已缓存到本地（{len(self._local_buffer)} 条）")
+        except Exception as e:
+            self._local_buffer.append(record)
+            record["sync_status"] = "buffered"
+            print(f"[WARN] Dataset 同步失败: {e}，已缓存到本地（{len(self._local_buffer)} 条）")
+
+        return record
+
+    def flush_local_buffer(self):
+        if not self._local_buffer:
+            print("[INFO] 本地缓冲区为空")
+            return
+        if not self.client:
+            print("[WARN] Langfuse 未连接，无法刷新缓冲区")
+            return
+        synced = 0
+        failed = 0
+        try:
+            dataset = self.client.get_dataset(self.dataset_name)
+            for record in self._local_buffer:
+                try:
+                    dataset.create_item(**record)
+                    synced += 1
+                except Exception:
+                    failed += 1
+            self._local_buffer.clear()
+            print(f"[OK] 缓冲区刷新完成: {synced} 条成功, {failed} 条失败")
+        except Exception as e:
+            print(f"[ERROR] 刷新缓冲区失败: {e}")
+
+    def get_buffer_stats(self):
+        return {
+            "buffered_count": len(self._local_buffer),
+            "dataset_name": self.dataset_name,
+        }
+
+
+print("=== QA Capture 演示 ===")
+
+qa = QACapture(dataset_name="tutorial_qa_v1", langfuse_client=langfuse_client)
+
+qa_data_path = Path("qa_capture_records.json")
+if not qa_data_path.exists():
+    qa_data_path = Path("turtorial/LG-09-production-langfuse/qa_capture_records.json")
+
+records = json.loads(qa_data_path.read_text(encoding="utf-8"))["records"]
+print(f"已加载 {len(records)} 条 QA 记录")
+
+for i, r in enumerate(records, 1):
+    print(f"\n--- 记录 {i} ---")
+    result = qa.capture(**r, trace_id=f"trace-{uuid.uuid4().hex[:8]}")
+    print(f"  同步状态: {result['sync_status']}")
+
+print(f"\n缓冲区统计: {qa.get_buffer_stats()}")
+```
+
+## 8. Prompt 生命周期管理Prompt 管理就像「菜谱管理」。核心工作流：**设计原则**：1. 本地 YAML 优先2. Hub 作为备份3. 版本可追溯4. 自动标签
+
+```python
+# PromptManager 生产级实现from pathlib import Pathclass PromptManager:    def __init__(self, local_dir="prompts", langfuse_client=None, auto_pull=True):        self.local_dir = Path(local_dir)        self.local_dir.mkdir(parents=True, exist_ok=True)        self.langfuse = langfuse_client        self.auto_pull = auto_pull        self._config_file = self.local_dir / "prompts_config.yaml"        self._config = self._load_config()    def _load_config(self):        if self._config_file.exists():            with open(self._config_file, "r", encoding="utf-8") as f:                return yaml.safe_load(f) or {"prompts": {}}        return {"prompts": {}}    def _save_config(self):        with open(self._config_file, "w", encoding="utf-8") as f:            yaml.dump(self._config, f, allow_unicode=True, sort_keys=False)    def get_prompt(self, prompt_name):        prompt_meta = self._config.get("prompts", {}).get(prompt_name)        if not prompt_meta:            return None        yaml_file = self.local_dir / prompt_meta.get("file", f"{prompt_name}.yaml")        if yaml_file.exists():            with open(yaml_file, "r", encoding="utf-8") as f:                data = yaml.safe_load(f)            data["_source"] = "local"            return data        if self.auto_pull and prompt_meta.get("hub_name"):            print(f"[*] 本地未找到, 尝试从 Hub 拉取...")        return None    def save_prompt(self, name, content, prompt_type="text", version="1.0.0", description="", input_variables=None, hub_name=None):        filename = f"{name}.yaml"        filepath = self.local_dir / filename        yaml_data = {"name": name, "version": version, "description": description, "type": prompt_type, "input_variables": input_variables or []}        if prompt_type == "chat":            yaml_data["messages"] = content if isinstance(content, list) else []        else:            yaml_data["template"] = content if isinstance(content, str) else ""        with open(filepath, "w", encoding="utf-8") as f:            f.write(f"# {name} - {version}")            f.write(f"# Generated at: {datetime.now().isoformat()}")            yaml.dump(yaml_data, f, allow_unicode=True, default_flow_style=False, sort_keys=False)        if "prompts" not in self._config:            self._config["prompts"] = {}        self._config["prompts"][name] = {"file": filename, "hub_name": hub_name or name}        self._save_config()        print(f"[OK] Prompt 已保存: {filepath}")        return filepath    def list_prompts(self):        return list(self._config.get("prompts", {}).keys())    def push_to_hub(self, prompt_name, commit_message=""):        if not self.langfuse:            print("[X] Langfuse 未连接")            return False        prompt_data = self.get_prompt(prompt_name)        if not prompt_data:            print(f"[X] Prompt 未找到")            return False        print(f"[OK] 推送完成（演示模式）")        return Trueprint("=== PromptManager 演示 ===")pm = PromptManager(local_dir="/tmp/tutorial_prompts", langfuse_client=langfuse_client)intent_classifier_prompt = [    {"role": "system", "content": "你是意图分类器..."},    {"role": "human", "content": "{{ query }}"}]pm.save_prompt(name="intent_classifier", content=intent_classifier_prompt, prompt_type="chat", version="1.0.0", description="意图分类器", input_variables=["query"], hub_name="deepresearch_intent_classifier")print(f"已保存: {pm.list_prompts()}")print("--- 读取 ---")prompt_data = pm.get_prompt("intent_classifier")if prompt_data:    print(f"  名称: {prompt_data['name']}, 版本: {prompt_data['version']}")print("--- 推送 ---")pm.push_to_hub("intent_classifier", commit_message="优化准确率")
+```
+
+### 8.1 prompts_config.yaml 配置示例以下配置来自用户项目的真实 prompts_config.yaml：**关键字段**：file, hub_name, test_dataset, evaluators, evaluator_weights, min_quality_score
+
+```python
+# prompts_config.yaml 结构演示prompts_config_example = """prompts:  intent_classifier:    file: "agent_research/intent_classifier.yaml"    hub_name: "deepresearch_intent_classifier"    test_dataset: "intent_classification_test"    evaluators:      - "structure_evaluator"      - "json_format_evaluator"    evaluator_weights:      structure_evaluator: 0.4      json_format_evaluator: 0.6    min_quality_score: 0.85  report_writer:    file: "agent_research/report_writer.yaml"    hub_name: "deepresearch_report_writer"    test_dataset: "report_writing_test"    evaluators:      - "structure_evaluator"      - "content_completeness_evaluator"    evaluator_weights:      structure_evaluator: 0.2      content_completeness_evaluator: 0.3    min_quality_score: 0.85versioning:  format: semantic  create_backup: true  max_versions: 10evaluation:  max_concurrency: 2  timeout: 300  min_quality_score: 0.8hub:  auto_pull: true  auto_push: false  public: false"""print(prompts_config_example)print("=" * 60)print("配置说明:")print("  versioning.format=semantic -> 语义化版本")print("  hub.auto_pull=true -> 自动从 Hub 拉取")print("  hub.auto_push=false -> 手动控制发布")
+```
+
+## 9. 完整示例：带 Langfuse 监控的 Agent将前面所有组件整合到一个完整的示例中。
+
+```python
+# 完整示例：带 Langfuse 监控的 Agentfrom typing import TypedDict, Annotatedfrom operator import addfrom langchain_core.messages import HumanMessagefrom langgraph.graph import StateGraph, START, ENDclass AgentState(TypedDict):    messages: Annotated[list, add]    intent: str    response: str    metadata: dictdef classify_intent(state: AgentState):    text = state["messages"][-1].content if state["messages"] else ""    if "天气" in text:        return {"intent": "weather"}    elif "时间" in text:        return {"intent": "time"}    return {"intent": "other"}def process_weather(state: AgentState):    return {"response": "今天天气晴朗，25度。"}def process_time(state: AgentState):    from datetime import datetime    return {"response": f"现在是 {datetime.now().strftime('%H:%M')}"}def fallback_response(state: AgentState):    return {"response": "抱歉，我暂时只能回答天气和时间问题。"}def route_by_intent(state: AgentState):    intent = state.get("intent", "other")    if intent == "weather":        return "process_weather"    elif intent == "time":        return "process_time"    return "fallback_response"builder = StateGraph(AgentState)builder.add_node("classify_intent", classify_intent)builder.add_node("process_weather", process_weather)builder.add_node("process_time", process_time)builder.add_node("fallback_response", fallback_response)builder.add_edge(START, "classify_intent")builder.add_edge("process_weather", END)builder.add_edge("process_time", END)builder.add_edge("fallback_response", END)builder.add_conditional_edges("classify_intent", route_by_intent)agent_graph = builder.compile()print("[OK] Agent 图编译成功")def run_with_monitoring(query, user_id="demo-user"):    session_id = str(uuid.uuid4())    trace_id = f"trace-{uuid.uuid4().hex[:12]}"    tags = build_default_tags(agent_type="demo_agent", feature="intent_routing", environment="dev")    lf_config = get_langfuse_config(        user_id=user_id, session_id=session_id, tags=tags,        metadata={"trace_name": "demo-agent-query", "trace_id": trace_id, "query": query}    )    import time    start_time = time.time()    result = agent_graph.invoke({"messages": [HumanMessage(query)]}, config=lf_config if lf_config else None)    duration_ms = (time.time() - start_time) * 1000    report_cache_hit_rate(trace_id, 0.75, 1500, 2000)    report_response_time(trace_id, "total", duration_ms)    qa = QACapture(dataset_name="demo_qa", langfuse_client=langfuse_client)    qa.capture(query=query, response=result["response"], trace_id=trace_id)    return resultprint("=== 带监控执行 ===")for query in ["今天天气怎么样？", "现在几点了？", "讲个笑话"]:    print(f"用户: {query}")    result = run_with_monitoring(query, user_id="student-01")    print(f"Agent: {result['response']}")    print(f"意图: {result.get('intent', 'unknown')}")    print("-" * 40)
+```
+
+## 10. 生产级降级策略当依赖服务出现故障时，系统应优雅降级。
+
+```python
+# 生产级降级策略from enum import Enum, autofrom functools import wrapsclass ServiceStatus(Enum):    HEALTHY = auto()    DEGRADED = auto()    UNAVAILABLE = auto()class DegradationPolicy:    def __init__(self):        self.policies = {            "llm": {ServiceStatus.HEALTHY: "full", ServiceStatus.DEGRADED: "light", ServiceStatus.UNAVAILABLE: "cache"},            "redis": {ServiceStatus.HEALTHY: "primary", ServiceStatus.DEGRADED: "fallback", ServiceStatus.UNAVAILABLE: "memory"},            "search": {ServiceStatus.HEALTHY: "vector", ServiceStatus.DEGRADED: "keyword", ServiceStatus.UNAVAILABLE: "skip"},            "langfuse": {ServiceStatus.HEALTHY: "full", ServiceStatus.DEGRADED: "essential", ServiceStatus.UNAVAILABLE: "buffer"},        }    def get_strategy(self, service, status):        return self.policies.get(service, {}).get(status, "fail")class ServiceHealthMonitor:    def __init__(self):        self._status = {}        self._last_check = {}        self._check_interval = 30    def check(self, service_name):        import time, random        now = time.time()        last = self._last_check.get(service_name, 0)        if now - last < self._check_interval:            return self._status.get(service_name, ServiceStatus.HEALTHY)        rand = random.random()        status = ServiceStatus.UNAVAILABLE if rand > 0.9 else ServiceStatus.DEGRADED if rand > 0.7 else ServiceStatus.HEALTHY        self._status[service_name] = status        self._last_check[service_name] = now        return statusprint("=== 降级策略演示 ===")policy = DegradationPolicy()monitor = ServiceHealthMonitor()for service in ["llm", "redis", "search", "langfuse"]:    print(f"服务: {service}")    for status in [ServiceStatus.HEALTHY, ServiceStatus.DEGRADED, ServiceStatus.UNAVAILABLE]:        strategy = policy.get_strategy(service, status)        print(f"  {status.name:12} -> {strategy}")    print()print("=" * 60)print("降级策略说明:")print("  LLM:     full -> light -> cache")print("  Redis:   primary -> fallback -> memory")print("  Search:  vector -> keyword -> skip")print("  Langfuse: full -> essential -> buffer")
+```
+
+## 11. 连接池管理与事件循环隔离
+
+```python
+# 连接池配置模板class ConnectionPoolConfig:    POSTGRES_CONFIG = {        "min_connections": 2, "max_connections": 20,        "connection_timeout": 10, "idle_timeout": 300,        "max_overflow": 5, "pool_recycle": 3600,    }    REDIS_CONFIG = {        "max_connections": 50, "socket_timeout": 5,        "socket_connect_timeout": 5, "health_check_interval": 30,        "retry_on_timeout": True,    }    LLM_CONFIG = {        "max_keepalive_connections": 10, "max_connections": 30,        "keepalive_expiry": 60, "timeout": 60.0,    }class EventLoopManager:    @staticmethod    def run_async_in_sync(coro, timeout=120.0):        import asyncio, concurrent.futures        try:            loop = asyncio.get_running_loop()            with concurrent.futures.ThreadPoolExecutor() as pool:                future = pool.submit(asyncio.run, coro)                return future.result(timeout=timeout)        except RuntimeError:            return asyncio.run(coro)print("=== 连接池配置 ===")print("Postgres:")for k, v in ConnectionPoolConfig.POSTGRES_CONFIG.items():    print(f"  {k}: {v}")print("Redis:")for k, v in ConnectionPoolConfig.REDIS_CONFIG.items():    print(f"  {k}: {v}")print("LLM API:")for k, v in ConnectionPoolConfig.LLM_CONFIG.items():    print(f"  {k}: {v}")print("事件循环隔离原则:")print("  同步上下文: 使用 EventLoopManager.run_async_in_sync()")print("  异步上下文: 直接使用 await")print("  避免: 嵌套 asyncio.run()")
+```
+
+## 12. 生产部署检查清单
+
+```python
+# 生产部署检查清单checklist = [    ("CRITICAL", "Docker 容器化", "多阶段构建，健康检查"),    ("CRITICAL", "API 认证", "JWT 认证，禁止未授权访问"),    ("CRITICAL", "输入校验", "Pydantic 验证所有参数"),    ("CRITICAL", "敏感信息过滤", "日志脱敏"),    ("CRITICAL", "容错降级", "Redis故障->Postgres->Memory"),    ("HIGH", "速率限制", "防止滥用和费用暴涨"),    ("HIGH", "连接池管理", "Postgres/Redis/LLM 连接池"),    ("HIGH", "并发控制", "max_concurrency 和 recursion_limit"),    ("HIGH", "Langfuse 监控", "Trace、Score、Dataset、Tags"),    ("HIGH", "Prompt 版本管理", "YAML + Hub 同步 + production标签"),    ("HIGH", "事件循环隔离", "同步/异步正确使用"),    ("HIGH", "健康检查", "/health 端点"),    ("MEDIUM", "异步任务", "Celery 队列"),    ("MEDIUM", "流式输出", "ProductionStreamWriter"),    ("MEDIUM", "日志规范", "结构化 JSON 日志"),]print("生产部署检查清单")print("=" * 70)level_order = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2}checklist.sort(key=lambda x: level_order[x[0]])current_level = Nonefor level, item, desc in checklist:    if level != current_level:        current_level = level        print(f"【{level}】")    print(f"  [ ] {item}")    print(f"      {desc}")print("Dockerfile 要点:")print("  - python:3.11-slim 基础镜像")print("  - 多阶段构建")print("  - 非 root 用户")print("  - 健康检查 /health")print("  - 环境变量注入")print("环境隔离:")print("  dev     -> project=dev, model=gpt-3.5")print("  staging -> project=staging, model=gpt-4")print("  prod    -> project=prod, model=gpt-4-turbo")
+```
+
+## 13. 常见误区与注意事项| 坑 | 现象 | 解决方案 ||---|---|---|| Langfuse 没配环境变量 | 追踪数据没上报 | 确认 LANGFUSE_ENABLED=true || Prompt 本地和 Hub 不一致 | 生产用了旧版 | 确认同步状态 || 缓存雪崩 | 大量缓存同时过期 | TTL 加随机偏移 || RAG 检索质量差 | 结果不相关 | 持续评估命中率 || 状态太大 | Checkpoint 变慢 | 定期裁剪 State || 忘记区分环境 | Trace 混乱 | Tags 打 env 标签 |### 调试技巧1. Langfuse Trace 排查：找慢请求 -> 瀑布图找瓶颈2. Prompt 版本对比：本地 vs Hub 并排对比3. 缓存效果验证：对比有/无缓存的响应时间4. RAG 效果评估：定期跑评测集
+
+## 14. 阶段小结### 核心要点回顾1. **Langfuse Trace = X 光片**：完整执行链路2. **Langfuse Score = 体检报告**：聚合指标3. **Langfuse Dataset = 病历本**：QA 数据4. **Prompt YAML + Hub = 菜谱管理**：版本管理5. **混合架构 = 速度与安全**：Redis + Postgres6. **生产部署 = 全流程**：Docker、监控、安全### 记忆口诀> **"Trace 看链路，Score 看指标，Dataset 做评估；YAML 管本地，Hub 管云端，同步保一致；Redis 管速度，Postgres 管持久，降级保可用。"****课程的终点是你们项目的起点。去构建吧！**
+
+## 15. 课后练习1. **PromptManager 完整实现**：扩展 Jinja2 模板渲染2. **Langfuse Score 监控面板**：设计完整监控体系3. **Docker 部署实践**：编写 Dockerfile 和 docker-compose.yml4. **降级策略测试**：模拟故障验证降级5. **Trace 分析实战**：在 Langfuse Web (http://192.168.10.189:3000) 分析 Trace---**课程完结！**> **记忆口诀**: "Trace 看链路，Score 看指标，Dataset 做评估；YAML 管本地，Hub 管云端，同步保一致；Redis 管速度，Postgres 管持久，降级保可用。"

@@ -194,3 +194,6 @@ config.json
 *.sqlite
 checkpoints/
 logs/
+
+# Generated article drafts
+turtorial/wechat-articles/

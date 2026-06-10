@@ -72,28 +72,38 @@
 
 ## 快速开始
 
-**方式一：Docker（推荐，一键拉起全部依赖）**
+如果你只是从 LG-00 / LG-01 开始学习，不需要一上来启动 Docker。前两节的目标是先理解“为什么需要图”和 State / Node / Edge 的基本心智模型，本地 Python 环境就够了。
+
+**方式一：轻量本地学习（推荐先用这个）**
 
 ```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -U langgraph langchain langchain-openai jupyter
 cp .env.example .env
-# 编辑 .env 填入 OPENAI_API_KEY
-docker compose up -d
-open http://localhost:8888   # Jupyter Notebook
-open http://localhost:3000   # Langfuse 可观测性界面
+# 编辑 .env，填入 OPENAI_API_KEY / OPENAI_BASE_URL / OPENAI_MODEL
+jupyter notebook
 ```
 
-不需要 Langfuse？用精简版：
+适合：LG-00、LG-01、LG-02，以及大多数不需要数据库的概念练习。
+
+**方式二：只启动课程需要的基础服务**
+
+从 LG-04 记忆、持久化、pgvector 检索开始，再启动精简版 Docker：
 
 ```bash
 docker compose -f docker-compose.minimal.yml up -d
 ```
 
-**方式二：本地 Python**
+它只包含 PostgreSQL + pgvector 和 Redis，用来跑 checkpoint、Store、缓存相关例子。
+
+**方式三：完整生产观测环境**
+
+只有当你学到 Langfuse 和生产监控时，才需要完整环境：
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install langgraph langchain langchain-openai jupyter
+docker compose up -d
+open http://localhost:3000   # Langfuse 可观测性界面
 ```
 
 详细 Docker 配置见 [DOCKER.md](DOCKER.md)。
@@ -102,8 +112,8 @@ pip install langgraph langchain langchain-openai jupyter
 
 ```
 .
-├── docker-compose.yml              # 完整环境：PG + Redis + Langfuse + Jupyter
-├── docker-compose.minimal.yml      # 精简环境：PG + Redis
+├── docker-compose.yml              # 可选完整环境：PG + pgvector + Redis + Langfuse
+├── docker-compose.minimal.yml      # 可选精简环境：PG + pgvector + Redis
 ├── .env.example                    # 环境变量模板
 ├── DOCKER.md                       # Docker 详细文档
 │

@@ -1,7 +1,7 @@
 services:
-  # PostgreSQL: 供 LangGraph Checkpoint + Langfuse 共用
+  # PostgreSQL + pgvector: 供 LangGraph Checkpoint / Store + Langfuse 共用
   postgres:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     container_name: langgraph_postgres
     restart: unless-stopped
     environment:
@@ -178,41 +178,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 5s
-    networks:
-      - langgraph-network
-
-  # Jupyter: 可选，方便在容器内运行 Notebook
-  jupyter:
-    image: jupyter/scipy-notebook:latest
-    container_name: langgraph_jupyter
-    restart: unless-stopped
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    ports:
-      - "8888:8888"
-    environment:
-      - JUPYTER_ENABLE_LAB=yes
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-}
-      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o}
-      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY:-}
-      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY:-}
-      - LANGFUSE_HOST=http://langfuse-web:3000
-      - POSTGRES_HOST=postgres
-      - POSTGRES_PORT=5432
-      - POSTGRES_USER=${POSTGRES_USER:-langgraph}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-langgraph}
-      - POSTGRES_DB=${POSTGRES_DB:-langgraph}
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - REDIS_PASSWORD=${REDIS_PASSWORD:-redis}
-    volumes:
-      - ./turtorial:/home/jovyan/work
-      - ./examples:/home/jovyan/examples
-    command: start-notebook.sh --NotebookApp.token=''
     networks:
       - langgraph-network
 
