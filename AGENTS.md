@@ -364,6 +364,25 @@ Notebook 中使用相对路径引用：
 
 如果当前 Claude Code 会话看不到新配置的 MCP 工具，重启会话或重新加载 MCP 配置后再试。
 
+### 5.5 公众号文章转化与发布 SOP
+
+当用户要求把课程 notebook、讲义或章节内容转成公众号文章、公众号草稿、Wenyan 草稿箱内容时，使用项目 skill：
+
+```text
+.claude/skills/wechat-course-article/SKILL.md
+```
+
+该 skill 固化了本项目的公众号流程：notebook 转 Markdown、课程内容重写、封面图安全区、SVG 转 PNG、`image-this-remote` 生成图、artifact URL 下载、Wenyan MCP 发布、以及草稿目录 gitignore 规则。
+
+关键规则：
+
+- `tutorial.md` 只是素材，不是公众号终稿。
+- 公众号稿必须按“人类直觉 → Graph/Agent 限制 → 机制需求 → API 名”的顺序重写。
+- 正文机制图如果需要文字准确，先做 SVG；正式发布前转 PNG。
+- 公众号封面按微信首图裁切安全区设计：优先 `16:9` 输出，但文字放进中间接近 `2.35:1` 的安全带。
+- Wenyan MCP 可能读不到本机路径，发布副本中的图片优先使用 `image-this` 的远端 artifact URL。
+- `turtorial/wechat-articles/` 是本地公众号草稿区，不进 Git。
+
 ## 6. 重点概念的讲法
 
 这些概念必须配场景、配图和小型可运行例子：
