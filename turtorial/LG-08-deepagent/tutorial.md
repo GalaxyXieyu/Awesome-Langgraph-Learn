@@ -31,6 +31,12 @@ DeepAgents 是 LangChain 官方推出的 Agent Harness，基于 LangGraph 构建
 | **Sub-agent** | 一个人干不完，需要团队协作 |
 | **Skills** | 领域知识太多，不能全塞进 prompt |
 
+<div style="max-width: 1040px; margin: 1rem auto;">
+  <img src="images/deepagent-architecture-cn.svg" alt="DeepAgent 架构全景：在 ReAct 循环上叠规划/文件/子代理/沙箱" style="width: 100%; height: auto; display: block;">
+</div>
+
+> DeepAgent 不是新范式：它把「深度研究」的常见能力（规划、文件工作区、子代理、摘要、沙箱），打包成一摞中间件叠在 LG-06 那条 ReAct 循环上。
+
 ---
 
 ## 2. create_deep_agent：一键创建 Deep Agent
@@ -577,31 +583,31 @@ print("流程: START → plan → skill_check → execute → [循环] → summa
 ```
 
 ```python
-# ==========================================
-# 执行 DeepResearch Agent
-# ==========================================
+# 用 stream 逐步观察这条“深度研究”流程：每个节点做了什么
+print("DeepResearch 执行过程（stream 观察每一步）:\n")
+research_input = {
+    "query": "分析2024年新能源汽车行业格局",
+    "todos": [],
+    "current_step": 0,
+    "workspace_files": [],
+    "subagent_results": [],
+    "loaded_skill": None,
+    "final_report": "",
+}
+final_state = None
+for update in graph.stream(
+    research_input,
+    config={"configurable": {"thread_id": "research_001"}},
+    stream_mode="updates",
+):
+    for node_name, node_update in update.items():
+        keys = [k for k, v in node_update.items() if v]
+        print(f"  ▸ {node_name:<12} 更新: {keys}")
 
-print("=" * 60)
-print("执行 DeepResearch Agent")
-print("=" * 60)
-
-result = graph.invoke(
-    {
-        "query": "分析2024年新能源汽车行业格局",
-        "todos": [],
-        "current_step": 0,
-        "workspace_files": [],
-        "subagent_results": [],
-        "loaded_skill": None,
-        "final_report": "",
-    },
-    config={"configurable": {"thread_id": "research_001"}}
-)
-
-print("\n" + "=" * 60)
-print("最终报告:")
-print("=" * 60)
-print(result["final_report"])
+# 取最终报告
+final_state = graph.get_state({"configurable": {"thread_id": "research_001"}}).values
+print("\n最终报告:\n")
+print(final_state["final_report"])
 ```
 
 ---

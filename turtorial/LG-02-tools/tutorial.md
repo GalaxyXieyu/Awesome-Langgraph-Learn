@@ -687,6 +687,10 @@ print_preview("7. 未裁剪 ToolMessage 预览", naive_tool_message.content)
 
 同样使用 ReAct Agent 调用安全 Tool，并打印 `output`、`messages` 和 `runtime_state` 对比。预期结果是：最终输出只来自摘要；`messages` 里只有裁剪后的 `ToolMessage`；完整 12960 条候选只存在 runtime，不会出现在消息流里。
 
+<div style="max-width: 1040px; margin: 1rem auto;">
+  <img src="images/tool-context-boundary-cn.svg" alt="Tool 返回值的上下文边界：摘要进消息，完整数据走 runtime 旁路" style="width: 100%; height: auto; display: block;">
+</div>
+
 ```python
 class AvailabilityInput(BaseModel):
     room_name: str | None = Field(default=None, description="书房名称，例如 平原轩")
@@ -1276,10 +1280,16 @@ print_kv("已裁剪 runtime 候选条数", len(safe_agent_runtime["availability_
 if LLM_API_KEY:
     llm = build_llm()
     llm_with_tools = llm.bind_tools([query_room_rules, query_availability, history_tool])
-    ai_message = llm_with_tools.invoke("查一下平原轩 2026-05-30 15:00 之后有哪些空位")
-    print("model content:", ai_message.content)
-    print("tool_calls:")
-    pprint(ai_message.tool_calls)
+
+    # 用 stream 收集分片，再用官方 pretty_print 打印完整消息（含 tool_calls）
+    ai_message = None
+    for chunk in llm_with_tools.stream("查一下平原轩 2026-05-30 15:00 之后有哪些空位"):
+        print(chunk.content, end="", flush=True)
+        ai_message = chunk if ai_message is None else ai_message + chunk
+    print()
+
+    # 官方方法：一次性看清角色、content 和 tool_calls
+    ai_message.pretty_print()
 else:
     print("未检测到 OPENAI_API_KEY，跳过 bind_tools 调用。")
 ```

@@ -33,9 +33,39 @@
 
 学完后你应该能不用 API 名解释上面的每一行。
 
+---
+
+## 开始前先对齐 LangGraph 里的几个专属词
+
+在 LangGraph 文档和代码里，记忆相关词会同时出现：`messages`、`checkpoint`、`saver`、`store`。它们不是同一层东西，先把关系说清楚，后面才不会混。
+
+| 人类直觉 | LangGraph 里的词 | 白话解释 | 和谁有关 |
+|---|---|---|---|
+| 聊天记录 | `messages` | 放在 state 里的消息列表，模型通常靠它理解上下文 | 属于 `state` 的一个字段 |
+| 当前窗口现场 | `checkpoint` | 某个时刻整张图 state 的快照；如果 state 里有 `messages`，checkpoint 里也会保存它 | 由 `thread_id` 找回 |
+| 存档本 / 存档后端 | `saver` / `checkpointer` | 负责把 checkpoint 写到哪里、从哪里读回来 | `MemorySaver` / `PostgresSaver` |
+| 用户长期资料 | `store` | 跨窗口的长期资料库，保存偏好、用户事实、知识片段，也可以向量检索 | 由 `namespace + key` 找回 |
+
+包含关系可以这样记：
+
+```text
+messages 是 state 里的一个字段
+checkpoint 是某一次 state 的完整快照
+saver/checkpointer 是保存 checkpoint 的后端
+store 是另一套长期资料库，不等于 checkpoint
+```
+
+所以同一句“记住”，在 Graph 里可能是三件完全不同的事：
+
+- “记住刚才聊了什么” → 把 `messages` 放进 state，再用 `saver` 保存成 checkpoint。
+- “记住这个窗口下次从哪继续” → 用同一个 `thread_id` 读取 checkpoint。
+- “记住这个用户以后都喜欢什么” → 写入 `store`，用 `("用户偏好", user_id)` 这样的 namespace 隔离。
+
+这节课后面所有代码，都围绕这张关系图展开。
+
 ```python
 # 安装依赖（如未安装请取消注释）
-# !pip install -U langgraph langchain langchain-openai langgraph-checkpoint-postgres "psycopg[binary]" pydantic
+# !pip install -U langgraph langchain langchain-openai langgraph-checkpoint-postgres "psycopg[binary]" dashscope redis pydantic
 
 # 本 notebook 直接读取项目根目录 .env：
 # OPENAI_MODEL=deepseek-v4-flash
@@ -193,15 +223,15 @@ print_json("第二轮输出", {
 ```text
 第一轮输出
 {
-  "回复": "你好张伟，很高兴认识你！",
+  "回复": "你好，张伟，欢迎！请问有什么可以帮助您的？",
   "是否知道姓名": "是",
-  "判断依据": "用户当前输入 '我叫张伟' 表明姓名是张伟"
+  "判断依据": "用户当前输入了“我叫张伟”，因此可以得知用户的名字。"
 }
 第二轮输出
 {
-  "回复": "您好，目前没有历史消息记录，我无法确定您的身份。请问您有什么需要帮助的吗？",
+  "回复": "您好！我是HR助教。由于当前工作台没有任何历史记录，我无法识别您的身份。如果您告知姓名，我可以更好地为您服务。",
   "是否知道姓名": "否",
-  "判断依据": "当前工作台历史消息为空，无法获取用户姓名信息。",
+  "判断依据": "当前工作台为空，没有任何上一轮消息，无法从中推断用户姓名。",
   "原因": "第二轮没有拿到第一轮的消息——短期上下文丢失了。"
 }
 ```
@@ -245,9 +275,9 @@ print("但真实聊天里，我们不希望每次都手动搬历史。")
 **输出**
 
 ```text
-{'user_input': '我是谁？', 'messages': [('用户', '我叫张伟'), ('助教', '你好张伟，很高兴认识你！'), ('用户', '我是谁？'), ('助教', '你是张伟，之前你告诉我你叫张伟。')], 'assistant_reply': '你是张伟，之前你告诉我你叫张伟。', 'knows_name': True, 'evidence': '当前工作台中用户说“我叫张伟”，助教回复“你好张伟”，表明已得知用户姓名。'}
+{'user_input': '我是谁？', 'messages': [('用户', '我叫张伟'), ('助教', '你好，张伟！欢迎来到HR助手。请问有什么可以帮您的？'), ('用户', '我是谁？'), ('助教', '您之前介绍过自己，您叫张伟。')], 'assistant_reply': '您之前介绍过自己，您叫张伟。', 'knows_name': True, 'evidence': '历史消息中用户说“我叫张伟”，助教回复“你好，张伟！”'}
 当前工作台里的消息数: 4
-第二轮回复: 你是张伟，之前你告诉我你叫张伟。
+第二轮回复: 您之前介绍过自己，您叫张伟。
 第二轮是否知道姓名: 是
 
 这次图能回答，因为我们手动把第一轮的消息搬进了 state。
@@ -273,6 +303,9 @@ Graph 需要两个东西才能做到类似效果：
 
 ```python
 # 给同一个聊天窗口加上自动存档。
+from email import message
+
+
 checkpointer = MemorySaver()
 persisted_graph = temporary_graph_builder.compile(checkpointer=checkpointer)
 
@@ -292,6 +325,7 @@ window_a_second = persisted_graph.invoke(
 
 print("同一个窗口第二轮回复:", window_a_second["assistant_reply"])
 print("同一个窗口消息数:", len(window_a_second["messages"]))
+print("窗口内容:", window_a_second["messages"])
 print("同一个窗口是否记得姓名:", "是" if window_a_second["knows_name"] else "否")
 print("")
 print("这里发生的事：")
@@ -302,8 +336,9 @@ print("  第二次运行开始 → 图先找回'窗口A'的现场，再处理新
 **输出**
 
 ```text
-同一个窗口第二轮回复: 您好，您之前告诉过我您叫张伟。
+同一个窗口第二轮回复: 您之前告诉我您叫张伟，所以您就是张伟呀！
 同一个窗口消息数: 4
+窗口内容: [['用户', '我叫张伟'], ['助教', '你好张伟，我是HR助教，很高兴认识你！请问有什么可以帮助你的？'], ('用户', '我是谁？'), ('助教', '您之前告诉我您叫张伟，所以您就是张伟呀！')]
 同一个窗口是否记得姓名: 是
 
 这里发生的事：
@@ -426,6 +461,17 @@ print("Checkpoint 跟着 thread_id 走 —— 新窗口不共享。")
 print("Store 跟着 user_id 走 —— 同一个用户，所有窗口都能读到。")
 ```
 
+**输出**
+
+```text
+新窗口是否记得聊天姓名（Checkpoint）: 否 — 短期记忆不跨窗口
+新窗口是否读到回答风格（Store）: 是
+长期记忆内容: 用户偏好：以后请用表格回答，语气要简洁。
+
+Checkpoint 跟着 thread_id 走 —— 新窗口不共享。
+Store 跟着 user_id 走 —— 同一个用户，所有窗口都能读到。
+```
+
 ### 5.1 “自动加记忆”到底自动在哪里？
 
 Store 的 `put()` 仍然是一次明确写入。所谓“自动加”，通常不是 Store 自动做，而是系统在某个生命周期点帮你调用写入逻辑。
@@ -514,6 +560,29 @@ print_json("会话结束 hook 写入的长期记忆", saved_memories)
 print("写入位置:", long_term_memory_namespace(user_id))
 ```
 
+**输出**
+
+```text
+会话结束 hook 写入的长期记忆
+[
+  {
+    "key": "user_name_role",
+    "memory": "用户叫张伟，是HR负责人",
+    "kind": "profile",
+    "source": "会话结束自动总结:窗口D",
+    "reason": "用户身份是跨会话稳定的个人信息，有助于个性化回复"
+  },
+  {
+    "key": "explanation_preference",
+    "memory": "解释技术概念时先给业务场景，再给API名",
+    "kind": "preference",
+    "source": "会话结束自动总结:窗口D",
+    "reason": "用户明确表达的长期沟通偏好，适用于所有技术解释"
+  }
+]
+写入位置: ('长期记忆', '用户-张伟')
+```
+
 ### 5.2 让 ReAct Agent 在回答前读 Store
 
 现在 Store 里已经有用户长期记忆。下一步不是让模型“凭感觉记得”，而是给 Agent 一个工具：回答前先查用户笔记本。
@@ -523,8 +592,12 @@ print("写入位置:", long_term_memory_namespace(user_id))
 > Agent 不直接拥有长期记忆，它通过工具把 Store 里的记忆取出来，再基于这些记忆回答。
 
 ```python
+import warnings
+
 from langchain_core.tools import tool
 from langgraph.prebuilt import create_react_agent
+
+warnings.filterwarnings("ignore", message="create_react_agent has been moved*")
 
 
 def format_store_items(store_items) -> str:
@@ -551,6 +624,52 @@ def read_zhangwei_memories() -> str:
     ])
 
 
+agent_archive_observation = {}
+
+
+def message_to_course_pair(message) -> tuple[str, str] | None:
+    message_type = getattr(message, "type", "")
+    content = str(getattr(message, "content", "")).strip()
+    if not content:
+        return None
+    if message_type == "human":
+        return ("用户", content)
+    if message_type == "ai":
+        return ("助教", content)
+    return None
+
+
+# Agent 结束一轮回答后，自动抽取长期记忆并写入 Store。
+def archive_react_session_memories(state: dict) -> dict:
+    messages = state.get("messages", [])
+    if not messages:
+        return {}
+
+    last_message = messages[-1]
+    if getattr(last_message, "type", "") != "ai" or getattr(last_message, "tool_calls", None):
+        return {}
+
+    course_messages = []
+    for message in messages:
+        pair = message_to_course_pair(message)
+        if pair:
+            course_messages.append(pair)
+
+    archived_memories = archive_session_memories(
+        user_id=user_id,
+        thread_id="窗口D-ReAct",
+        messages=course_messages,
+    )
+    agent_archive_observation.update({
+        "触发位置": "create_react_agent.post_model_hook",
+        "读取消息数": len(course_messages),
+        "写入namespace": long_term_memory_namespace(user_id),
+        "写入条数": len(archived_memories),
+        "写入记忆": archived_memories,
+    })
+    return {}
+
+
 memory_agent_system_prompt = """
 你是 LangGraph 课程助教。
 回答用户问题前，必须先调用 read_zhangwei_memories 工具读取用户长期记忆。
@@ -561,24 +680,68 @@ memory_agent = create_react_agent(
     chat_model,
     tools=[read_zhangwei_memories],
     prompt=memory_agent_system_prompt,
+    post_model_hook=archive_react_session_memories,
 )
 
-agent_result = memory_agent.invoke({
-    "messages": [("user", "下次给我解释 Store 时，应该用什么方式回答更合适？")]
-})
+# 用 stream + 官方 pretty_print 观察 Agent 一轮完整消息流
+# （能看到它先调用 read_zhangwei_memories 读记忆，再据此回答）
+print("Agent 一轮消息流（stream + 官方 pretty_print）:\n")
+seen = 0
+for step in memory_agent.stream(
+    {"messages": [
+        ("user", "下次给我解释 Store 时，应该用什么方式回答更合适？"),
+        ("user", "另外请记住：以后例子尽量贴近 HR 工作。"),
+    ]},
+    stream_mode="values",
+):
+    for message in step["messages"][seen:]:
+        message.pretty_print()
+    seen = len(step["messages"])
 
-tool_messages = [
-    message for message in agent_result["messages"]
-    if getattr(message, "type", "") == "tool"
-]
+print_json("\nReAct post_model_hook 自动沉淀证据", agent_archive_observation)
+```
 
-print("是否调用长期记忆工具:", "是" if tool_messages else "否")
-if tool_messages:
-    print("工具读到的记忆:")
-    print(tool_messages[-1].content)
-print("")
-print("Agent 最终回答:")
-print(agent_result["messages"][-1].content)
+**输出**
+
+```text
+是否调用长期记忆工具: 是
+工具读到的记忆:
+用户偏好：
+- 回答风格: 用户偏好：以后请用表格回答，语气要简洁。（来源：用户显式要求）
+
+长期记忆：
+- user_name_role: 用户叫张伟，是HR负责人（来源：会话结束自动总结:窗口D）
+- explanation_preference: 解释技术概念时先给业务场景，再给API名（来源：会话结束自动总结:窗口D）
+
+Agent 最终回答:
+已读取你的记忆偏好。以下回答：
+
+| 项目 | 说明 |
+|------|------|
+| **解释方式** | 先用你熟悉的 **HR 业务场景**做引子，再给出对应的 API 名称 |
+| **示例风格** | 所有例子贴近 HR 工作（招聘、考勤、绩效、薪酬等） |
+| **呈现形式** | 表格为主，语气简洁 |
+
+已记住你的要求：**以后例子尽量贴近 HR 工作** ✅ 下次解释 Store 或其他概念时，我会按上述方式回答。
+ReAct post_model_hook 自动沉淀证据
+{
+  "触发位置": "create_react_agent.post_model_hook",
+  "读取消息数": 3,
+  "写入namespace": [
+    "长期记忆",
+    "用户-张伟"
+  ],
+  "写入条数": 1,
+  "写入记忆": [
+    {
+      "key": "prefer_hr_examples",
+      "memory": "偏好使用HR工作场景的示例来理解概念",
+      "kind": "preference",
+      "source": "会话结束自动总结:窗口D-ReAct",
+      "reason": "用户明确要求所有例子贴近HR工作，是持续偏好"
+    }
+  ]
+}
 ```
 
 ### 5.3 Store 能不能用向量检索？
@@ -697,6 +860,14 @@ except Exception as error:
     print("如果你之前已经用 postgres:16-alpine 创建过容器，需要删除旧容器并重新创建。")
 ```
 
+**输出**
+
+```text
+尝试拼接 POSTGRES_URL: postgresql://langgraph:***@localhost:5432/langgraph
+Postgres 连接成功。
+pgvector 扩展版本: 0.8.2
+```
+
 ```python
 # 即使没有 Postgres，也先展示 PostgresSaver / PostgresStore 的切换位置。
 # 有 Postgres 时，这一段会真实导入后续示例需要的类。
@@ -717,6 +888,18 @@ else:
     print("以下展示代码结构；启动带 pgvector 的 Postgres 后可以真实运行。")
 ```
 
+**输出**
+
+```text
+langgraph-checkpoint-postgres 可用。
+
+切换 checkpointer 只需要一行代码的变化：
+  课堂: builder.compile(checkpointer=MemorySaver())
+  生产: builder.compile(checkpointer=PostgresSaver(conn))
+
+长期记忆也可以换成 PostgresStore，并继续使用 namespace 隔离。
+```
+
 ```python
 # 用 PostgresSaver 编译同一张图，跑相同的逻辑。
 if postgres_available:
@@ -730,6 +913,12 @@ else:
     pg_graph = None
     print("跳过: Postgres 不可用。")
     print("以下代码逻辑不变，可以阅读理解。")
+```
+
+**输出**
+
+```text
+已编译使用 PostgresSaver 的图。
 ```
 
 ```python
@@ -754,6 +943,18 @@ if postgres_available:
     print("行为与 MemorySaver 一致。")
 else:
     print("跳过: Postgres 不可用。")
+```
+
+**输出**
+
+```text
+PostgresSaver 第一轮: 您已经告诉我很多次您叫张伟了，我一直知道您的名字。请问还需要什么帮助吗？
+```
+
+```text
+PostgresSaver 第二轮: 您之前多次告诉我您叫张伟，所以我知道您是张伟。请问有什么需要帮助的吗？
+同一窗口是否记得姓名: 是
+行为与 MemorySaver 一致。
 ```
 
 ```python
@@ -781,6 +982,21 @@ else:
     print("跳过: Postgres 不可用。")
 ```
 
+**输出**
+
+```text
+当前窗口已有两轮对话，checkpoint 已持久化到数据库。
+```
+
+```text
+进程重启后，同一 thread_id 的第三轮回复:
+根据当前会话，您多次告诉我您叫张伟，所以我总结出：您的名字是张伟。
+同一 thread_id 是否仍记得姓名: 是
+消息数: 36
+
+结论: 进程重启后，PostgresSaver 仍能从数据库恢复现场。
+```
+
 ```python
 # 证据3（对比证据）：MemorySaver 进程重启后无法恢复。
 # 创建一个新的 MemorySaver 实例（模拟进程重启）。
@@ -798,6 +1014,16 @@ print("")
 if postgres_available:
     print("对比：PostgresSaver 在同一 thread_id 下恢复了所有记忆。")
     print("这就是持久化的意义——记忆不跟着进程生命周期走。")
+```
+
+**输出**
+
+```text
+MemorySaver 新实例是否记得姓名: 否
+原因: 新的 MemorySaver 实例内存为空，没有之前的存档。
+
+对比：PostgresSaver 在同一 thread_id 下恢复了所有记忆。
+这就是持久化的意义——记忆不跟着进程生命周期走。
 ```
 
 ### 6.3 在数据库里看见 checkpoint
@@ -846,6 +1072,38 @@ else:
     print("跳过: Postgres 不可用。")
 ```
 
+**输出**
+
+```text
+数据库里的 checkpoint 证据
+{
+  "checkpoint相关表": [
+    "checkpoint_blobs",
+    "checkpoint_migrations",
+    "checkpoint_writes",
+    "checkpoints"
+  ],
+  "Postgres窗口A的checkpoint数量": 54,
+  "最近checkpoint": [
+    {
+      "thread_id": "Postgres窗口A",
+      "checkpoint_ns": "",
+      "checkpoint_id": "1f164e87-b1d9-6140-8034-b5e4f60c6037"
+    },
+    {
+      "thread_id": "Postgres窗口A",
+      "checkpoint_ns": "",
+      "checkpoint_id": "1f164e87-9e1d-60e8-8033-841f6dade891"
+    },
+    {
+      "thread_id": "Postgres窗口A",
+      "checkpoint_ns": "",
+      "checkpoint_id": "1f164e87-9e1a-64d8-8032-628a636b7769"
+    }
+  ]
+}
+```
+
 ### 6.4 用 PostgresStore 看见 namespace 和 pgvector 检索
 
 Checkpoint 证明“同一个窗口的现场”进了数据库。长期记忆还要证明三件事：
@@ -876,14 +1134,30 @@ def display_search_results(items) -> list[dict]:
 
 if postgres_available and pgvector_available:
     try:
-        from langchain_openai import OpenAIEmbeddings
+        from dashscope import TextEmbedding
+        from langchain_core.embeddings import Embeddings
 
-        memory_embeddings = OpenAIEmbeddings(
-            model=OPENAI_EMBEDDING_MODEL,
-            base_url=OPENAI_BASE_URL,
-            api_key=OPENAI_API_KEY,
-            dimensions=OPENAI_EMBEDDING_DIMS,
-        )
+        class DashScopeTextEmbeddings(Embeddings):
+            def embed_documents(self, texts: list[str]) -> list[list[float]]:
+                response = TextEmbedding.call(
+                    model=OPENAI_EMBEDDING_MODEL,
+                    input=list(texts),
+                    dimension=OPENAI_EMBEDDING_DIMS,
+                    api_key=OPENAI_API_KEY,
+                )
+                if response.status_code != 200:
+                    raise RuntimeError(f"DashScope embedding 失败: {response.code} {response.message}")
+                embeddings = sorted(
+                    response.output["embeddings"],
+                    key=lambda item: item.get("text_index", 0),
+                )
+                return [item["embedding"] for item in embeddings]
+
+            def embed_query(self, text: str) -> list[float]:
+                return self.embed_documents([text])[0]
+
+        memory_embeddings = DashScopeTextEmbeddings()
+        probe_vector = memory_embeddings.embed_query("解释技术概念时先讲业务场景")
 
         store_index_config = {
             "embed": memory_embeddings,
@@ -965,6 +1239,7 @@ if postgres_available and pgvector_available:
         print_json("PostgresStore + pgvector 证据", {
             "embedding模型": OPENAI_EMBEDDING_MODEL,
             "embedding维度": OPENAI_EMBEDDING_DIMS,
+            "实际向量维度": len(probe_vector),
             "写入namespace": {
                 "张伟偏好": zhangwei_preference_ns,
                 "张伟长期记忆": zhangwei_memory_ns,
@@ -981,70 +1256,699 @@ if postgres_available and pgvector_available:
         })
     except Exception as error:
         print("PostgresStore + pgvector 示例运行失败:", error)
-        print("请检查: langgraph-checkpoint-postgres、langchain-openai、OPENAI_EMBEDDING_MODEL、OPENAI_EMBEDDING_DIMS。")
+        print("请检查: langgraph-checkpoint-postgres、dashscope、OPENAI_EMBEDDING_MODEL、OPENAI_EMBEDDING_DIMS。")
 else:
     print("跳过: 需要可用的 Postgres + pgvector。")
-```
-
----
-
-## 7. 长历史需要整理：不是越多越好
-
-前面解决了"记忆存在哪、怎么找回"。还有一个现实问题：如果短期记忆太多了怎么办？
-
-人类不会逐字记住一整天的对话，而是记住要点。Graph 也一样。消息越来越多时，模型输入会越来越长，成本越来越高，也更容易忽略关键信息。
-
-最好把早期内容压成摘要，只保留最近几轮原文。
-
-```python
-# 长历史通常先压成摘要，再保留最近几轮原文。
-def summarize_long_history(messages: list[tuple[str, str]], keep_recent: int = 4) -> list[tuple[str, str]]:
-    if len(messages) <= keep_recent:
-        return messages
-
-    earlier_messages = messages[:-keep_recent]
-    recent_messages = messages[-keep_recent:]
-    summary = f"历史摘要：前面共有 {len(earlier_messages)} 条消息，用户姓名和长期偏好如果出现，需要继续保留。"
-    return [("系统", summary), *recent_messages]
-
-
-long_history = [
-    ("用户", "我叫张伟"),
-    ("助教", "记住了张伟。"),
-    ("用户", "以后请用表格回答"),
-    ("助教", "好的，我会用表格。"),
-    ("用户", "先解释 state"),
-    ("助教", "state 是工作台。"),
-    ("用户", "再解释 checkpoint"),
-    ("助教", "checkpoint 是窗口存档。"),
-    ("用户", "最后解释 store"),
-    ("助教", "store 是用户笔记本。"),
-]
-
-summarized = summarize_long_history(long_history, keep_recent=4)
-
-print("整理前消息数:", len(long_history))
-print("整理后消息数:", len(summarized))
-print("是否生成历史摘要:", "是" if summarized[0][0] == "系统" else "否")
-print("是否保留最近问题:", "是" if "最后解释 store" in summarized[-2][1] else "否")
-print("摘要内容:", summarized[0][1])
 ```
 
 **输出**
 
 ```text
-整理前消息数: 10
-整理后消息数: 5
-是否生成历史摘要: 是
-是否保留最近问题: 是
-摘要内容: 历史摘要：前面共有 6 条消息，用户姓名和长期偏好如果出现，需要继续保留。
+PostgresStore + pgvector 证据
+{
+  "embedding模型": "text-embedding-v3",
+  "embedding维度": 1024,
+  "实际向量维度": 1024,
+  "写入namespace": {
+    "张伟偏好": [
+      "用户偏好",
+      "用户-张伟"
+    ],
+    "张伟长期记忆": [
+      "长期记忆",
+      "用户-张伟"
+    ],
+    "李雷长期记忆": [
+      "长期记忆",
+      "用户-李雷"
+    ]
+  },
+  "按key精确读取": "用户偏好：以后请用表格回答，语气要简洁。",
+  "张伟namespace语义检索": [
+    {
+      "key": "技术解释顺序",
+      "相似度": 0.853,
+      "memory": "用户学习偏好：解释技术概念时，先给业务场景，再解释机制，最后再给 API 名。",
+      "kind": "preference"
+    },
+    {
+      "key": "用户角色",
+      "相似度": 0.407,
+      "memory": "用户长期事实：张伟是 HR 负责人，关注员工政策和招聘流程。",
+      "kind": "profile"
+    },
+    {
+      "key": "用户身份",
+      "相似度": 0.398,
+      "memory": "用户长期事实：张伟是 HR 负责人。",
+      "kind": "profile"
+    }
+  ],
+  "李雷namespace对照检索": [
+    {
+      "key": "回答风格",
+      "相似度": 0.56,
+      "memory": "用户偏好：李雷喜欢项目计划式回答，先列里程碑。",
+      "kind": "preference"
+    }
+  ],
+  "store相关表": [
+    "store",
+    "store_migrations",
+    "store_vectors"
+  ],
+  "vector列": [
+    {
+      "table": "store_vectors",
+      "column": "embedding",
+      "type": "vector"
+    }
+  ]
+}
 ```
 
-这里的关键心智模型：
+---
 
-> 长期运行的图不能把所有原文无限塞进上下文。早期历史要整理成更短、更稳定的记忆，但关键事实（姓名、偏好）不能丢。
+## 7. 长历史需要整理：三种实现位置
 
-生产环境中可以用 `trim_messages`、summary node、`pre_model_hook` 等更完善的工具，但它们解决的是同一个问题。
+前面解决了“记忆存在哪、怎么找回”。还有一个现实问题：如果短期上下文太长了怎么办？
+
+人类不会逐字记住一整天的对话，而是把早期内容整理成要点，只保留最近几轮原文。Graph 也一样：消息越来越多时，模型输入会变长、成本变高，也更容易忽略关键信息。
+
+上下文压缩不是只有一种写法，常见有三种位置：
+
+| 实现位置 | 适合什么 | 优点 | 限制 |
+|---|---|---|---|
+| 自定义 reducer | 每次追加消息时顺手裁剪 | 简单、自动、便宜 | 不适合复杂语义总结 |
+| ReAct Agent `pre_model_hook` | 只在模型调用前压缩输入 | 不改原始状态，适合预构建 Agent | 要理解 hook 改的是模型输入 |
+| 独立 summary node | 在图里显式检查上下文长度 | 最清楚、可审计、可接 LLM 总结 | 多一个节点和边 |
+
+先分别看三个最小证据，再做一个 PG + Redis 的综合案例。
+
+```python
+# 方案一：自定义 reducer。每次追加消息时，自动保留摘要 + 最近几轮。
+def add_messages_with_window(existing: list[tuple[str, str]], new: list[tuple[str, str]]) -> list[tuple[str, str]]:
+    combined = [*(existing or []), *(new or [])]
+    keep_recent = 4
+    if len(combined) <= keep_recent + 1:
+        return combined
+
+    earlier_messages = combined[:-keep_recent]
+    recent_messages = combined[-keep_recent:]
+    summary = f"历史摘要：前面 {len(earlier_messages)} 条消息已压缩；关键事实和长期偏好要继续保留。"
+    return [("系统", summary), *recent_messages]
+
+
+class ReducerCompressionState(TypedDict):
+    user_input: str
+    messages: Annotated[list[tuple[str, str]], add_messages_with_window]
+
+
+def append_reducer_demo_reply(state: ReducerCompressionState) -> dict:
+    return {
+        "messages": [
+            ("用户", state["user_input"]),
+            ("助教", f"已处理：{state['user_input']}"),
+        ]
+    }
+
+
+reducer_compression_builder = StateGraph(ReducerCompressionState)
+reducer_compression_builder.add_node("append_reply", append_reducer_demo_reply)
+reducer_compression_builder.add_edge(START, "append_reply")
+reducer_compression_builder.add_edge("append_reply", END)
+reducer_compression_graph = reducer_compression_builder.compile()
+
+reducer_state = {"user_input": "", "messages": []}
+for user_input in [
+    "我叫张伟",
+    "以后请用表格回答",
+    "先解释 state",
+    "再解释 checkpoint",
+    "最后解释 store",
+]:
+    reducer_state = reducer_compression_graph.invoke({
+        "user_input": user_input,
+        "messages": reducer_state["messages"],
+    })
+
+print_json("自定义 reducer 压缩证据", {
+    "最终消息数": len(reducer_state["messages"]),
+    "第一条是否摘要": reducer_state["messages"][0][0] == "系统",
+    "保留的消息": reducer_state["messages"],
+})
+```
+
+**输出**
+
+```text
+自定义 reducer 压缩证据
+{
+  "最终消息数": 5,
+  "第一条是否摘要": true,
+  "保留的消息": [
+    [
+      "系统",
+      "历史摘要：前面 3 条消息已压缩；关键事实和长期偏好要继续保留。"
+    ],
+    [
+      "用户",
+      "再解释 checkpoint"
+    ],
+    [
+      "助教",
+      "已处理：再解释 checkpoint"
+    ],
+    [
+      "用户",
+      "最后解释 store"
+    ],
+    [
+      "助教",
+      "已处理：最后解释 store"
+    ]
+  ]
+}
+```
+
+Reducer 的关键点：压缩发生在“写入 state 的时候”。它适合简单规则，比如只保留最近几轮、把早期内容折成一条系统摘要。
+
+如果你想保留完整 checkpoint，但只在模型调用前压缩输入，就不要改 reducer，改 ReAct Agent 的 `pre_model_hook`。
+
+```python
+# 方案二：ReAct Agent 的 pre_model_hook。
+# 原始 state 保持完整；只压缩送进模型的 llm_input_messages。
+from langchain_core.messages import SystemMessage
+
+react_hook_observation = {}
+
+
+def compact_before_react_model(state: dict) -> dict:
+    messages = state["messages"]
+    keep_recent = 4
+    if len(messages) <= keep_recent + 1:
+        react_hook_observation.update({
+            "原始消息数": len(messages),
+            "送入模型消息数": len(messages),
+            "是否压缩": False,
+        })
+        return {}
+
+    earlier_messages = messages[:-keep_recent]
+    recent_messages = messages[-keep_recent:]
+    summary_message = SystemMessage(
+        content=f"历史摘要：前面 {len(earlier_messages)} 条消息围绕 state、checkpoint、store 展开；用户偏好是先讲业务场景，再讲 API。"
+    )
+    compacted_messages = [summary_message, *recent_messages]
+    react_hook_observation.update({
+        "原始消息数": len(messages),
+        "送入模型消息数": len(compacted_messages),
+        "是否压缩": True,
+        "摘要内容": summary_message.content,
+    })
+    return {"llm_input_messages": compacted_messages}
+
+
+hooked_memory_agent = create_react_agent(
+    chat_model,
+    tools=[],
+    prompt="你是 LangGraph 课程助教。回答要简洁，先讲人能理解的场景，再贴 API 名。",
+    pre_model_hook=compact_before_react_model,
+)
+
+long_react_messages = [
+    ("user", "我叫张伟"),
+    ("assistant", "记住了张伟。"),
+    ("user", "以后请用表格回答"),
+    ("assistant", "好的。"),
+    ("user", "先解释 state"),
+    ("assistant", "state 是图的共享工作台。"),
+    ("user", "再解释 checkpoint"),
+    ("assistant", "checkpoint 是同一窗口的自动存档。"),
+    ("user", "请一句话解释 store 和 checkpoint 的区别。"),
+]
+
+hooked_agent_result = hooked_memory_agent.invoke({"messages": long_react_messages})
+
+print_json("ReAct pre_model_hook 压缩证据", react_hook_observation)
+print("Agent 回复:", hooked_agent_result["messages"][-1].content)
+```
+
+**输出**
+
+```text
+ReAct pre_model_hook 压缩证据
+{
+  "原始消息数": 9,
+  "送入模型消息数": 5,
+  "是否压缩": true,
+  "摘要内容": "历史摘要：前面 5 条消息围绕 state、checkpoint、store 展开；用户偏好是先讲业务场景，再讲 API。"
+}
+Agent 回复: **Store** 是跨对话的持久化数据库（如：用户画像、知识库），**Checkpoint** 是单次对话的断点存档（如：恢复上次运行）。
+
+API：`Store.put()`、`Checkpoint.put()`。
+```
+
+`pre_model_hook` 的关键点：它压缩的是“送进模型的输入”，不一定改写 checkpoint 里的完整消息。
+
+如果你希望压缩本身成为图里可见、可审计、可测试的一步，就把它做成一个独立节点。
+
+```python
+# 方案三：独立 summary node。节点检查上下文长度，必要时调用 LLM 生成摘要。
+summary_node_system_prompt = """
+你是上下文整理器。请把早期聊天压缩成给后续 Agent 使用的短摘要。
+
+要求：
+- 保留用户姓名、长期偏好、已经解释过的概念。
+- 不要逐字复述。
+- 返回严格 JSON，不要输出 JSON 外的内容。
+字段：summary
+""".strip()
+
+summary_node_user_prompt_template = """
+需要整理的早期聊天：
+{history_text}
+
+JSON 格式：
+{{
+  "summary": "..."
+}}
+""".strip()
+
+summary_node_prompt = ChatPromptTemplate.from_messages([
+    ("system", summary_node_system_prompt),
+    ("human", summary_node_user_prompt_template),
+])
+
+
+class SummaryNodeState(TypedDict):
+    messages: list[tuple[str, str]]
+    context_summary: str
+    compressed: bool
+
+
+def summarize_context_node(state: SummaryNodeState) -> dict:
+    keep_recent = 4
+    if len(state["messages"]) <= keep_recent + 1:
+        return {"context_summary": "（消息不多，暂不需要摘要）", "compressed": False}
+
+    earlier_messages = state["messages"][:-keep_recent]
+    recent_messages = state["messages"][-keep_recent:]
+    prompt_messages = summary_node_prompt.invoke({
+        "history_text": format_history_for_prompt(earlier_messages),
+    })
+    result = parse_json_message(chat_model.invoke(prompt_messages))
+    summary = result["summary"]
+    return {
+        "context_summary": summary,
+        "messages": [("系统", f"历史摘要：{summary}"), *recent_messages],
+        "compressed": True,
+    }
+
+
+summary_node_builder = StateGraph(SummaryNodeState)
+summary_node_builder.add_node("summarize_context", summarize_context_node)
+summary_node_builder.add_edge(START, "summarize_context")
+summary_node_builder.add_edge("summarize_context", END)
+summary_node_graph = summary_node_builder.compile()
+
+summary_node_input = {
+    "messages": [
+        ("用户", "我叫张伟"),
+        ("助教", "记住了张伟。"),
+        ("用户", "以后请用表格回答"),
+        ("助教", "好的，我会用表格。"),
+        ("用户", "先解释 state"),
+        ("助教", "state 是共享工作台。"),
+        ("用户", "再解释 checkpoint"),
+        ("助教", "checkpoint 是窗口存档。"),
+        ("用户", "最后解释 store"),
+        ("助教", "store 是用户笔记本。"),
+    ],
+    "context_summary": "",
+    "compressed": False,
+}
+
+summary_node_result = summary_node_graph.invoke(summary_node_input)
+
+print_json("Summary node 压缩证据", {
+    "是否压缩": summary_node_result["compressed"],
+    "整理前消息数": len(summary_node_input["messages"]),
+    "整理后消息数": len(summary_node_result["messages"]),
+    "摘要": summary_node_result["context_summary"],
+    "最近消息是否保留": "最后解释 store" in summary_node_result["messages"][-2][1],
+})
+```
+
+**输出**
+
+```text
+Summary node 压缩证据
+{
+  "是否压缩": true,
+  "整理前消息数": 10,
+  "整理后消息数": 5,
+  "摘要": "用户张伟偏好表格形式回答，已解释 state 为共享工作台。",
+  "最近消息是否保留": true
+}
+```
+
+### 7.4 综合案例：PG + Redis 把所有记忆层串起来
+
+最后做一个更像真实产品的小案例：HR 助教 `MemoryPal`。
+
+它同时用到五类记忆：
+
+| 记忆类型 | 载体 | 在案例里的作用 |
+|---|---|---|
+| State | 当前图状态 | 保存本轮输入、检索结果、回复草稿 |
+| Checkpoint | PostgresSaver | 同一个 `thread_id` 可以继续对话 |
+| Store | PostgresStore + namespace | 按 `user_id` 保存用户偏好和长期事实 |
+| Summary | summary node | 长上下文先压缩，再给模型 |
+| Cache | Redis | 缓存政策查询结果，第二次不重复查 |
+
+学生要观察的不是“代码很多”，而是这几个记忆层各自解决不同生命周期的问题。
+
+```python
+from redis import Redis
+
+
+class MemoryPalState(TypedDict):
+    user_input: str
+    messages: Annotated[list[tuple[str, str]], add]
+    retrieved_memories: list[dict]
+    policy_context: str
+    cache_status: str
+    context_summary: str
+    assistant_reply: str
+
+
+memorypal_user_id = "用户-张伟"
+memorypal_thread_id = "MemoryPal窗口A"
+memorypal_policy_key = "memorypal:policy:annual_leave"
+
+
+def seed_memorypal_store() -> dict:
+    memorypal_store_index = {
+        "embed": DashScopeTextEmbeddings(),
+        "dims": OPENAI_EMBEDDING_DIMS,
+        "fields": ["memory"],
+    }
+    with PostgresStore.from_conn_string(POSTGRES_URL, index=memorypal_store_index) as memorypal_store:
+        memorypal_store.setup()
+        memorypal_store.put(
+            preference_namespace(memorypal_user_id),
+            key="回答风格",
+            value={
+                "memory": "用户偏好：用表格回答，语气简洁，例子尽量贴近 HR 工作。",
+                "kind": "preference",
+                "source": "MemoryPal 初始化",
+            },
+        )
+        memorypal_store.put(
+            long_term_memory_namespace(memorypal_user_id),
+            key="用户角色",
+            value={
+                "memory": "用户长期事实：张伟是 HR 负责人，关注员工政策和招聘流程。",
+                "kind": "profile",
+                "source": "MemoryPal 初始化",
+            },
+        )
+    return memorypal_store_index
+
+
+def retrieve_memorypal_memories(state: MemoryPalState) -> dict:
+    with PostgresStore.from_conn_string(POSTGRES_URL, index=memorypal_store_index) as memorypal_store:
+        preference_items = memorypal_store.search(preference_namespace(memorypal_user_id), limit=3)
+        semantic_items = memorypal_store.search(
+            long_term_memory_namespace(memorypal_user_id),
+            query=state["user_input"],
+            limit=3,
+        )
+    return {
+        "retrieved_memories": display_search_results([*preference_items, *semantic_items])
+    }
+
+
+def load_policy_from_redis(state: MemoryPalState) -> dict:
+    cached_policy = redis_client.get(memorypal_policy_key)
+    if cached_policy:
+        return {"policy_context": cached_policy, "cache_status": "Redis 命中"}
+
+    policy_context = "公司年假政策：入职满 1 年享 5 天年假；满 5 年享 10 天；满 10 年享 15 天。"
+    redis_client.setex(memorypal_policy_key, 3600, policy_context)
+    return {"policy_context": policy_context, "cache_status": "Redis 未命中，已写入缓存"}
+
+
+def summarize_memorypal_context(state: MemoryPalState) -> dict:
+    keep_recent = 4
+    messages = state.get("messages", [])
+    if len(messages) <= keep_recent + 1:
+        return {"context_summary": "（当前上下文较短，不需要压缩）"}
+
+    earlier_messages = messages[:-keep_recent]
+    prompt_messages = summary_node_prompt.invoke({
+        "history_text": format_history_for_prompt(earlier_messages),
+    })
+    result = parse_json_message(chat_model.invoke(prompt_messages))
+    return {"context_summary": result["summary"]}
+
+
+memorypal_reply_system_prompt = """
+你是 HR 助教 MemoryPal。请根据用户长期偏好、公司政策、当前摘要回答。
+
+要求：
+- 如果用户偏好要求表格，就用表格。
+- 先给业务解释，再给技术/机制解释。
+- 返回严格 JSON，不要输出 JSON 外的内容。
+字段：assistant_reply
+""".strip()
+
+memorypal_reply_user_prompt_template = """
+用户问题：{user_input}
+
+长期记忆：
+{memories_text}
+
+Redis 缓存/政策上下文：
+{policy_context}
+
+当前会话摘要：
+{context_summary}
+
+JSON 格式：
+{{
+  "assistant_reply": "..."
+}}
+""".strip()
+
+memorypal_reply_prompt = ChatPromptTemplate.from_messages([
+    ("system", memorypal_reply_system_prompt),
+    ("human", memorypal_reply_user_prompt_template),
+])
+
+
+def generate_memorypal_reply(state: MemoryPalState) -> dict:
+    memories_text = "\n".join(
+        f"- {item['key']}: {item['memory']}"
+        for item in state.get("retrieved_memories", [])
+    ) or "（没有检索到长期记忆）"
+    prompt_messages = memorypal_reply_prompt.invoke({
+        "user_input": state["user_input"],
+        "memories_text": memories_text,
+        "policy_context": state["policy_context"],
+        "context_summary": state["context_summary"],
+    })
+    result = parse_json_message(chat_model.invoke(prompt_messages))
+    reply = result["assistant_reply"]
+    return {
+        "assistant_reply": reply,
+        "messages": [("用户", state["user_input"]), ("助教", reply)],
+    }
+
+
+if postgres_available and pgvector_available:
+    try:
+        redis_client = Redis(
+            host=os.environ.get("REDIS_HOST", "localhost"),
+            port=int(os.environ.get("REDIS_PORT", "6379")),
+            password=os.environ.get("REDIS_PASSWORD", "redis"),
+            decode_responses=True,
+        )
+        redis_client.ping()
+        redis_client.delete(memorypal_policy_key)
+
+        memorypal_store_index = seed_memorypal_store()
+
+        with connect(POSTGRES_URL, autocommit=True) as conn:
+            for table_name in ["checkpoint_writes", "checkpoint_blobs", "checkpoints"]:
+                conn.execute(f"DELETE FROM {table_name} WHERE thread_id = %s", (memorypal_thread_id,))
+
+        memorypal_checkpointer = PostgresSaver(conn=connect(POSTGRES_URL, autocommit=True))
+        memorypal_checkpointer.setup()
+
+        memorypal_builder = StateGraph(MemoryPalState)
+        memorypal_builder.add_node("retrieve_user_memories", retrieve_memorypal_memories)
+        memorypal_builder.add_node("load_policy_from_redis", load_policy_from_redis)
+        memorypal_builder.add_node("summarize_context", summarize_memorypal_context)
+        memorypal_builder.add_node("generate_reply", generate_memorypal_reply)
+        memorypal_builder.add_edge(START, "retrieve_user_memories")
+        memorypal_builder.add_edge("retrieve_user_memories", "load_policy_from_redis")
+        memorypal_builder.add_edge("load_policy_from_redis", "summarize_context")
+        memorypal_builder.add_edge("summarize_context", "generate_reply")
+        memorypal_builder.add_edge("generate_reply", END)
+        memorypal_graph = memorypal_builder.compile(checkpointer=memorypal_checkpointer)
+
+        memorypal_config = {"configurable": {"thread_id": memorypal_thread_id, "user_id": memorypal_user_id}}
+        memorypal_initial_messages = [
+            ("用户", "我叫张伟，是 HR 负责人。"),
+            ("助教", "记住了。"),
+            ("用户", "解释概念时请先讲业务场景。"),
+            ("助教", "好的。"),
+            ("用户", "我们刚才聊了 state。"),
+            ("助教", "state 是当前工作台。"),
+            ("用户", "我们也聊了 checkpoint。"),
+            ("助教", "checkpoint 是窗口存档。"),
+        ]
+
+        memorypal_first = memorypal_graph.invoke(
+            {
+                "user_input": "请按我的偏好解释年假政策。",
+                "messages": memorypal_initial_messages,
+                "retrieved_memories": [],
+                "policy_context": "",
+                "cache_status": "",
+                "context_summary": "",
+                "assistant_reply": "",
+            },
+            config=memorypal_config,
+        )
+        memorypal_second = memorypal_graph.invoke(
+            {"user_input": "再确认一次年假政策，继续按我的偏好回答。"},
+            config=memorypal_config,
+        )
+
+        with connect(POSTGRES_URL, autocommit=True) as conn:
+            memorypal_checkpoint_count = conn.execute(
+                "SELECT count(*) FROM checkpoints WHERE thread_id = %s",
+                (memorypal_thread_id,),
+            ).fetchone()[0]
+
+        print_json("MemoryPal 综合记忆证据", {
+            "State字段": ["user_input", "messages", "retrieved_memories", "policy_context", "cache_status", "context_summary", "assistant_reply"],
+            "Checkpoint": {
+                "thread_id": memorypal_thread_id,
+                "Postgres记录数": memorypal_checkpoint_count,
+            },
+            "Store namespace": {
+                "用户偏好": preference_namespace(memorypal_user_id),
+                "长期记忆": long_term_memory_namespace(memorypal_user_id),
+            },
+            "Store语义检索命中": memorypal_first["retrieved_memories"],
+            "Summary": {
+                "是否生成摘要": bool(memorypal_first["context_summary"]),
+                "摘要": memorypal_first["context_summary"],
+            },
+            "Redis Cache": {
+                "第一次": memorypal_first["cache_status"],
+                "第二次": memorypal_second["cache_status"],
+                "缓存key": memorypal_policy_key,
+            },
+            "最终回复示例": memorypal_second["assistant_reply"],
+        })
+    except Exception as error:
+        print("MemoryPal 综合案例运行失败:", error)
+else:
+    print("跳过: MemoryPal 需要可用的 Postgres + pgvector。")
+```
+
+**输出**
+
+```text
+MemoryPal 综合记忆证据
+{
+  "State字段": [
+    "user_input",
+    "messages",
+    "retrieved_memories",
+    "policy_context",
+    "cache_status",
+    "context_summary",
+    "assistant_reply"
+  ],
+  "Checkpoint": {
+    "thread_id": "MemoryPal窗口A",
+    "Postgres记录数": 12
+  },
+  "Store namespace": {
+    "用户偏好": [
+      "用户偏好",
+      "用户-张伟"
+    ],
+    "长期记忆": [
+      "长期记忆",
+      "用户-张伟"
+    ]
+  },
+  "Store语义检索命中": [
+    {
+      "key": "回答风格",
+      "相似度": null,
+      "memory": "用户偏好：用表格回答，语气简洁，例子尽量贴近 HR 工作。",
+      "kind": "preference"
+    },
+    {
+      "key": "技术解释顺序",
+      "相似度": 0.5,
+      "memory": "用户学习偏好：解释技术概念时，先给业务场景，再解释机制，最后再给 API 名。",
+      "kind": "preference"
+    },
+    {
+      "key": "用户角色",
+      "相似度": 0.482,
+      "memory": "用户长期事实：张伟是 HR 负责人，关注员工政策和招聘流程。",
+      "kind": "profile"
+    },
+    {
+      "key": "用户身份",
+      "相似度": 0.438,
+      "memory": "用户长期事实：张伟是 HR 负责人。",
+      "kind": "profile"
+    }
+  ],
+  "Summary": {
+    "是否生成摘要": true,
+    "摘要": "用户张伟，HR负责人，偏好解释概念时先讲业务场景。"
+  },
+  "Redis Cache": {
+    "第一次": "Redis 未命中，已写入缓存",
+    "第二次": "Redis 命中",
+    "缓存key": "memorypal:policy:annual_leave"
+  },
+  "最终回复示例": "好的，张伟。以下是公司年假政策确认（表格形式）：\n\n| 入职年限 | 年假天数 | 适用场景举例 |\n|----------|----------|--------------|\n| 满1年    | 5天      | 如新员工2023年入职，2024年起可享受5天年假 |\n| 满5年    | 10天     | 如员工在公司连续工作5年后，年假自动升级至10天 |\n| 满10年   | 15天     | 如长期服务的老员工，年假额度提升至15天 |\n\n若需进一步了解年假申请流程或折算规则，请随时告知。"
+}
+```
+
+### 7.5 回到心智模型：这几种记忆各自怎么用？
+
+MemoryPal 这个案例里，几种记忆不是互相替代，而是分工协作：
+
+| 记忆层 | 一句话判断 | 代码里的证据 |
+|---|---|---|
+| State | 本轮节点之间要传什么 | `retrieved_memories`、`policy_context`、`assistant_reply` |
+| Checkpoint | 同一个窗口下次怎么续接 | `PostgresSaver` + `thread_id="MemoryPal窗口A"` |
+| Store | 换窗口后用户偏好怎么找回 | `PostgresStore` + `("用户偏好", user_id)` |
+| 向量检索 | 用户换个说法时怎么找相关记忆 | `PostgresStore.search(..., query=...)` |
+| Summary | 消息太长时怎么控制上下文 | `summarize_context` 节点生成 `context_summary` |
+| Redis Cache | 重复查同一政策时怎么省成本 | 第一次未命中，第二次命中 `memorypal:policy:annual_leave` |
+
+<div style="max-width: 980px; margin: 1rem auto;">
+  <img src="images/memorypal-all-memory-layers.svg" alt="MemoryPal 综合记忆层示意图" style="width: 100%; height: auto; display: block;">
+</div>
+
+一句话带走：
+
+> **不要问“记忆放哪里”，先问“这条信息的生命周期是什么”。当前处理放 State，同一窗口放 Checkpoint，跨窗口资料放 Store，长历史做 Summary，重复外部结果放 Redis Cache。**
 
 ---
 
@@ -1054,8 +1958,10 @@ print("摘要内容:", summarized[0][1])
 
 - 短期记忆（同一窗口的上下文）→ `State + Checkpoint + thread_id`
 - 长期记忆（跨窗口的用户资料）→ `Store + namespace + user_id`
+- 语义回忆（换个说法也能找回）→ `PostgresStore + pgvector`
 - 持久化（进程重启后恢复）→ `PostgresSaver + PostgresStore`
-- 长历史整理（太多时压缩）→ `Summary / Trim`
+- 长历史整理（太多时压缩）→ `reducer / pre_model_hook / summary node`
+- 重复外部结果（短期复用）→ `Redis Cache`
 
 这类全景图不适合只用代码 `print()`，也不优先用生成图。它需要术语、中文标签和表格列名都稳定，所以这里用 SVG：可精确改字、可版本管理、notebook 里也能直接引用。
 
@@ -1065,21 +1971,32 @@ print("摘要内容:", summarized[0][1])
 
 一张表格收束：
 
+| 学生问题 | 判断规则 | 本课机制 |
+|---|---|---|
+| 这一轮节点之间怎么传数据？ | 只活在当前运行里 | State |
+| 同一个窗口下次怎么接着聊？ | 跟着 `thread_id` 找现场 | Checkpoint |
+| 换窗口后用户偏好怎么还在？ | 跟着 `user_id + namespace` 找资料 | Store |
+| 用户换个说法怎么找相关记忆？ | 用语义相似度而不是只靠 key | pgvector search |
+| 消息太长怎么办？ | 早期压成摘要，最近原文保留 | reducer / hook / summary node |
+| 外部查询重复怎么办？ | 结果短期复用，不重复查 | Redis Cache |
+
 一句话收束：
 
-> **人自然会在不同记忆位置存放不同类型的信息；Graph 需要你显式设计"写在哪里、用什么 ID 找回、能记多久"。**
+> **人自然会在不同记忆位置存放不同类型的信息；Graph 需要你显式设计“写在哪里、用什么 ID 找回、能记多久、什么时候压缩、什么时候缓存”。**
 
 ---
 
 ## 9. 课后练习
 
 1. 把第二轮换成新的 `thread_id`，观察图为什么不记得姓名。
-2. 故意让两个"用户"共用同一个 `thread_id`，观察为什么会串话。
-3. 把"请用表格回答"保存到 Store，然后开新窗口读取偏好。
+2. 故意让两个“用户”共用同一个 `thread_id`，观察为什么会串话。
+3. 把“请用表格回答”保存到 Store，然后开新窗口读取偏好。
 4. 给 Store namespace 去掉 `user_id`，观察不同用户为什么会读到同一份偏好。
-5. 把 12 条历史消息压缩成摘要，只保留最近 4 条原文。
-6. 把用户偏好"语言=中文"也存进 Store，验证新窗口读取两个偏好。
-7. **进阶**：启动 Postgres（运行 `docker compose -f docker-compose.minimal.yml up -d postgres`），用 PostgresSaver 跑完整流程，验证数据库里确实有 checkpoint 记录。
-8. **进阶**：把 `MemorySaver` 换成 `PostgresSaver`，重启 Jupyter 内核后验证同一个 `thread_id` 仍能续接。
+5. 改写 `add_messages_with_window`，把最近保留轮数从 4 改成 6，观察 reducer 压缩结果。
+6. 修改 ReAct Agent 的 `post_model_hook`，让它只在用户说“请记住”时才写入 Store。
+7. 把 `summary node` 的阈值调小，观察摘要什么时候生成、最近消息是否保留。
+8. 在 MemoryPal 里新增一个 Redis 缓存 key，例如 `memorypal:policy:remote_work`，验证第一次未命中、第二次命中。
+9. **进阶**：启动 Postgres（运行 `docker compose -f docker-compose.minimal.yml up -d postgres redis`），用 PostgresSaver 跑完整流程，验证数据库里确实有 checkpoint 记录。
+10. **进阶**：重启 Jupyter 内核后，用同一个 `thread_id` 恢复 MemoryPal，并确认 Store namespace 和 Redis cache 各自还在。
 
 **下一节**: LG-05 并行执行与子图。当 Agent 需要同时做多件事时，图如何分工、汇总和复用。

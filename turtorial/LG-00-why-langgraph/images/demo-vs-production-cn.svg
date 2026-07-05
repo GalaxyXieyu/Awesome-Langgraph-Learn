@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
+  <title id="title">Demo 很美好，生产很残酷</title>
+  <desc id="desc">Demo 五分钟出效果，但落到企业生产时循环、恢复、人工介入、持久化、可维护性逐一暴露。</desc>
+  <defs>
+    <filter id="shadow" x="-12%" y="-12%" width="124%" height="124%"><feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#3f4d55" flood-opacity="0.10"/></filter>
+    <style>
+      .bg{fill:#fbf7ef}
+      .title{font:700 37px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#27343b}
+      .sub{font:400 18px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#66737b}
+      .panel{fill:#fffdf8;stroke:#ded6ca;stroke-width:1.4;filter:url(#shadow)}
+      .ph{font:700 25px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#2c3940}
+      .ok{font:500 18px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#4f8a69}
+      .bad{font:500 18px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#b3796a}
+      .footer{font:700 20px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#34454d}
+      .tag{font:700 15px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;fill:#8a8073}
+    </style>
+  </defs>
+  <rect class="bg" width="1280" height="720"/>
+  <text class="title" x="640" y="58" text-anchor="middle">Demo 很美好，生产很残酷</text>
+  <text class="sub" x="640" y="92" text-anchor="middle">框架选型的核心痛点：Demo 证明「AI 能做」，企业级要确保「AI 能一直可靠地做」。</text>
+
+  <!-- 左：Demo -->
+  <rect class="panel" x="66" y="126" width="558" height="470" rx="28"/>
+  <text class="ph" x="345" y="176" text-anchor="middle">Demo：五分钟就很酷</text>
+  <text class="tag" x="345" y="206" text-anchor="middle">订机票 · 写周报 · 规划旅行</text>
+  <text class="ok" x="108" y="266">✓ 五分钟出效果，代码最少</text>
+  <text class="ok" x="108" y="312">✓ 演示流程一条直线，跑通就行</text>
+  <text class="ok" x="108" y="358">✓ 单次调用，不用管中断和恢复</text>
+  <text class="ok" x="108" y="404">✓ 没有真实用户、并发、重启</text>
+  <text class="ok" x="108" y="450">✓ 出错重跑一次就好</text>
+  <text class="sub" x="345" y="540" text-anchor="middle">看起来「AI 什么都能做」</text>
+
+  <!-- 右：生产 -->
+  <rect class="panel" x="656" y="126" width="558" height="470" rx="28"/>
+  <text class="ph" x="935" y="176" text-anchor="middle">生产：问题逐个找上门</text>
+  <text class="tag" x="935" y="206" text-anchor="middle">真实业务 · 并发 · 重启 · 合规</text>
+  <text class="bad" x="698" y="266">✗ 循环 / 重试逻辑写不了</text>
+  <text class="bad" x="698" y="312">✗ 状态丢了，没法从断点恢复</text>
+  <text class="bad" x="698" y="358">✗ 人工审核不知道怎么插进去</text>
+  <text class="bad" x="698" y="404">✗ 服务一重启，会话全没了</text>
+  <text class="bad" x="698" y="450">✗ 想加个审核节点，整个架构要重构</text>
+  <text class="sub" x="935" y="540" text-anchor="middle">才发现「能做」离「可靠地做」很远</text>
+
+  <rect x="270" y="632" width="740" height="54" rx="27" fill="#ffffff" stroke="#d8cec1"/>
+  <text class="footer" x="640" y="666" text-anchor="middle">企业级买的不是 AI 的能力，是它的可靠性、可控性、可维护性。</text>
+</svg>

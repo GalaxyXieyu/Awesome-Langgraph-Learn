@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="760" viewBox="0 0 1280 760" role="img" aria-labelledby="title desc">
+  <title id="title">DeepAgent 架构全景</title>
+  <desc id="desc">create_deep_agent 在 ReAct 循环上叠了规划、文件工作区、子代理、摘要和沙箱后端，形成深度研究能力。</desc>
+  <defs>
+    <filter id="shadow" x="-14%" y="-14%" width="128%" height="128%"><feDropShadow dx="0" dy="7" stdDeviation="11" flood-color="#3f4d55" flood-opacity="0.10"/></filter>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="9" refY="6" orient="auto"><path d="M2,2 L10,6 L2,10 Z" fill="#74838a"/></marker>
+    <style>
+      .bg{fill:#fbf7ef}
+      .title{font:700 34px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#27343b}
+      .sub{font:400 18px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#66737b}
+      .step{font:700 20px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#2c3940}
+      .box{filter:url(#shadow);stroke-width:1.3}
+      .n{font:600 16px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#2c3940}
+      .nt{font:600 13px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;fill:#7a8790}
+      .line{stroke:#74838a;stroke-width:2.2;fill:none;marker-end:url(#arrow)}
+      .mw{font:700 16px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;fill:#2c3940}
+      .mwt{font:400 15px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#43525a}
+      .core{font:700 17px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#2c3940}
+      .footer{font:700 18px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#34454d}
+    </style>
+  </defs>
+  <rect class="bg" width="1280" height="760"/>
+  <text class="title" x="640" y="50" text-anchor="middle">DeepAgent = 在 ReAct 循环上，叠一套「深度研究」能力</text>
+  <text class="sub" x="640" y="82" text-anchor="middle">create_deep_agent 封装的不只是循环，还有 规划 / 文件工作区 / 子代理 / 沙箱——本质仍是 LG-06 那张图。</text>
+
+  <!-- ① 深度研究流程 -->
+  <text class="step" x="60" y="128">① 一次深度研究长这样</text>
+  <rect class="box" x="60" y="146" width="120" height="58" rx="16" fill="#ffffff" stroke="#d8d1c7"/><text class="n" x="120" y="180" text-anchor="middle">用户 query</text>
+  <rect class="box" x="212" y="146" width="130" height="58" rx="16" fill="#edf3ef" stroke="#9fb5aa"/><text class="n" x="277" y="172" text-anchor="middle">规划 todos</text><text class="nt" x="277" y="192" text-anchor="middle">plan</text>
+  <rect class="box" x="374" y="146" width="120" height="58" rx="16" fill="#eef1e9" stroke="#b4bfa9"/><text class="n" x="434" y="172" text-anchor="middle">加载技能</text><text class="nt" x="434" y="192" text-anchor="middle">skills</text>
+  <rect class="box" x="526" y="146" width="176" height="58" rx="16" fill="#e9eff7" stroke="#a1b3c8"/><text class="n" x="614" y="172" text-anchor="middle">执行·写文件到工作区</text><text class="nt" x="614" y="192" text-anchor="middle">execute ↺</text>
+  <rect class="box" x="734" y="146" width="150" height="58" rx="16" fill="#e9eff7" stroke="#a1b3c8"/><text class="n" x="809" y="172" text-anchor="middle">并行子代理</text><text class="nt" x="809" y="192" text-anchor="middle">subagents</text>
+  <rect class="box" x="916" y="146" width="140" height="58" rx="16" fill="#f4eae2" stroke="#d8b6a8"/><text class="n" x="986" y="172" text-anchor="middle">汇总报告</text><text class="nt" x="986" y="192" text-anchor="middle">summarize</text>
+  <path class="line" d="M180 175 H208"/>
+  <path class="line" d="M342 175 H370"/>
+  <path class="line" d="M494 175 H522"/>
+  <path class="line" d="M702 175 H730"/>
+  <path class="line" d="M884 175 H912"/>
+  <path class="line" d="M560 204 C548 232, 680 232, 668 206"/>
+  <text class="nt" x="614" y="228" text-anchor="middle">逐条 todo</text>
+
+  <!-- ② 中间件栈 -->
+  <text class="step" x="60" y="290">② create_deep_agent 在 ReAct 循环上叠了这些中间件</text>
+
+  <rect class="box" x="60" y="316" width="300" height="380" rx="22" fill="#f3efe6" stroke="#cfc3ad"/>
+  <text class="core" x="210" y="352" text-anchor="middle">核心：ReAct 循环</text>
+  <rect class="box" x="96" y="392" width="104" height="60" rx="16" fill="#edf3ef" stroke="#9fb5aa"/><text class="n" x="148" y="428" text-anchor="middle">model</text>
+  <rect class="box" x="222" y="392" width="104" height="60" rx="16" fill="#e9eff7" stroke="#a1b3c8"/><text class="n" x="274" y="428" text-anchor="middle">tools</text>
+  <path class="line" d="M200 408 C214 394, 210 394, 220 402"/>
+  <path class="line" d="M224 442 C210 456, 212 456, 202 448"/>
+  <text class="nt" x="210" y="486" text-anchor="middle">和 LG-06 的 create_agent 同一条循环</text>
+  <rect class="box" x="96" y="520" width="230" height="150" rx="16" fill="#eef2f7" stroke="#b6c4d4"/>
+  <text class="mwt" x="118" y="552">沙箱后端（Backend）：</text>
+  <text class="mw" x="118" y="582">State</text><text class="mwt" x="200" y="582">内存虚拟文件</text>
+  <text class="mw" x="118" y="610">LocalShell</text><text class="mwt" x="234" y="610">本地执行</text>
+  <text class="mw" x="118" y="638">Docker …</text><text class="mwt" x="228" y="638">隔离执行</text>
+
+  <rect class="box" x="392" y="316" width="822" height="66" rx="14" fill="#e9f0ea" stroke="#a9c3b3"/>
+  <text class="mw" x="414" y="355">TodoListMiddleware</text><text class="mwt" x="700" y="355">把大任务拆成可勾选的 todo 清单，边做边更新</text>
+  <rect class="box" x="392" y="392" width="822" height="66" rx="14" fill="#e9eef7" stroke="#a9bdd4"/>
+  <text class="mw" x="414" y="431">FilesystemMiddleware</text><text class="mwt" x="700" y="431">中间结果写文件，不塞爆上下文（呼应 LG-02 的旁路思路）</text>
+  <rect class="box" x="392" y="468" width="822" height="66" rx="14" fill="#f2ece2" stroke="#d3c0a6"/>
+  <text class="mw" x="414" y="507">SubAgentMiddleware</text><text class="mwt" x="700" y="507">复杂子任务交给「上下文隔离」的子代理，主线不被污染</text>
+  <rect class="box" x="392" y="544" width="822" height="66" rx="14" fill="#f4ece9" stroke="#d8bcb0"/>
+  <text class="mw" x="414" y="583">SummarizationMiddleware</text><text class="mwt" x="700" y="583">长对话自动摘要，控制 token（呼应 LG-04 的上下文压缩）</text>
+  <rect class="box" x="392" y="620" width="822" height="66" rx="14" fill="#f1efe9" stroke="#d5cdbd"/>
+  <text class="mw" x="414" y="659">Skills / HITL / 缓存 …</text><text class="mwt" x="700" y="659">技能加载、人工审批、提示缓存等，按需叠加</text>
+
+  <rect x="240" y="708" width="800" height="42" rx="21" fill="#ffffff" stroke="#d8cec1"/>
+  <text class="footer" x="640" y="736" text-anchor="middle">DeepAgent 不是新范式：它把「深度研究」的常见能力，打包成一摞中间件叠在 ReAct 循环上。</text>
+</svg>

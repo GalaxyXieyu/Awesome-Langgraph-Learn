@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
+  <title id="title">stream_mode 全景</title>
+  <desc id="desc">按推送内容和粒度选 stream_mode：values/updates/tasks/messages 沿粗到细排列，custom 是旁路，checkpoints/debug 是调试档。</desc>
+  <defs>
+    <filter id="shadow" x="-12%" y="-12%" width="124%" height="124%"><feDropShadow dx="0" dy="7" stdDeviation="11" flood-color="#3f4d55" flood-opacity="0.10"/></filter>
+    <marker id="arrow" markerWidth="13" markerHeight="13" refX="9" refY="6" orient="auto"><path d="M2,2 L11,6 L2,10 Z" fill="#9aa7ad"/></marker>
+    <style>
+      .bg{fill:#fbf7ef}
+      .title{font:700 35px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#27343b}
+      .sub{font:400 17px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#66737b}
+      .axis{font:700 15px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#8a8073}
+      .box{filter:url(#shadow);stroke-width:1.4}
+      .pill{font:700 17px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;fill:#2c3940}
+      .lab{font:700 13px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#9a9183;letter-spacing:1px}
+      .p{font:400 15px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#43525a}
+      .hot{font:700 15px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#b5664e}
+      .tag{font:700 12px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#7a6a55}
+      .dh{font:700 16px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#5a6a72}
+      .dp{font:400 15px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#5a6a72}
+      .rule{font:600 14px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;fill:#42525a}
+      .div{stroke:#e6dfd1;stroke-width:1.1}
+      .gl{stroke:#cdd3cf;stroke-width:2.4;fill:none;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <rect class="bg" width="1280" height="720"/>
+  <text class="title" x="640" y="50" text-anchor="middle">stream_mode 全景：按「推送什么、看多细」一张图选</text>
+  <text class="sub" x="640" y="82" text-anchor="middle">稳定版 astream 直接给你裸数据：values 给 State、updates 给 {节点:输出}、custom 给你推的负载——别去 chunk["data"] 里找。</text>
+
+  <!-- 粒度轴 -->
+  <text class="axis" x="62" y="132">粗 · 看整盘</text>
+  <path class="gl" d="M170 126 H1006"/>
+  <text class="axis" x="1014" y="132">细 · 逐 token</text>
+
+  <!-- 卡片 -->
+  <!-- values -->
+  <rect class="box" x="59" y="150" width="218" height="280" rx="22" fill="#edf3ef" stroke="#9fb5aa"/>
+  <text class="pill" x="168" y="186" text-anchor="middle">values</text>
+  <line class="div" x1="79" y1="204" x2="257" y2="204"/>
+  <text class="lab" x="79" y="232">何时推送</text><text class="p" x="79" y="256">每个超级步结束</text>
+  <text class="lab" x="79" y="296">推送什么</text><text class="p" x="79" y="320">完整 State 快照</text>
+  <text class="lab" x="79" y="360">典型用途</text><text class="p" x="79" y="384">状态面板 · 节点高亮</text>
+
+  <!-- updates -->
+  <rect class="box" x="295" y="150" width="218" height="280" rx="22" fill="#e9eff7" stroke="#a1b3c8"/>
+  <text class="pill" x="404" y="186" text-anchor="middle">updates</text>
+  <line class="div" x1="315" y1="204" x2="493" y2="204"/>
+  <text class="lab" x="315" y="232">何时推送</text><text class="p" x="315" y="256">每个超级步结束</text>
+  <text class="lab" x="315" y="296">推送什么</text><text class="p" x="315" y="320">{节点: 返回增量}</text>
+  <text class="lab" x="315" y="360">典型用途</text><text class="p" x="315" y="384">省带宽的增量更新</text>
+
+  <!-- tasks -->
+  <rect class="box" x="531" y="150" width="218" height="280" rx="22" fill="#eef1e9" stroke="#b4bfa9"/>
+  <text class="pill" x="640" y="186" text-anchor="middle">tasks</text>
+  <line class="div" x1="551" y1="204" x2="729" y2="204"/>
+  <text class="lab" x="551" y="232">何时推送</text><text class="p" x="551" y="256">每个节点 起 / 止</text>
+  <text class="lab" x="551" y="296">推送什么</text><text class="p" x="551" y="320">任务信息(耗时/error)</text>
+  <text class="lab" x="551" y="360">典型用途</text><text class="p" x="551" y="384">执行监控 · 错误捕获</text>
+
+  <!-- messages (重点) -->
+  <rect class="box" x="767" y="150" width="218" height="280" rx="22" fill="#f4eae2" stroke="#d8a98f" stroke-width="2.4"/>
+  <text class="pill" x="876" y="186" text-anchor="middle">messages</text>
+  <line class="div" x1="787" y1="204" x2="965" y2="204"/>
+  <text class="lab" x="787" y="232">何时推送</text><text class="p" x="787" y="256">LLM 每个 token</text>
+  <text class="lab" x="787" y="296">推送什么</text><text class="p" x="787" y="320">(消息块, 元数据)</text>
+  <text class="lab" x="787" y="360">典型用途</text><text class="hot" x="787" y="384">打字机效果 ← 本章重点</text>
+
+  <!-- custom (旁路) -->
+  <rect class="box" x="1003" y="150" width="218" height="280" rx="22" fill="#f1ede4" stroke="#cfc3ad"/>
+  <text class="pill" x="1112" y="186" text-anchor="middle">custom</text>
+  <rect x="1150" y="160" width="58" height="22" rx="11" fill="#efe6d4" stroke="#d8c9a8"/><text class="tag" x="1179" y="175" text-anchor="middle">旁路</text>
+  <line class="div" x1="1023" y1="204" x2="1201" y2="204"/>
+  <text class="lab" x="1023" y="232">何时推送</text><text class="p" x="1023" y="256">节点里调 writer()</text>
+  <text class="lab" x="1023" y="296">推送什么</text><text class="p" x="1023" y="320">你给的任意数据</text>
+  <text class="lab" x="1023" y="360">典型用途</text><text class="p" x="1023" y="384">进度条 · 业务通知</text>
+
+  <!-- 调试档 -->
+  <rect x="59" y="462" width="1162" height="68" rx="18" fill="#f3f1ec" stroke="#e0d9cb"/>
+  <text class="dh" x="84" y="494">调试档（平时不用）</text>
+  <text class="dp" x="290" y="494">checkpoints：检查点事件，配合状态恢复调试</text>
+  <text class="dp" x="720" y="494">debug = tasks + checkpoints，数据量最大，生产别开</text>
+
+  <!-- 两条通用规则 -->
+  <rect x="59" y="552" width="568" height="120" rx="18" fill="#ffffff" stroke="#dcd3c6"/>
+  <text class="dh" x="84" y="588">组合多种模式</text>
+  <text class="rule" x="84" y="620">stream_mode=["messages", "custom"]</text>
+  <text class="p" x="84" y="650">→ 每条变成 (mode, chunk)，记得解包</text>
+
+  <rect x="653" y="552" width="568" height="120" rx="18" fill="#ffffff" stroke="#dcd3c6"/>
+  <text class="dh" x="678" y="588">看子图内部</text>
+  <text class="rule" x="678" y="620">subgraphs=True</text>
+  <text class="p" x="678" y="650">→ 每条前面多一截 namespace：(ns, chunk)</text>
+</svg>

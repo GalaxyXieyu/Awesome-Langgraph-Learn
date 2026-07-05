@@ -1,26 +1,32 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
   <title id="title">预构建 Agent 与自定义 StateGraph 的取舍</title>
-  <desc id="desc">对比预构建 Agent 和自定义 StateGraph 在速度、控制、状态、审批、可观测性上的差异。</desc>
-  <defs><filter id="shadow" x="-12%" y="-12%" width="124%" height="124%"><feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#3f4d55" flood-opacity="0.10"/></filter><style>.bg{fill:#fbf7ef}.title{font:700 40px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#27343b}.sub{font:400 19px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#66737b}.panel{fill:#fffdf8;stroke:#ded6ca;stroke-width:1.4;filter:url(#shadow)}.h{font:700 24px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#2c3940}.p{font:400 17px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#43525a}.api{font:600 14px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;fill:#687781}.line{stroke:#e3dacd;stroke-width:1.1}.footer{font:700 18px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#34454d}</style></defs>
+  <desc id="desc">预构建 Agent 也支持中断、审批、持久化；真正需要迁移到自定义 StateGraph 的，是自定义业务状态、复杂路由和把审批权限审计做成一等结构。</desc>
+  <defs><filter id="shadow" x="-12%" y="-12%" width="124%" height="124%"><feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#3f4d55" flood-opacity="0.10"/></filter><style>.bg{fill:#fbf7ef}.title{font:700 40px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#27343b}.sub{font:400 18px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#66737b}.panel{fill:#fffdf8;stroke:#ded6ca;stroke-width:1.4;filter:url(#shadow)}.h{font:700 24px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#2c3940}.p{font:400 17px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#43525a}.api{font:600 13px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;fill:#8a8073}.foot{font:600 14px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;fill:#687781}.line{stroke:#e3dacd;stroke-width:1.1}.footer{font:700 18px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#34454d}</style></defs>
   <rect class="bg" width="1280" height="720"/>
-  <text class="title" x="640" y="60" text-anchor="middle">预构建求快，自定义求控</text>
-  <text class="sub" x="640" y="96" text-anchor="middle">一旦需要业务状态、审批、复杂路由或审计，就该从 create_react_agent 迁移到 StateGraph</text>
-  <rect class="panel" x="80" y="145" width="1120" height="458" rx="30"/>
-  <text class="h" x="310" y="198" text-anchor="middle">create_react_agent</text>
-  <text class="h" x="970" y="198" text-anchor="middle">自定义 StateGraph</text>
-  <line class="line" x1="640" y1="168" x2="640" y2="574"/>
-  <text class="p" x="150" y="260">✅ 三行代码搭标准 ReAct</text>
-  <text class="p" x="150" y="310">✅ 快速验证工具组合</text>
-  <text class="p" x="150" y="360">✅ 适合内部原型</text>
-  <text class="p" x="150" y="430">⚠️ messages 为核心状态</text>
-  <text class="p" x="150" y="480">⚠️ 路由和审批不够可控</text>
-  <text class="api" x="150" y="530">LLM → tools → LLM</text>
-  <text class="p" x="740" y="260">✅ 自定义业务 State</text>
-  <text class="p" x="740" y="310">✅ 显式审批与安全边界</text>
-  <text class="p" x="740" y="360">✅ 复杂路由和可观测性</text>
+  <text class="title" x="640" y="58" text-anchor="middle">预构建求快，自定义求控</text>
+  <text class="sub" x="640" y="92" text-anchor="middle">预构建也能中断 / 审批 / 持久化；真正要迁移的，是自定义业务状态、复杂路由、把审批权限审计做成一等结构。</text>
+
+  <rect class="panel" x="80" y="138" width="1120" height="442" rx="30"/>
+  <text class="h" x="310" y="190" text-anchor="middle">create_agent（预构建）</text>
+  <text class="h" x="970" y="190" text-anchor="middle">自定义 StateGraph</text>
+  <line class="line" x1="640" y1="160" x2="640" y2="552"/>
+
+  <text class="p" x="150" y="248">✅ 三行搭标准 ReAct 循环</text>
+  <text class="p" x="150" y="296">✅ 快速验证工具组合</text>
+  <text class="p" x="150" y="344">✅ 也能中断 / 审批 / 持久化</text>
+  <text class="api" x="174" y="370">interrupt_before · HumanInTheLoopMiddleware · checkpointer</text>
+  <text class="p" x="150" y="430">⚠️ 核心状态以 messages 为主，业务字段要靠 state_schema</text>
+  <text class="p" x="150" y="478">⚠️ 复杂业务分支超出 ReAct 循环就吃力</text>
+  <text class="foot" x="150" y="528">model → tools 循环 + middleware 扩展</text>
+
+  <text class="p" x="740" y="248">✅ 任意业务 State（user_role / risk_level）</text>
+  <text class="p" x="740" y="296">✅ 任意节点 / 边 / 分支路由</text>
+  <text class="p" x="740" y="344">✅ 审批 / 权限 / 审计 做成一等显式结构</text>
+  <text class="api" x="764" y="370">控制流完全握在自己手里</text>
   <text class="p" x="740" y="430">⚠️ 代码量更多</text>
-  <text class="p" x="740" y="480">⚠️ 需要理解图机制</text>
-  <text class="api" x="740" y="530">State / node / edge / interrupt</text>
-  <rect x="210" y="636" width="860" height="48" rx="24" fill="#ffffff" stroke="#d8cec1"/>
-  <text class="footer" x="640" y="667" text-anchor="middle">判断：标准循环先用预构建；出现业务控制需求，就迁移自定义图。</text>
+  <text class="p" x="740" y="478">⚠️ 需要理解图机制</text>
+  <text class="foot" x="740" y="528">State / node / edge / interrupt</text>
+
+  <rect x="180" y="616" width="920" height="48" rx="24" fill="#ffffff" stroke="#d8cec1"/>
+  <text class="footer" x="640" y="647" text-anchor="middle">判断：标准循环 + 局部审批，预构建够用；要自定义状态 / 复杂路由 / 一等审计，再迁移自定义图。</text>
 </svg>

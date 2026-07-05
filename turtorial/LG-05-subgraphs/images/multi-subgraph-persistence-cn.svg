@@ -1,0 +1,122 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
+  <title id="title">多行业 Subgraph 并行与 Postgres 持久化</title>
+  <desc id="desc">父图并行挂载财经、政策、市场三个子图，每个子图的运行现场都按 thread_id + checkpoint_ns 写入 Postgres。</desc>
+  <defs>
+    <filter id="shadow" x="-12%" y="-12%" width="124%" height="124%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#40515a" flood-opacity="0.12"/>
+    </filter>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="9" refY="6" orient="auto" markerUnits="strokeWidth">
+      <path d="M2,2 L10,6 L2,10 Z" fill="#74838a"/>
+    </marker>
+    <linearGradient id="pgGrad" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0%" stop-color="#f4f8fb"/>
+      <stop offset="100%" stop-color="#d6e4ed"/>
+    </linearGradient>
+    <style>
+      .bg { fill: #fbf7ef; }
+      .title { font: 700 38px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", sans-serif; fill: #27343b; }
+      .subtitle { font: 400 18px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", sans-serif; fill: #65717a; }
+      .panel { filter: url(#shadow); stroke-width: 1.4; fill: #ffffff; stroke: #d8d1c7; }
+      .box { filter: url(#shadow); stroke-width: 1.35; }
+      .h { font: 700 21px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", sans-serif; fill: #2c3940; }
+      .p { font: 400 16px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", sans-serif; fill: #43525a; }
+      .api { font: 600 13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #6e7a82; }
+      .small { font: 400 13px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", sans-serif; fill: #748089; }
+      .line { stroke: #71818a; stroke-width: 2.2; fill: none; marker-end: url(#arrow); }
+      .soft { stroke: #aeb9bf; stroke-width: 1.5; fill: none; marker-end: url(#arrow); }
+      .dash { stroke: #9aa8b0; stroke-width: 1.8; fill: none; stroke-dasharray: 6,5; }
+      .foot { font: 600 17px -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", sans-serif; fill: #35464e; }
+      .pg { fill: url(#pgGrad); stroke: #9db4c4; stroke-width: 1.4; }
+    </style>
+  </defs>
+
+  <rect class="bg" width="1280" height="720"/>
+  <text class="title" x="640" y="58" text-anchor="middle">多行业 Subgraph 并行与 Postgres 持久化</text>
+  <text class="subtitle" x="640" y="92" text-anchor="middle">父图并行挂载三个子图，子图运行现场也按 thread_id + checkpoint_ns 写入 Postgres</text>
+
+  <!-- Parent state panel -->
+  <rect class="panel" x="40" y="150" width="220" height="420" rx="26"/>
+  <text class="h" x="150" y="190" text-anchor="middle">父图 State</text>
+  <text class="api" x="68" y="232">topic</text>
+  <text class="small" x="68" y="252">研究主题</text>
+  <text class="api" x="68" y="292">finance_finding</text>
+  <text class="api" x="68" y="312">policy_finding</text>
+  <text class="api" x="68" y="332">market_finding</text>
+  <text class="small" x="68" y="352">子图输出</text>
+  <text class="api" x="68" y="392">report</text>
+  <text class="small" x="68" y="412">汇总报告</text>
+  <path class="soft" d="M66 440 H234"/>
+  <text class="small" x="68" y="470">子图内部字段不泄漏</text>
+  <text class="small" x="68" y="490">snippets / headlines / signals</text>
+
+  <!-- START -->
+  <rect class="box" x="340" y="130" width="90" height="44" rx="22" fill="#eef3ef" stroke="#9db4aa"/>
+  <text class="h" x="385" y="158" text-anchor="middle">START</text>
+
+  <!-- Finance subgraph -->
+  <rect class="panel" x="320" y="210" width="280" height="300" rx="24"/>
+  <text class="h" x="460" y="244" text-anchor="middle">财经</text>
+  <text class="api" x="460" y="262" text-anchor="middle">finance_analysis</text>
+  <rect class="box" x="350" y="282" width="220" height="46" rx="16" fill="#e9eff7" stroke="#9fb2c9"/>
+  <text class="p" x="460" y="310" text-anchor="middle">prepare_context</text>
+  <rect class="box" x="350" y="348" width="220" height="46" rx="16" fill="#f3ece4" stroke="#d0b79b"/>
+  <text class="p" x="460" y="376" text-anchor="middle">evaluate_metrics</text>
+  <rect class="box" x="350" y="414" width="220" height="46" rx="16" fill="#f5e7e4" stroke="#d7aba3"/>
+  <text class="p" x="460" y="442" text-anchor="middle">write_finding</text>
+
+  <!-- Policy subgraph -->
+  <rect class="panel" x="630" y="210" width="280" height="300" rx="24"/>
+  <text class="h" x="770" y="244" text-anchor="middle">政策</text>
+  <text class="api" x="770" y="262" text-anchor="middle">policy_analysis</text>
+  <rect class="box" x="660" y="282" width="220" height="46" rx="16" fill="#e9eff7" stroke="#9fb2c9"/>
+  <text class="p" x="770" y="310" text-anchor="middle">prepare_context</text>
+  <rect class="box" x="660" y="348" width="220" height="46" rx="16" fill="#f3ece4" stroke="#d0b79b"/>
+  <text class="p" x="770" y="376" text-anchor="middle">evaluate_impact</text>
+  <rect class="box" x="660" y="414" width="220" height="46" rx="16" fill="#f5e7e4" stroke="#d7aba3"/>
+  <text class="p" x="770" y="442" text-anchor="middle">write_finding</text>
+
+  <!-- Market subgraph -->
+  <rect class="panel" x="940" y="210" width="280" height="300" rx="24"/>
+  <text class="h" x="1080" y="244" text-anchor="middle">市场</text>
+  <text class="api" x="1080" y="262" text-anchor="middle">market_analysis</text>
+  <rect class="box" x="970" y="282" width="220" height="46" rx="16" fill="#e9eff7" stroke="#9fb2c9"/>
+  <text class="p" x="1080" y="310" text-anchor="middle">prepare_context</text>
+  <rect class="box" x="970" y="348" width="220" height="46" rx="16" fill="#f3ece4" stroke="#d0b79b"/>
+  <text class="p" x="1080" y="376" text-anchor="middle">evaluate_sentiment</text>
+  <rect class="box" x="970" y="414" width="220" height="46" rx="16" fill="#f5e7e4" stroke="#d7aba3"/>
+  <text class="p" x="1080" y="442" text-anchor="middle">write_finding</text>
+
+  <!-- compile_report -->
+  <rect class="box" x="560" y="550" width="320" height="54" rx="20" fill="#eef3ef" stroke="#9db4aa"/>
+  <text class="h" x="720" y="582" text-anchor="middle">compile_report → END</text>
+
+  <!-- Postgres cylinder -->
+  <g transform="translate(1060, 540)">
+    <ellipse cx="80" cy="20" rx="80" ry="22" class="pg"/>
+    <path d="M0,20 L0,95 C0,118 36,130 80,130 C124,130 160,118 160,95 L160,20" class="pg"/>
+    <ellipse cx="80" cy="95" rx="80" ry="22" class="pg"/>
+    <text class="h" x="80" y="70" text-anchor="middle" fill="#2c3940">Postgres</text>
+    <text class="api" x="80" y="90" text-anchor="middle">checkpoints</text>
+    <text class="small" x="80" y="112" text-anchor="middle">thread_id + checkpoint_ns</text>
+  </g>
+
+  <!-- Edges -->
+  <path class="line" d="M430 152 C430 175, 460 175, 460 208"/>
+  <path class="line" d="M385 174 C540 174, 770 174, 770 208"/>
+  <path class="line" d="M385 174 C660 174, 1080 174, 1080 208"/>
+
+  <path class="line" d="M460 510 C460 525, 560 540, 560 576"/>
+  <path class="line" d="M770 510 C770 525, 720 540, 720 576"/>
+  <path class="line" d="M1080 510 C1080 525, 880 540, 880 576"/>
+
+  <path class="line" d="M260 340 C280 340, 300 340, 318 340"/>
+
+  <!-- Dashed persistence edges -->
+  <path class="dash" d="M600 360 C720 360, 900 470, 1060 545"/>
+  <path class="dash" d="M770 510 C830 510, 960 520, 1060 545"/>
+  <path class="dash" d="M970 360 C900 360, 980 470, 1060 545"/>
+
+  <!-- Footer -->
+  <rect x="180" y="640" width="920" height="50" rx="25" fill="#ffffff" stroke="#d8cec1"/>
+  <text class="foot" x="640" y="670" text-anchor="middle">每个子图拥有独立 checkpoint_ns，进程重启后父图和子图状态都能从 Postgres 恢复</text>
+</svg>

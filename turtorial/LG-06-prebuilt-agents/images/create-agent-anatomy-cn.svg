@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
+  <title id="title">create_agent 编译出来的真实结构</title>
+  <desc id="desc">先看整体骨架：只有 model 和 tools 两个业务节点；再拆解唯一的难点——循环是否继续由最后一条 AIMessage 是否还有 tool_calls 决定。</desc>
+  <defs>
+    <filter id="shadow" x="-12%" y="-12%" width="124%" height="124%"><feDropShadow dx="0" dy="7" stdDeviation="11" flood-color="#3f4d55" flood-opacity="0.10"/></filter>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="9" refY="6" orient="auto"><path d="M2,2 L10,6 L2,10 Z" fill="#74838a"/></marker>
+    <marker id="arrowg" markerWidth="12" markerHeight="12" refX="9" refY="6" orient="auto"><path d="M2,2 L10,6 L2,10 Z" fill="#5f8a72"/></marker>
+    <style>
+      .bg{fill:#fbf7ef}
+      .title{font:700 35px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#27343b}
+      .sub{font:400 18px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#66737b}
+      .step{font:700 20px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#2c3940}
+      .box{filter:url(#shadow);stroke-width:1.4}
+      .h{font:700 22px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#2c3940}
+      .api{font:600 14px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;fill:#687781}
+      .p{font:400 15px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#43525a}
+      .edge{stroke:#74838a;stroke-width:2.2;fill:none;marker-end:url(#arrow)}
+      .edgeg{stroke:#5f8a72;stroke-width:2.2;fill:none;marker-end:url(#arrowg)}
+      .tag{font:600 14px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#5a6a72}
+      .badge{font:700 15px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#4f8a69}
+      .note{font:500 16px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#7a4f3e}
+      .yn{font:700 16px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#2c3940}
+      .divider{stroke:#e7e0d2;stroke-width:1.4;stroke-dasharray:2 6}
+    </style>
+  </defs>
+  <rect class="bg" width="1280" height="720"/>
+
+  <text class="title" x="640" y="50" text-anchor="middle">白盒化：create_agent 编译出来，其实就这么大</text>
+  <text class="sub" x="640" y="82" text-anchor="middle">只有 2 个业务节点（model / tools）；真正的难点，只在那 1 个条件判断上。</text>
+
+  <!-- ===== Panel 1: 整体骨架 ===== -->
+  <text class="step" x="72" y="132">① 先看整体：编译出来就这 4 个框</text>
+
+  <rect class="box" x="72" y="170" width="124" height="62" rx="20" fill="#ffffff" stroke="#d8d1c7"/>
+  <text class="api" x="134" y="200" text-anchor="middle">__start__</text>
+  <text class="p" x="134" y="220" text-anchor="middle">入口</text>
+
+  <rect class="box" x="320" y="156" width="196" height="92" rx="26" fill="#edf3ef" stroke="#9fb5aa"/>
+  <text class="h" x="418" y="196" text-anchor="middle">model 节点</text>
+  <text class="api" x="418" y="224" text-anchor="middle">调用 LLM</text>
+
+  <rect class="box" x="660" y="156" width="196" height="92" rx="26" fill="#e9eff7" stroke="#a1b3c8"/>
+  <text class="h" x="758" y="196" text-anchor="middle">tools 节点</text>
+  <text class="api" x="758" y="224" text-anchor="middle">执行工具</text>
+
+  <rect class="box" x="1084" y="170" width="124" height="62" rx="20" fill="#ffffff" stroke="#d8d1c7"/>
+  <text class="api" x="1146" y="200" text-anchor="middle">__end__</text>
+  <text class="p" x="1146" y="220" text-anchor="middle">结束</text>
+
+  <!-- edges -->
+  <path class="edge" d="M196 201 H316"/>
+  <text class="tag" x="256" y="190" text-anchor="middle">硬边</text>
+
+  <path class="edge" d="M516 188 C560 168, 616 168, 656 188"/>
+  <text class="tag" x="586" y="158" text-anchor="middle">有 tool_calls</text>
+
+  <path class="edgeg" d="M758 248 C740 312, 436 312, 418 252"/>
+  <text class="tag" x="588" y="330" text-anchor="middle">工具结果带回 model，再来一轮</text>
+
+  <path class="edge" d="M516 224 C760 360, 940 360, 1082 232"/>
+  <text class="tag" x="900" y="372" text-anchor="middle">无 tool_calls → 结束</text>
+
+  <rect x="930" y="118" width="278" height="40" rx="20" fill="#eef5f0" stroke="#bcd2c5"/>
+  <text class="badge" x="1069" y="144" text-anchor="middle">2 个业务节点 · 1 个真正的判断</text>
+
+  <line class="divider" x1="72" y1="402" x2="1208" y2="402"/>
+
+  <!-- ===== Panel 2: 拆解唯一难点 ===== -->
+  <text class="step" x="72" y="446">② 再拆那 1 个难点：循环要不要继续，不看模型嘴上说，看最后一条 AIMessage</text>
+
+  <rect class="box" x="72" y="492" width="160" height="74" rx="20" fill="#edf3ef" stroke="#9fb5aa"/>
+  <text class="h" x="152" y="525" text-anchor="middle">model 跑完</text>
+  <text class="p" x="152" y="548" text-anchor="middle">产出一条 AIMessage</text>
+
+  <path class="edge" d="M232 529 H300"/>
+
+  <rect class="box" x="300" y="492" width="206" height="74" rx="20" fill="#ffffff" stroke="#d8d1c7"/>
+  <text class="h" x="403" y="525" text-anchor="middle">看最后一条 AIMessage</text>
+  <text class="api" x="403" y="548" text-anchor="middle">.tool_calls</text>
+
+  <path class="edge" d="M506 529 H560"/>
+
+  <!-- decision diamond -->
+  <polygon class="box" points="660,479 762,529 660,579 558,529" fill="#f4eae2" stroke="#d8b6a8"/>
+  <text class="yn" x="660" y="524" text-anchor="middle">还有</text>
+  <text class="yn" x="660" y="546" text-anchor="middle">tool_calls？</text>
+
+  <!-- 是 -> tools -->
+  <path class="edge" d="M735 504 C780 484, 800 480, 858 480"/>
+  <text class="yn" x="772" y="478" text-anchor="middle">是</text>
+  <rect class="box" x="860" y="452" width="190" height="60" rx="18" fill="#e9eff7" stroke="#a1b3c8"/>
+  <text class="h" x="955" y="488" text-anchor="middle">去 tools 执行</text>
+  <text class="tag" x="955" y="536" text-anchor="middle">结果回 model，重复 ①</text>
+
+  <!-- 否 -> end -->
+  <path class="edge" d="M735 554 C780 574, 800 580, 858 580"/>
+  <text class="yn" x="772" y="600" text-anchor="middle">否</text>
+  <rect class="box" x="860" y="552" width="190" height="60" rx="18" fill="#ffffff" stroke="#d8d1c7"/>
+  <text class="h" x="955" y="588" text-anchor="middle">__end__ 结束</text>
+
+  <rect x="1086" y="492" width="122" height="74" rx="18" fill="#f7f1ea" stroke="#e0d3c6"/>
+  <text class="note" x="1147" y="522" text-anchor="middle">加 middleware</text>
+  <text class="p" x="1147" y="544" text-anchor="middle">只在 model 前后</text>
+  <text class="p" x="1147" y="562" text-anchor="middle">插节点（见 4.7）</text>
+</svg>

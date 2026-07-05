@@ -1,6 +1,6 @@
-# LG-06：预构建 Agent，不是魔法，是标准循环的封装
+# LG-06：预构建 Agent —— 你反复手搓的那几张图，LangGraph 已经封装好了
 
-> **核心冲突句：人会自然把“查工具 → 看结果 → 再判断”当成连续动作，但图不会；如果这是标准 ReAct 循环，预构建 Agent 可以帮你快速封装，代价是中间控制权变少。**
+> **核心冲突句：你已经会用 StateGraph 手搓图了；但“能调工具的 Agent”“给 Agent 加限次 / 脱敏 / 审批”“多专家协作”这几张图你会反复搭。LangGraph 把它们封装成预构建件——直接用，别再手搓；只有超出标准件时，才回到自定义图。**
 
 这节课从一个真实产品场景开始：**OpsBot 客服 / 运维助手**。
 
@@ -8,26 +8,38 @@
 
 > “查一下订单 A100 的状态，如果符合规则，帮我估算退款金额。”
 
-这类需求很常见：LLM 判断要用哪些工具，工具返回结果，LLM 再整合回答。你当然可以从零写 StateGraph：agent 节点、tools 节点、条件边、循环边。但如果只是标准循环，先用预构建 Agent 更快。
+这类需求很常见，而且它背后的图结构是高度标准化的。你当然可以从零写 StateGraph：agent 节点、tools 节点、条件边、循环边……但如果只是标准件，没必要每次手搓。
 
-本节课要训练的不是“背 `create_agent`”，而是判断：**什么时候用预构建快速验证，什么时候必须回到自定义 StateGraph。**
+本节课要训练的不是“背 `create_agent`”，而是判断：**哪些需求被预构建件覆盖了、可以直接拿来用；哪些超出了标准件、必须回到自定义 StateGraph。**
 
-## 0. 为什么需要预构建 Agent？
+## 0. 这一章在讲什么：LangGraph 替你封装好了哪些“图”
 
-<div style="max-width: 980px; margin: 1rem auto;">
-  <img src="images/prebuilt-agent-scenario-cn.svg" alt="为什么需要预构建 Agent" style="width: 100%; height: auto; display: block;">
+到上一章为止，你已经能用 `StateGraph` 手搓图：定义 state、加 node、连 edge、画条件边和循环边。
+
+但很快你会发现，有几张图你会**反复搭**：
+
+- 一个“能调工具、看结果、再判断”的 Agent；
+- 给这个 Agent 加上“最多调 3 次 / 敏感信息打码 / 长对话摘要 / 危险动作先问人”；
+- 让多个专家 Agent 分工协作。
+
+这些图结构高度标准化。LangGraph 干脆把它们封装成**预构建件**：你直接拿来用，不必每次从零连节点和边。
+
+<div style="max-width: 1040px; margin: 1rem auto;">
+  <img src="images/prebuilt-landscape-cn.svg" alt="LangGraph 预构建件全景：覆盖哪些问题、什么才手搓" style="width: 100%; height: auto; display: block;">
 </div>
 
-OpsBot 同时有三类需求：
+这一章就沿着这张全景图走。先把“预构建件覆盖了哪几类问题”和“什么才回到手搓”对齐：
 
-| 需求 | 适合的机制 | 为什么 |
+| 你的需求 | 用哪个预构建件 | 替代了什么手搓 |
 |---|---|---|
-| 快速验证一个能查工具的 Agent | `create_agent` | 标准 LLM → tools → LLM 循环不用重写 |
-| 把订单查询、退款计算做成可复用能力 | tools | 能力原子化，可被不同 Agent 复用 |
-| 多个专家协作：订单、退款、技术 | supervisor / swarm | 角色能力原子化，可被调度或交接 |
-| 涉及审批、权限、审计 | 自定义 StateGraph | 需要显式状态、路由和人工边界 |
+| 能查工具、循环判断的 Agent | `create_agent` | agent / tools 节点 + 条件边 + 循环边 |
+| 限次 / 重试 / 摘要 / 脱敏 / 审批 | `middleware` 全家桶 | 塞 prompt 或手写拦截节点 |
+| 多专家分发 / 平级转接 | `create_supervisor` / `create_swarm` | 手搓调度与交接路由 |
+| 副作用审批 / 自定义状态 / 复杂分支 | 自定义 `StateGraph` | —— 这才是你该手搓的部分 |
 
-判断规则先记住：**预构建求快，自定义求控。**
+> 核心判断：**预构建不是“更高级的图”，而是“你会反复手搓的那几张图，LangGraph 提前搭好了”。它求快、覆盖标准件；手搓求控、处理例外。**
+
+后面每一节都落在全景图的某一格：§2–§5 讲 ①号件 `create_agent`（它的内部结构、参数、middleware），§6 / §9 讲“什么时候回到手搓”，§8 讲 ③号件 `supervisor` / `swarm`。
 
 ## 1. 模型配置：本节继续用真实 LLM
 
@@ -98,9 +110,32 @@ print("工具名称:", [tool.name for tool in ops_tools])
 print("能力是否已原子化:", "是 — 这些工具可以被不同 Agent 复用")
 ```
 
-## 3. create_agent：标准循环三行封装
+## 3. ①号预构建件：`create_agent` —— 标准 ReAct 循环
 
-如果需求就是标准循环：
+### 先理解这条循环为什么存在：AI 显得蠢，常因为少了工具和负反馈
+
+很多人觉得 AI 蠢，其实是拿一个被剥夺了工具和反馈的它，去比一个工具和反馈都齐全的人。
+
+人解决问题显得聪明，不是一次就想对，而是因为人是一个带“工具 + 负反馈”的个体：手里有很多工具（查资料、算一遍、问同事），每做一步都有负反馈（算错会发现、对方说“不对”会改）。于是能不断试错、纠偏。
+
+纯 LLM 正好被剥夺这两样：**没工具**（只凭记忆）、**没负反馈**（说完即止，错了不知道、不能回头）。它不是笨，是“一锤子买卖 + 没有手”。
+
+`ReAct（Reason + Act）` 就是把这套逻辑还给模型：
+
+```text
+Reason（想下一步）→ Act（用工具动手）→ Observe（看结果，这就是负反馈）→ 再 Reason
+      ↑___________________ 循环到模型认为做完 ___________________|
+```
+
+`create_agent` 封装的就是这条标准循环。它的灵魂是“自主”：走哪条路由模型当场决定。下图把这条演化线，和“什么时候该把控制权收回手搓”放在同一条光谱上：
+
+<div style="max-width: 1040px; margin: 1rem auto;">
+  <img src="images/control-autonomy-spectrum-cn.svg" alt="从纯 LLM 到 ReAct 再到图嵌 Agent 的控制力与自主性光谱" style="width: 100%; height: auto; display: block;">
+</div>
+
+### 三行就能搭出来
+
+如果需求就是这条标准循环：
 
 ```text
 用户问题 → LLM 判断需要哪些工具 → 工具返回结果 → LLM 整合回复
@@ -123,20 +158,37 @@ opsbot_agent = create_agent(
 )
 
 user_question = "查一下订单 A100 的状态，如果这笔订单金额是 299 元，帮我估算可退多少钱。"
-opsbot_result = opsbot_agent.invoke({"messages": [HumanMessage(content=user_question)]})
 
-messages = opsbot_result["messages"]
+# ① 先看原始输出：用 stream 逐步取状态，对每条新消息调用官方的 message.pretty_print()。
+#    pretty_print() 是 LangChain 消息自带的方法，会打印角色、内容、tool_calls、工具名。
+print("① 原始消息流：一条条看 agent 内部发生了什么\n")
+seen = 0
+final_state = None
+for step in opsbot_agent.stream(
+    {"messages": [HumanMessage(content=user_question)]},
+    stream_mode="values",
+):
+    final_state = step
+    for message in step["messages"][seen:]:
+        message.pretty_print()
+    seen = len(step["messages"])
+
+# ② 看完原始流，再从这串消息里抽取关键证据，对照刚才一条条看到的内容。
+print("\n② 从原始消息里抽取关键证据")
+messages = final_state["messages"]
 ai_tool_messages = [message for message in messages if getattr(message, "tool_calls", None)]
 tool_messages = [message for message in messages if message.type == "tool"]
 
 print("消息总数:", len(messages))
 print("是否产生 tool_calls:", display_bool(bool(ai_tool_messages)))
 print("工具消息数量:", len(tool_messages))
-print("最终回复:")
-print(messages[-1].content)
+print("最终回复（官方 pretty_print）:")
+messages[-1].pretty_print()
 ```
 
 这个例子已经不是假函数演示：真实 LLM 决定调用哪些工具，预构建 Agent 负责把 tool call、tool execution、再思考循环串起来。
+
+打印用的是 LangChain 官方方法 `message.pretty_print()`——每条消息自带的方法，会显示角色、内容和 `tool_calls`。注意：库里**没有**“一行打印整串消息”的官方函数（别人教程里的 `print_stream` / `pretty_print_messages` 都是作者手写的 helper）。我们这里只是用一个普通 `for` 循环，对每条消息调用官方的 `pretty_print()`。
 
 ## 4. 白盒化：create_agent 内部到底帮你搭了什么？
 
@@ -152,20 +204,215 @@ print(messages[-1].content)
 4. 有工具调用就回到模型，没有工具调用就结束。
 
 ```python
-print("观察消息链路:")
-for index, message in enumerate(messages, 1):
-    if message.type == "human":
-        print(f"{index}. HumanMessage: {message.content[:80]}")
-    elif message.type == "ai":
-        tool_calls = getattr(message, "tool_calls", [])
-        print(f"{index}. AIMessage: tool_calls={len(tool_calls)} content={str(message.content)[:80]}")
-        for tool_call in tool_calls:
-            print(f"   - {tool_call['name']}({tool_call['args']})")
-    elif message.type == "tool":
-        print(f"{index}. ToolMessage: {message.name} → {message.content[:80]}")
+# 白盒化第一步：把上一节产生的整串 messages 一条条打出来。
+# 不自己拼接 content / tool_calls，直接用官方的 message.pretty_print()。
+print("观察消息链路（每条都用官方 pretty_print 打印）:\n")
+for message in messages:
+    message.pretty_print()
 ```
 
 循环终止的关键不是模型说“我结束了”，而是程序看到最后一条 AIMessage 没有 `tool_calls`。这就是预构建 Agent 的核心路由规则。
+
+## 4.5 源码白盒化：先看清结构图，再让 agent 自己确认
+
+上一节用文字描述了循环，但学生很容易把 `create_agent` 当黑盒。其实它返回的就是一个 `CompiledStateGraph`——和 LG-01 学的 `StateGraph().compile()` 是同一种东西，编译出来的结构很小。
+
+先建立这张「先整体、再拆解」的结构图：
+
+<div style="max-width: 1040px; margin: 1rem auto;">
+  <img src="images/create-agent-anatomy-cn.svg" alt="create_agent 编译出来的真实结构：整体骨架 + 条件路由拆解" style="width: 100%; height: auto; display: block;">
+</div>
+
+记住两层就够了：
+
+1. **整体**：只有 `model` 和 `tools` 两个业务节点。
+2. **唯一难点**：循环要不要继续，不看模型嘴上说，而看最后一条 `AIMessage` 还有没有 `tool_calls`。
+
+下面不靠「我画的图」取信，而是用 LG-01 学过的内省方法 `get_graph()`，让 agent **自己说出节点和边**，回头对照上图验证。
+
+```python
+# 运行证据：让 agent 自己说出节点和边，应与上面的结构图逐字对应。
+print("agent 实际类型:", type(opsbot_agent).__name__)
+
+graph = opsbot_agent.get_graph()
+print("\n图里到底有哪些节点:")
+for node in graph.nodes.values():
+    print(" -", node.id)
+
+print("\n图里有哪些边:")
+for edge in graph.edges:
+    arrow = "条件边" if edge.conditional else "硬边"
+    print(f" - {edge.source:>10} → {edge.target:<10} ({arrow})")
+```
+
+打印出来应该正好对上上图：4 个框（`__start__` / `model` / `tools` / `__end__`），其中 `model → ?`、`tools → ?` 是**条件边**，`__start__ → model` 是硬边。**结构图不是隐喻，而是逐字对应这里的节点和边。**
+
+> 想要可视化版本，可以 `print(opsbot_agent.get_graph().draw_mermaid())` 把 mermaid 文本贴到 mermaid.live 看。这里不展开——我们已经有了上面那张更清晰的结构图，原始 mermaid 文本对初学者反而更难读。
+
+### 这两条条件边到底是怎么写出来的
+
+打开 `langchain/agents/factory.py` 里 `create_agent` 的实现，去掉 middleware 相关分支之后，核心组装其实就是这几行（已精简）：
+
+```python
+graph = StateGraph(state_schema=resolved_state_schema, ...)
+
+graph.add_node("model", RunnableCallable(model_node, amodel_node, trace=False))
+if tool_node is not None:
+    graph.add_node("tools", tool_node)
+
+graph.add_edge(START, "model")
+
+# 条件边 1：model 跑完之后，看最后一条 AIMessage 有没有 tool_calls
+graph.add_conditional_edges(
+    "model",
+    _make_model_to_tools_edge(
+        model_destination="model",
+        structured_output_tools=structured_output_tools,
+        end_destination=END,
+    ),
+    ["tools", END],
+)
+
+# 条件边 2：tools 跑完之后，把工具结果带回 model 继续推理
+graph.add_conditional_edges(
+    "tools",
+    _make_tools_to_model_edge(
+        tool_node=tool_node,
+        model_destination="model",
+        structured_output_tools=structured_output_tools,
+        end_destination=END,
+    ),
+    ["model", END],
+)
+
+return graph.compile(checkpointer=checkpointer, store=store, ...)
+```
+
+三件事值得记住：
+
+1. **只有 `model` 和 `tools` 两个真正的业务节点。** 你之前自己手写 ReAct 也会写这两个节点，预构建只是替你写好了。
+2. **判定是否继续循环的函数叫 `_make_model_to_tools_edge`。** 它的核心判断是：最后一条 `AIMessage` 还有 `tool_calls` 就路由到 `tools`，否则到 `END`。模型并不能直接喊“结束”，是这个函数决定的。
+3. **`tools → model` 也是条件边而不是硬边。** 因为如果某个工具声明了 `return_direct=True`（或绑定了结构化输出工具），`tools` 也可能直接跳到 `END`，不会再回 `model`。
+
+### 加了 middleware 之后图会变胖
+
+`create_agent` 还有一个 `middleware=[...]` 参数。一旦你传入带 `before_agent` / `before_model` / `after_model` / `after_agent` 钩子的中间件，源码会**多 add 几个节点**，并且把：
+
+- 入口节点改成第一个 `before_agent` / `before_model` 节点；
+- 循环入口改成第一个 `before_model` 节点；
+- 循环出口改成最后一个 `after_model` 节点；
+- 退出节点改成最后一个 `after_agent` 节点。
+
+这一节先不展开 middleware，但学生现在已经能回答一个关键问题：**为什么有时候你打印 `get_graph()` 会看到比 `model`、`tools` 更多的节点？** —— 那是 middleware 注入进去的钩子节点，骨架还是同一条 ReAct 循环。
+
+记住这条体检流程：**遇到不熟悉的预构建 Agent，先 `print(agent.get_graph().draw_mermaid())`，让它自己说出结构，再去读源码。**
+
+## 4.6 create_agent 参数全景：你还能拉哪些杠杆
+
+到这里我们其实只用过三个参数：`model`、`tools`、`system_prompt`。但 `create_agent` 实际签名（langchain 1.3）里有十几个杠杆，按用途分成五组就清楚了：
+
+| 组别 | 参数 | 一句话作用 | 课堂里要不要碰 |
+|---|---|---|---|
+| 必填两件套 | `model`、`tools` | 模型实例 + 工具集 | 必碰 |
+| 改 prompt / 输出形态 | `system_prompt`、`response_format` | 系统提示词 / 让模型返回结构化对象 | `system_prompt` 必碰；`response_format` 第 7 节之后再用 |
+| 改 state | `state_schema`、`context_schema` | 给 messages 之外加业务字段 / 加运行时上下文 | 真有自定义字段时再碰，一般留给自定义 StateGraph |
+| 接持久层 | `checkpointer`、`store`、`cache` | thread 内现场 / 跨 thread 偏好 / 节点级缓存 | `checkpointer` 第 7 节用，其它按需 |
+| 调试与控制 | `debug`、`name`、`interrupt_before`、`interrupt_after`、`transformers` | 打详细日志 / 给 subgraph 起名 / 在某个节点前后挂断点 / 流式自定义 | 多 Agent 时 `name` 必碰，其它按需 |
+| **扩展点本体** | **`middleware`** | **把横切关注点（限流、审批、PII、摘要等）插成图节点** | **本节重点** |
+
+一个判断口诀：
+
+```text
+要改模型行为 / 要加横切能力 → middleware
+要加业务字段 → state_schema（或干脆回自定义 StateGraph）
+要换记忆层 → checkpointer + store
+要在某个节点前后强行卡断点 → interrupt_before / interrupt_after
+```
+
+`interrupt_before=["tools"]` 是 `create_agent` 里最直接的「在工具执行前先暂停」开关，等价于让学生想象的「人会问一句再动手」。这条路线是无 middleware 时最快的人工审批方案，但它**对所有工具一视同仁**——如果你只想审某个工具，下一节的 `HumanInTheLoopMiddleware` 会更合适。
+
+## 4.7 middleware：把横切关注点从 prompt 里搬出来
+
+### 为什么需要 middleware
+
+学生最常见的反直觉点是：当 Agent 出了问题，第一反应是「再加一句 prompt」。但这些动作其实根本不属于业务对话：
+
+- **「最多调 3 次模型，再多就停」**——这是预算控制，不是业务规则。
+- **「用户消息里如果有信用卡号要打码」**——这是合规，不是业务规则。
+- **「这次对话太长了，给我把前 30 条总结成一段」**——这是上下文管理，不是业务规则。
+- **「`issue_refund` 调用前必须先问人」**——这是审批，不是业务规则。
+
+把这些塞进 prompt，模型只是「被告知应该这样做」，并不一定会真的做。`middleware` 的设计就是：**把这些横切动作拆出来，变成图里真实的节点**，不依赖模型的自觉。
+
+### 它到底改变了图的哪里
+
+回顾 4.5 节，`create_agent` 默认只有 `model` 和 `tools`。源码会扫描每个 middleware 是否实现了 `before_agent` / `before_model` / `after_model` / `after_agent` 四个钩子之一，然后**为每个钩子 `add_node` 一个新节点**，并把入口、循环入口、循环出口、退出节点一一替换掉。
+
+也就是说：**middleware 不是装饰器，是真节点。** 它会出现在 `get_graph()` 里，会在 LangSmith trace 里出现，调试时一目了然。
+
+### 最小可运行 demo：给 OpsBot 加调用次数预算
+
+`ModelCallLimitMiddleware(run_limit=1, exit_behavior="end")` 表示「每次 `invoke` 最多让模型说话 1 次，超过就以一条说明性 AIMessage 结束」。这是最容易看到效果的 middleware：图里多出节点，行为也立刻变了。
+
+```python
+from langchain.agents.middleware import ModelCallLimitMiddleware
+
+budget_agent = create_agent(
+    chat_model,
+    ops_tools,
+    system_prompt=opsbot_prompt,
+    middleware=[ModelCallLimitMiddleware(run_limit=1, exit_behavior="end")],
+)
+
+print("加 middleware 之后的节点:")
+for node in budget_agent.get_graph().nodes.values():
+    print(" -", node.id)
+
+budget_result = budget_agent.invoke({
+    "messages": [HumanMessage(content="查 A100，再算 299 元订单的退款")]
+})
+
+print("\n总消息数:", len(budget_result["messages"]))
+print("最后一条消息（官方 pretty_print，行为被 middleware 阻断）:")
+budget_result["messages"][-1].pretty_print()
+```
+
+学生会看到：
+
+```text
+加 middleware 之后的节点:
+ - __start__
+ - model
+ - tools
+ - ModelCallLimitMiddleware.before_model
+ - ModelCallLimitMiddleware.after_model
+ - __end__
+
+总消息数: 6
+最后一条消息（官方 pretty_print，行为被 middleware 阻断）:
+================================== Ai Message ==================================
+
+Model call limits exceeded: run limit (1/1)
+```
+
+两个观察对应 4.5 节埋下的伏笔：
+
+1. **图真的变胖了。** 多了 `ModelCallLimitMiddleware.before_model` 和 `.after_model` 两个节点，但骨架仍然是那条 ReAct 循环——正是结构图右下角标注的「加 middleware 只在 model 前后插节点」。
+2. **行为是被 middleware 阻断的，不是被 prompt 劝退的。** 即使 prompt 没说「只能调 1 次」，到第二次准备进 `model` 节点时，`before_model` 钩子检测到预算用完，直接把 agent 推到 END，并附上一条说明性消息。
+
+### 常用内置 middleware 速览
+
+langchain 自带的 middleware 按动机分四类。课堂上不需要全部演示，只需要让学生**知道每种横切问题应该往哪个 middleware 看**：
+
+| 动机 | middleware | 关键参数 | 学生常见误区 |
+|---|---|---|---|
+| 限制模型 / 工具调用次数 | `ModelCallLimitMiddleware`、`ToolCallLimitMiddleware` | `run_limit`、`thread_limit`、`exit_behavior` | 用 prompt 写「请最多调 3 次」；模型不会真的算 |
+| 自动重试 / 模型回退 | `ModelRetryMiddleware`、`ToolRetryMiddleware`、`ModelFallbackMiddleware` | `max_retries`、`retry_on`、`first_model + 备用模型` | 用 try/except 包业务节点；难复用、难审计 |
+| 上下文管理 | `SummarizationMiddleware`、`ContextEditingMiddleware` | `trigger`、`keep`、`edits` | 等到 token 爆了再手工剪历史 |
+| 安全与合规 | `PIIMiddleware`、`HumanInTheLoopMiddleware` | `pii_type + strategy`、`interrupt_on` | 在 prompt 里写「请脱敏」、「请先问我」；模型不可靠 |
+| 工具体验增强 | `LLMToolSelectorMiddleware`、`TodoListMiddleware`、`FilesystemFileSearchMiddleware`、`ShellToolMiddleware` | `max_tools`、`always_include` | 把所有工具塞给一个 Agent，模型选择空间太大 |
+
+记住：**middleware 是给「不属于业务对话但又必须做」的事情准备的容器**。下一节我们演示一个「副作用工具不能直接执行」的例子——这正是 `HumanInTheLoopMiddleware` 的主场（留到第 6 节）。
 
 ## 5. 用 stream 观察黑盒内部
 
@@ -175,39 +422,36 @@ for index, message in enumerate(messages, 1):
 stream_question = "查一下订单 B200 是否还能退款，并估算 520 元订单的退款金额。"
 print("用户:", stream_question)
 
+# 每个 step 用官方 pretty_print() 打印这一步最新的消息；
+# 步数和当前 messages 数留作证据，证明内部仍是“消息流 + 工具调用 + 循环路由”。
 for step_index, chunk in enumerate(
     opsbot_agent.stream({"messages": [HumanMessage(content=stream_question)]}, stream_mode="values"),
     1,
 ):
-    last_message = chunk["messages"][-1]
-    print(f"\n--- Step {step_index} ---")
-    print("消息类型:", last_message.type)
-    if last_message.type == "ai":
-        tool_calls = getattr(last_message, "tool_calls", [])
-        print("tool_calls 数量:", len(tool_calls))
-        if tool_calls:
-            print("工具:", [tool_call["name"] for tool_call in tool_calls])
-        else:
-            print("最终回答片段:", str(last_message.content)[:120])
-    elif last_message.type == "tool":
-        print("工具结果:", last_message.name, "→", last_message.content[:120])
-    print("当前 messages 数:", len(chunk["messages"]))
+    print(f"\n--- Step {step_index}（当前 messages 数: {len(chunk['messages'])}）---")
+    chunk["messages"][-1].pretty_print()
 ```
 
 stream 的意义不是炫技，而是帮助学生看到：预构建虽然封装了图，但内部仍然是消息流、工具调用和循环路由。
 
 ## 6. 预构建的代价：快，但控制力少
 
-<div style="max-width: 980px; margin: 1rem auto;">
+<div style="max-width: 1040px; margin: 1rem auto;">
   <img src="images/prebuilt-vs-custom-cn.svg" alt="预构建 Agent 与自定义 StateGraph 的取舍" style="width: 100%; height: auto; display: block;">
 </div>
 
-只要出现下面需求，就不要迷信三行代码：
+注意一个常见误解：**预构建 Agent 并不是「不能审批、不能中断」。** 它自带这些开关——
 
-- 需要人工审批。
-- 需要自定义业务状态，比如 `user_role`、`risk_level`、`pending_approval`。
-- 需要复杂路由，不只是 LLM → tools → LLM。
-- 需要完整审计每个中间节点。
+- 工具执行前要人工确认：`interrupt_before=["tools"]` + `checkpointer`，或 `HumanInTheLoopMiddleware`。
+- 整段挂起 / 恢复：靠 `checkpointer`，和 LG-03 学的一样。
+
+真正需要迁移到自定义 `StateGraph` 的，是下面这些**超出标准循环**的需求：
+
+- 自定义业务状态，比如 `user_role`、`risk_level`、`pending_approval`。
+- 复杂路由，不只是 LLM → tools → LLM。
+- 把审批 / 权限 / 完整审计做成图里的一等显式结构。
+
+下面先看一个反例：默认的 create_agent 会**直接执行**有副作用的危险工具。
 
 ```python
 @tool
@@ -227,11 +471,14 @@ unsafe_result = unsafe_agent.invoke({
 unsafe_tool_messages = [message for message in unsafe_result["messages"] if message.type == "tool"]
 
 print("危险工具是否被调用:", display_bool(any(message.name == "issue_refund" for message in unsafe_tool_messages)))
-print("为什么这是问题:", "退款是副作用动作，生产环境必须先走审批边界")
-print("正确迁移方向:", "自定义 StateGraph + interrupt / 审批节点 / wrapper 级审批")
+print("为什么这是问题:", "默认 agent 直接执行了退款，中间没有任何审批关卡")
+print("最简修法（仍在预构建内）:", "interrupt_before=['tools'] + checkpointer，或 HumanInTheLoopMiddleware")
+print("需要更强控制时再迁移:", "自定义 StateGraph —— 业务状态 / 复杂路由 / 一等审批审计")
 ```
 
-这个例子要让学生形成判断：预构建 Agent 很适合原型，但遇到副作用工具、审批、权限时，应该迁移到自定义图，而不是继续往 prompt 里塞“请谨慎”。
+这个例子要让学生形成判断：默认的 create_agent 会**直接执行**副作用工具——但修复它**不一定要迁移**。预构建自带 `interrupt_before=["tools"]` 和 `HumanInTheLoopMiddleware`，就能在工具执行前加上审批关卡。只有当你还需要自定义业务状态、复杂路由、把审批 / 权限 / 审计做成一等显式结构时，才迁移到自定义 `StateGraph`。
+
+唯一不能做的，是**把「请谨慎」塞进 prompt 当安全边界**——模型不保证照做。
 
 ## 7. 记忆与上下文：messages 会越来越长
 
@@ -268,7 +515,8 @@ second_turn = opsbot_with_memory.invoke(
 print("第一轮 messages 数:", len(first_turn["messages"]))
 print("第二轮 messages 数:", len(second_turn["messages"]))
 print("第二轮是否接上同一 thread:", display_bool(len(second_turn["messages"]) > len(first_turn["messages"])))
-print("第二轮回复:", second_turn["messages"][-1].content[:200])
+print("第二轮回复（官方 pretty_print）:")
+second_turn["messages"][-1].pretty_print()
 ```
 
 这里衔接 LG-04：checkpointer 保存的是可恢复现场，不是长期偏好 Store。预构建 Agent 可以接 checkpointer，但如果你需要长期用户资料、权限、审批状态，仍然要认真设计外层状态。
@@ -277,12 +525,14 @@ print("第二轮回复:", second_turn["messages"][-1].content[:200])
 
 LG-05 讲过 tools 和 subgraph 的能力原子化；LG-06 继续往上一层：把一个专家 Agent 原子化。
 
-<div style="max-width: 980px; margin: 1rem auto;">
-  <img src="images/supervisor-swarm-cn.svg" alt="Supervisor 与 Swarm 的区别" style="width: 100%; height: auto; display: block;">
+<div style="max-width: 1040px; margin: 1rem auto;">
+  <img src="images/supervisor-swarm-cn.svg" alt="Supervisor 与 Swarm 的区别，以及它们本身也是图" style="width: 100%; height: auto; display: block;">
 </div>
 
 - `create_supervisor`：一个主管调度多个专家，适合任务分发。
 - `create_swarm`：多个专家平级交接，适合客服转接。
+
+但别把它们当魔法。和 §4.5 一样，`create_supervisor` / `create_swarm` 编译出来**同样是 `CompiledStateGraph`**——看上图最后一层「套娃」：**每个专家就是图里的一个节点，而专家内部又是 §4.5 那张 model / tools 循环**。所谓「多 Agent」，本质就是把一张 ReAct 图当成一个节点，再用一张更大的图把它们连起来。
 
 ```python
 from langgraph_supervisor import create_supervisor
@@ -301,26 +551,79 @@ refund_agent = create_agent(
     name="refund_expert",
 )
 
-supervisor_builder = create_supervisor(
+supervisor_app = create_supervisor(
     [order_agent, refund_agent],
     model=chat_model,
     prompt="你是客服主管。根据用户问题，把任务交给订单专员或退款专员；必要时整合他们的结果。",
     output_mode="last_message",
-)
-supervisor_app = supervisor_builder.compile()
+).compile()
 
-supervisor_result = supervisor_app.invoke({
-    "messages": [HumanMessage(content="订单 A100 的状态是什么？如果金额是 299 元，能退多少钱？")]
-})
-
-print("Supervisor messages 数:", len(supervisor_result["messages"]))
-print("最终回复:")
-print(supervisor_result["messages"][-1].content)
+# 全流程 pretty_print：一条条看主管如何把任务分给专家、专家又如何交还结果。
+print("====== Supervisor 全流程 ======")
+seen = 0
+for step in supervisor_app.stream(
+    {"messages": [HumanMessage(content="订单 A100 的状态是什么？如果金额是 299 元，能退多少钱？")]},
+    stream_mode="values",
+):
+    for message in step["messages"][seen:]:
+        message.pretty_print()
+    seen = len(step["messages"])
 ```
 
-Supervisor 的本质是：主管 Agent 把“订单专家”“退款专家”当成可调用的专家能力。它不是把所有工具塞给一个大 Agent，而是把角色能力原子化。
+```python
+# 证据：supervisor 也只是一张编译出来的图，专家就是图里的节点（对照上图「套娃」那层）。
+print("supervisor 实际类型:", type(supervisor_app).__name__)
+print("\nsupervisor 图里的节点:")
+for node in supervisor_app.get_graph().nodes.values():
+    print(" -", node.id)
+```
 
-Swarm 适合另一类场景：没有固定主管，当前 Agent 可以把对话交接给另一个 Agent，并用 `active_agent` 记住当前由谁负责。课堂只需要先掌握选型：**任务分发用 supervisor，连续转接用 swarm。**
+上面两段印证了「套娃」：`supervisor` / `order_expert` / `refund_expert` 真就是图里的节点，而每个专家内部又是一张 §4.5 的 model/tools 图。Supervisor 的本质是——主管 Agent 把专家当成可调用的能力，而不是把所有工具塞进一个大 Agent。
+
+下面看另一种拓扑：**Swarm 去掉中心主管**，让专家用 `handoff` 工具直接把对话交接给对方，并用 `active_agent` 记住当前由谁负责。
+
+```python
+from langgraph_swarm import create_swarm, create_handoff_tool
+
+# 和 supervisor 用同一批能力，但给每个专家加一个 handoff 工具，让它们能把对话交接给对方。
+order_member = create_agent(
+    chat_model,
+    [query_order_status, create_handoff_tool(agent_name="refund_member")],
+    system_prompt="你是订单专员。处理订单状态；遇到退款政策或金额问题，就转给 refund_member。",
+    name="order_member",
+)
+refund_member = create_agent(
+    chat_model,
+    [query_refund_policy, calculate_refund_amount, create_handoff_tool(agent_name="order_member")],
+    system_prompt="你是退款专员。处理退款政策和金额；遇到订单状态问题，就转给 order_member。",
+    name="refund_member",
+)
+
+swarm_app = create_swarm(
+    [order_member, refund_member],
+    default_active_agent="order_member",
+).compile()
+
+# 同样全流程 pretty_print：观察对话如何从 order_member 被 handoff 到 refund_member。
+print("====== Swarm 全流程 ======")
+seen = 0
+for step in swarm_app.stream(
+    {"messages": [HumanMessage(content="订单 A100 的状态是什么？如果金额是 299 元，能退多少钱？")]},
+    stream_mode="values",
+):
+    for message in step["messages"][seen:]:
+        message.pretty_print()
+    seen = len(step["messages"])
+
+# swarm 也是编译出来的图：成员就是节点（和 supervisor 同理的套娃）。
+print("\nswarm 图里的节点:")
+for node in swarm_app.get_graph().nodes.values():
+    print(" -", node.id)
+```
+
+观察 Swarm 全流程能看到和 Supervisor 的区别：没有 `supervisor` 这个中心节点，而是 `order_member` 通过一个 `transfer_to_refund_member` 的 handoff 工具，把对话**直接交接**给 `refund_member`；`active_agent` 一路记录当前由谁负责。结构上它仍是 `CompiledStateGraph`，成员就是节点。
+
+选型口诀先记住：**任务分发、结果汇总用 `supervisor`；连续转接、平级协作用 `swarm`。**
 
 ## 9. 什么时候从预构建迁移到自定义？
 

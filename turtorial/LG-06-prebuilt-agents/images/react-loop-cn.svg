@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
-  <title id="title">create_react_agent 的循环</title>
-  <desc id="desc">展示 create_react_agent 内部的 agent 节点、tools 节点、tool_calls 路由和结束条件。</desc>
+  <title id="title">create_agent 的循环</title>
+  <desc id="desc">展示 create_agent 内部的 agent 节点、tools 节点、tool_calls 路由和结束条件。</desc>
   <defs>
     <filter id="shadow" x="-12%" y="-12%" width="124%" height="124%"><feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#3f4d55" flood-opacity="0.10"/></filter>
     <marker id="arrow" markerWidth="12" markerHeight="12" refX="9" refY="6" orient="auto"><path d="M2,2 L10,6 L2,10 Z" fill="#74838a"/></marker>
@@ -37,5 +37,5 @@
   <text class="api" x="810" y="488" text-anchor="middle">无 tool_calls → 结束</text>
 
   <rect x="222" y="626" width="836" height="50" rx="25" fill="#ffffff" stroke="#d8cec1"/>
-  <text class="footer" x="640" y="658" text-anchor="middle">create_react_agent = agent 节点 + tools 节点 + 条件路由 + 循环边。</text>
+  <text class="footer" x="640" y="658" text-anchor="middle">create_agent = agent 节点 + tools 节点 + 条件路由 + 循环边。</text>
 </svg>

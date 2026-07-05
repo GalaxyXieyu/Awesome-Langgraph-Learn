@@ -1,0 +1,104 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
+  <title id="title">控制力与自主性光谱</title>
+  <desc id="desc">从纯 LLM 到 ReAct Agent 再到图嵌 Agent，展示工具与负反馈如何让模型不再显得蠢，以及图如何补上硬反馈。</desc>
+  <defs>
+    <filter id="shadow" x="-12%" y="-12%" width="124%" height="124%"><feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#3f4d55" flood-opacity="0.10"/></filter>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="9" refY="6" orient="auto"><path d="M2,2 L10,6 L2,10 Z" fill="#74838a"/></marker>
+    <linearGradient id="spec" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#a9c0b6"/>
+      <stop offset="0.5" stop-color="#cfd2cb"/>
+      <stop offset="1" stop-color="#dcc0ac"/>
+    </linearGradient>
+    <style>
+      .bg{fill:#fbf7ef}
+      .title{font:700 36px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#27343b}
+      .sub{font:400 18px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#66737b}
+      .box{filter:url(#shadow);stroke-width:1.4}
+      .h{font:700 23px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#2c3940}
+      .api{font:600 14px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;fill:#687781}
+      .p{font:400 16px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#43525a}
+      .yes{font:600 16px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#4f8a69}
+      .no{font:600 16px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#b3796a}
+      .take{font:700 16px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#34454d}
+      .line{stroke:#74838a;stroke-width:2.4;fill:none;marker-end:url(#arrow)}
+      .sec{font:700 21px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#2c3940}
+      .end{font:600 16px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#4a585f}
+      .mk{font:700 16px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#2c3940}
+      .footer{font:700 18px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#34454d}
+      .div{stroke:#e4ddd0;stroke-width:1.2}
+    </style>
+  </defs>
+  <rect class="bg" width="1280" height="720"/>
+
+  <text class="title" x="640" y="52" text-anchor="middle">AI 不是更蠢，是少了工具和负反馈</text>
+  <text class="sub" x="640" y="84" text-anchor="middle">人有一堆工具、每步有负反馈，所以能试错纠偏、显得聪明；纯模型这两样都没有，还不能回头。</text>
+  <text class="sub" x="640" y="110" text-anchor="middle">ReAct 把「工具 + 看结果的反馈循环」还给模型；图再补上「规则 / 人在固定位置」的硬反馈。</text>
+
+  <!-- Card 1: 纯 LLM -->
+  <rect class="box" x="64" y="150" width="270" height="224" rx="24" fill="#f3efe6" stroke="#d8d1c7"/>
+  <text class="h" x="199" y="190" text-anchor="middle">纯 LLM</text>
+  <text class="api" x="199" y="214" text-anchor="middle">一锤子买卖</text>
+  <line class="div" x1="86" y1="230" x2="312" y2="230"/>
+  <text class="no" x="88" y="262">✗ 没工具（只凭记忆）</text>
+  <text class="no" x="88" y="294">✗ 没反馈（说完即止）</text>
+  <text class="p" x="88" y="328">不能回头，错了也不知道</text>
+  <text class="take" x="88" y="360">→ 看似很蠢</text>
+
+  <!-- Card 2: +Tools -->
+  <rect class="box" x="358" y="150" width="270" height="224" rx="24" fill="#f1ede4" stroke="#d8d1c7"/>
+  <text class="h" x="493" y="190" text-anchor="middle">+ Tools（单次）</text>
+  <text class="api" x="493" y="214" text-anchor="middle">function calling</text>
+  <line class="div" x1="380" y1="230" x2="606" y2="230"/>
+  <text class="yes" x="382" y="262">✓ 能调一次工具</text>
+  <text class="no" x="382" y="294">✗ 调完不看结果</text>
+  <text class="p" x="382" y="328">有手了，但不会再来一轮</text>
+  <text class="take" x="382" y="360">→ 还差一个循环</text>
+
+  <!-- Card 3: ReAct Agent -->
+  <rect class="box" x="652" y="150" width="270" height="224" rx="24" fill="#edf3ef" stroke="#9fb5aa"/>
+  <text class="h" x="787" y="190" text-anchor="middle">ReAct Agent</text>
+  <text class="api" x="787" y="214" text-anchor="middle">create_agent</text>
+  <line class="div" x1="674" y1="230" x2="900" y2="230"/>
+  <text class="yes" x="676" y="262">✓ 随时调工具</text>
+  <text class="yes" x="676" y="294">✓ 看结果（软反馈）</text>
+  <text class="p" x="676" y="328">模型自己循环、自己纠偏</text>
+  <text class="take" x="676" y="360">→ 显得没那么蠢</text>
+
+  <!-- Card 4: 图 + Agent -->
+  <rect class="box" x="946" y="150" width="270" height="224" rx="24" fill="#e9eff7" stroke="#a1b3c8" stroke-width="2.2"/>
+  <text class="h" x="1081" y="190" text-anchor="middle">图 + Agent</text>
+  <text class="api" x="1081" y="214" text-anchor="middle">StateGraph + create_agent</text>
+  <line class="div" x1="968" y1="230" x2="1194" y2="230"/>
+  <text class="yes" x="970" y="262">✓ 工具照用</text>
+  <text class="yes" x="970" y="294">✓ 软反馈 + 硬反馈</text>
+  <text class="p" x="970" y="328">规则 / 人在固定位置卡它</text>
+  <text class="take" x="970" y="360">→ 该自由自由，该钉死钉死</text>
+
+  <!-- arrows between cards -->
+  <path class="line" d="M334 262 H356"/>
+  <path class="line" d="M628 262 H650"/>
+  <path class="line" d="M922 262 H944"/>
+
+  <!-- spectrum band -->
+  <text class="sec" x="640" y="446" text-anchor="middle">同一条光谱：下一步由谁决定</text>
+
+  <rect x="150" y="486" width="980" height="16" rx="8" fill="url(#spec)"/>
+  <text class="end" x="150" y="476">精准 · 确定性（图把路钉死，硬反馈）</text>
+  <text class="end" x="1130" y="476" text-anchor="end">自主 · 发散（模型当场决定，软反馈）</text>
+
+  <!-- markers -->
+  <circle cx="300" cy="494" r="9" fill="#ffffff" stroke="#6f8b9c" stroke-width="2.4"/>
+  <text class="mk" x="300" y="540" text-anchor="middle">图 / 写死流程</text>
+
+  <circle cx="640" cy="494" r="13" fill="#f3e7df" stroke="#cf9f86" stroke-width="2.6"/>
+  <text class="mk" x="640" y="540" text-anchor="middle">图嵌 Agent</text>
+  <text class="api" x="640" y="562" text-anchor="middle">= 好系统的位置</text>
+
+  <circle cx="980" cy="494" r="9" fill="#ffffff" stroke="#5f8a72" stroke-width="2.4"/>
+  <text class="mk" x="980" y="540" text-anchor="middle">ReAct / create_agent</text>
+
+  <!-- footer -->
+  <rect x="170" y="616" width="940" height="64" rx="20" fill="#ffffff" stroke="#d8cec1"/>
+  <text class="footer" x="640" y="645" text-anchor="middle">好系统不是二选一：用图的精准搭骨架，在骨架里留出口子让模型发散。</text>
+  <text class="footer" x="640" y="670" text-anchor="middle">该钉死的地方用边卡死，该自由的地方交给模型。</text>
+</svg>

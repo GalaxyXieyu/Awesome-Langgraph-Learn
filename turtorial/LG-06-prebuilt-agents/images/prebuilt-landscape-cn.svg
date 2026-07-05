@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
+  <title id="title">LangGraph 预构建件全景</title>
+  <desc id="desc">预构建件覆盖标准 Agent 循环、横切关注点、多 Agent 协作三类常见需求；超出标准件才回到手搓 StateGraph。</desc>
+  <defs>
+    <filter id="shadow" x="-12%" y="-12%" width="124%" height="124%"><feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#3f4d55" flood-opacity="0.10"/></filter>
+    <style>
+      .bg{fill:#fbf7ef}
+      .title{font:700 35px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#27343b}
+      .sub{font:400 18px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#66737b}
+      .box{filter:url(#shadow);stroke-width:1.4}
+      .h{font:700 23px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#2c3940}
+      .pill{font:600 15px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;fill:#42525a}
+      .lab{font:700 14px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#8a8073;letter-spacing:1px}
+      .p{font:400 16px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#43525a}
+      .save{font:600 16px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#4f8a69}
+      .bh{font:700 22px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#7a4f3e}
+      .bp{font:500 17px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#6a4436}
+      .footer{font:700 18px -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;fill:#34454d}
+      .div{stroke:#e4ddd0;stroke-width:1.2}
+    </style>
+  </defs>
+  <rect class="bg" width="1280" height="720"/>
+
+  <text class="title" x="640" y="52" text-anchor="middle">这一章：你反复手搓的那几张图，LangGraph 已经封装好了</text>
+  <text class="sub" x="640" y="86" text-anchor="middle">预构建件覆盖三类常见需求，直接拿来用；只有超出标准件时，才回到手搓 StateGraph。</text>
+
+  <!-- Card A: 标准 Agent 循环 -->
+  <rect class="box" x="66" y="118" width="364" height="288" rx="24" fill="#edf3ef" stroke="#9fb5aa"/>
+  <text class="h" x="248" y="160" text-anchor="middle">① 标准 Agent 循环</text>
+  <rect x="90" y="178" width="316" height="32" rx="16" fill="#ffffff" stroke="#cfdcd4"/>
+  <text class="pill" x="248" y="200" text-anchor="middle">create_agent</text>
+  <line class="div" x1="90" y1="234" x2="406" y2="234"/>
+  <text class="lab" x="90" y="262">覆盖的问题</text>
+  <text class="p" x="90" y="288">模型调工具 → 看结果 → 再判断</text>
+  <text class="p" x="90" y="312">（这就是 ReAct 循环）</text>
+  <text class="lab" x="90" y="350">省掉的手搓</text>
+  <text class="save" x="90" y="376">agent / tools 节点 + 条件边 + 循环边</text>
+
+  <!-- Card B: 横切关注点 -->
+  <rect class="box" x="458" y="118" width="364" height="288" rx="24" fill="#e9eff7" stroke="#a1b3c8"/>
+  <text class="h" x="640" y="160" text-anchor="middle">② 横切关注点</text>
+  <rect x="482" y="178" width="316" height="32" rx="16" fill="#ffffff" stroke="#cdd8e3"/>
+  <text class="pill" x="640" y="200" text-anchor="middle">middleware 全家桶</text>
+  <line class="div" x1="482" y1="234" x2="798" y2="234"/>
+  <text class="lab" x="482" y="262">覆盖的问题</text>
+  <text class="p" x="482" y="288">限次 · 重试 · 摘要 · 脱敏 · 审批</text>
+  <text class="p" x="482" y="312">（不是业务对话，是横切动作）</text>
+  <text class="lab" x="482" y="350">省掉的手搓</text>
+  <text class="save" x="482" y="376">往 prompt 里硬塞、手写拦截节点</text>
+
+  <!-- Card C: 多 Agent 协作 -->
+  <rect class="box" x="850" y="118" width="364" height="288" rx="24" fill="#eef1e9" stroke="#b4bfa9"/>
+  <text class="h" x="1032" y="160" text-anchor="middle">③ 多 Agent 协作</text>
+  <rect x="874" y="178" width="316" height="32" rx="16" fill="#ffffff" stroke="#d6dccc"/>
+  <text class="pill" x="1032" y="200" text-anchor="middle">create_supervisor / create_swarm</text>
+  <line class="div" x1="874" y1="234" x2="1190" y2="234"/>
+  <text class="lab" x="874" y="262">覆盖的问题</text>
+  <text class="p" x="874" y="288">主管分发任务 / 专家平级转接</text>
+  <text class="p" x="874" y="312">（把专家角色原子化）</text>
+  <text class="lab" x="874" y="350">省掉的手搓</text>
+  <text class="save" x="874" y="376">手搓调度路由与交接逻辑</text>
+
+  <!-- boundary band -->
+  <rect class="box" x="66" y="448" width="1148" height="172" rx="24" fill="#f4eae2" stroke="#d8b6a8"/>
+  <text class="bh" x="640" y="494" text-anchor="middle">超出标准件 → 这些才回到手搓 StateGraph</text>
+  <text class="bp" x="640" y="536" text-anchor="middle">副作用要审批　·　需要 user_role / risk_level 等自定义状态　·　复杂业务分支</text>
+  <line class="div" x1="320" y1="562" x2="960" y2="562"/>
+  <text class="footer" x="640" y="596" text-anchor="middle">预构建求快、覆盖标准件；手搓求控、处理例外。</text>
+
+  <text class="sub" x="640" y="664" text-anchor="middle">本章主线：先认清预构建件覆盖了什么，再判断什么时候必须把控制权拿回手搓的图里。</text>
+</svg>

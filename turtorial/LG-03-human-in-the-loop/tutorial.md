@@ -467,15 +467,17 @@ agent_input = {
 }
 
 print_json("Agent 级 HITL 已创建", {"model": MODEL_NAME, "interrupt_before": ["tools"]})
-print_json("\n1) 用户输入", {"message": agent_input["messages"][0].content})
+print("\n1) 用户输入:", agent_input["messages"][0].content)
 
-agent_first = publish_agent.invoke(agent_input, config=agent_config)
+# 用 stream 跑第一段（会停在执行工具前），逐条用官方 pretty_print 观察 Agent 想干什么
+print("\n2) Agent 第一段消息流（stream 观察，停在执行工具前）:")
+seen = 0
+for step in publish_agent.stream(agent_input, config=agent_config, stream_mode="values"):
+    for message in step["messages"][seen:]:
+        message.pretty_print()
+    seen = len(step["messages"])
+
 agent_snapshot = publish_agent.get_state(agent_config)
-proposed_message = agent_first["messages"][-1]
-
-print_json("\n2) Agent 想做什么", {
-    "tool_calls": proposed_message.tool_calls,
-})
 print_json("\n3) 为什么停住", {
     "当前节点": display(agent_snapshot.next),
     "原因": "tools 节点会执行真实发布动作，所以 interrupt_before=['tools'] 先拦住。",
@@ -513,24 +515,15 @@ Agent 级 HITL 已创建
 ```
 
 ```python
-print_json("1) 人工确认", {
-    "decision": "approve",
-    "meaning": "允许 Agent 执行刚才的 publish_to_channel 工具调用。",
-})
+print("1) 人工确认: approve —— 允许 Agent 执行刚才的 publish_to_channel 工具调用。")
 
-agent_final = publish_agent.invoke(Command(resume={}), config=agent_config)
-
-print("\n2) Agent 恢复后的消息流")
-for index, message in enumerate(agent_final["messages"], start=1):
-    item = {
-        "type": message.type,
-        "content": message.content,
-    }
-    if getattr(message, "tool_calls", None):
-        item["tool_calls"] = message.tool_calls
-    if getattr(message, "name", None):
-        item["tool_name"] = message.name
-    print_json(f"message {index}", item)
+# 恢复执行，用 stream + 官方 pretty_print 观察恢复后的完整消息流
+print("\n2) Agent 恢复后的消息流（stream + 官方 pretty_print）:")
+seen = 0
+for step in publish_agent.stream(Command(resume={}), config=agent_config, stream_mode="values"):
+    for message in step["messages"][seen:]:
+        message.pretty_print()
+    seen = len(step["messages"])
 ```
 
 **输出**
